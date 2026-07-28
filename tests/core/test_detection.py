@@ -34,7 +34,7 @@ def test_probe_broken_binary(monkeypatch):
     monkeypatch.setattr(detection.subprocess, "run", lambda *a, **k: _cp(1, "", "boom"))
     p = detection.probe_cli("x")
     assert p.ok is False
-    assert "실행 실패" in p.error
+    assert "run failed" in p.error
 
 
 def test_probe_timeout(monkeypatch):
@@ -47,7 +47,7 @@ def test_probe_timeout(monkeypatch):
     monkeypatch.setattr(detection.subprocess, "run", raise_timeout)
     p = detection.probe_cli("slow")
     assert p.ok is False
-    assert "초과" in p.error
+    assert "timed out" in p.error
 
 
 def test_probe_cached_until_refresh(monkeypatch):

@@ -24,14 +24,15 @@ PROPERTIES = {
 # Notion Calendar 앱 설정은 공개 API가 없어 자동 적용이 불가능하다(앱 로컬 설정) —
 # 안내가 유일한 수단이므로 문구를 여기 한 곳에 두고 부트스트랩·setup 양쪽이 공유한다.
 SETUP_STEPS = (
-    "앱 Settings → Add Notion workspace 로 워크스페이스를 연결합니다",
-    f"사이드바에서 워크스페이스 ••• → Add Notion database → '{DB_TITLE}' 를 추가합니다",
-    f"'{DB_TITLE}' 위에 마우스 → ••• → Make default calendar 로 기본 캘린더를 지정합니다 "
-    "(중요: 지정하지 않으면 앱에서 만든 일정이 Google 계정에 저장돼 에이전트가 읽지 못합니다)",
-    f"색을 바꾸려면 '{DB_TITLE}' 위에 마우스 → ••• → 원하는 색 선택 (색은 DB 단위입니다)",
+    "In the app: Settings → Add Notion workspace to connect your workspace",
+    f"In the sidebar: workspace ••• → Add Notion database → add '{DB_TITLE}'",
+    f"Hover over '{DB_TITLE}' → ••• → Make default calendar "
+    "(important: if you don't, events created in the app are saved to your Google "
+    "account and the agent can't read them)",
+    f"To change the color, hover over '{DB_TITLE}' → ••• → pick a color (color is per DB)",
 )
 
-CONNECT_HINT = ("  · Notion Calendar 앱에서도 보려면:\n"
+CONNECT_HINT = ("  · To also see it in the Notion Calendar app:\n"
                 + "\n".join(f"    {i}. {s}" for i, s in enumerate(SETUP_STEPS, 1)))
 
 

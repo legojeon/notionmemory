@@ -28,7 +28,7 @@ def test_schema_contract():
 def test_run_points_to_cli_verbs():
     result = _skill().run({}, lambda *_: None)
     assert result.ok is False
-    assert result.message == ("calendar는 CLI verb로 사용합니다: "
+    assert result.message == ("calendar is used as a CLI verb: "
                               "notionmemory calendar list/add/update/cancel")
 
 

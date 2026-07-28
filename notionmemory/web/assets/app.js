@@ -359,13 +359,16 @@ async function openIntegration(id) {
   const disconnect = info.connected && id === "notion"
     ? html`<button type="button" class="btn-quiet" id="int-disconnect">${tr("int.disconnect")}</button>` : "";
   const head = html`
-    <div class="int-head"><h3>${info.name}</h3>
+    <div class="int-head">
+      <div class="int-textcol">
+        <h3>${info.name}</h3>
+        <div class="int-status ${info.connected ? "on" : "off"}">
+          <span class="status-dot"></span><span id="int-detail">${info.detail ?? ""}</span>
+        </div>
+      </div>
       <div class="int-actions">
         <button type="button" class="btn-quiet" id="int-test">${tr("int.test")}</button>${raw(disconnect)}
       </div>
-    </div>
-    <div class="int-status ${info.connected ? "on" : "off"}">
-      <span class="status-dot"></span><span id="int-detail">${info.detail ?? ""}</span>
     </div>`;
   const g = GUIDES[id];
   const guideRow = !info.connected && g ? html`

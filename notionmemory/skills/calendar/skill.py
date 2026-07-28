@@ -24,17 +24,17 @@ class CalendarSkill(Skill):
             "parent_page_id": {
                 "type": "str", "default": "",
                 "label": "Parent page ID",
-                "help": "Calendar DB를 만들 부모 페이지 ID. 비우면 워크스페이스 "
-                        "최상위에 직접 생성."},
+                "help": "Parent page ID under which the Calendar DB is created. "
+                        "Leave blank to create it at the workspace top level."},
             "write_target": {
                 "type": "str", "default": "",
-                "label": "일정 쓰기 대상",
-                "help": "비우면 등록된 템플릿과 겹칠 때 매번 되묻습니다. "
-                        "`calendar` = 내장 Calendar DB로 고정. "
-                        "`template:<slug>/<db-key>` = 그 템플릿으로 안내 "
-                        "(calendar 가 대신 쓰지는 않습니다)."},
+                "label": "event write target",
+                "help": "If blank, asks each time a registered template overlaps. "
+                        "`calendar` = pin to the built-in Calendar DB. "
+                        "`template:<slug>/<db-key>` = point to that template "
+                        "(calendar does not write there for you)."},
         }
 
     def run(self, options: dict, log: Callable[[str], None]) -> RunResult:
-        return RunResult(False, "calendar는 CLI verb로 사용합니다: "
+        return RunResult(False, "calendar is used as a CLI verb: "
                                 "notionmemory calendar list/add/update/cancel")

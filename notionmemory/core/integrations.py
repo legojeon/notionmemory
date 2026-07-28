@@ -34,19 +34,19 @@ class NotionIntegration(Integration):
         meta = config.integration("notion")
         if notion_auth.load_pat():
             ws = meta.get("workspace_name")
-            return IntegrationStatus(self.id, True, f"PAT ({ws})" if ws else "PAT 저장됨")
+            return IntegrationStatus(self.id, True, f"PAT ({ws})" if ws else "PAT saved")
         if meta.get("token"):
-            return IntegrationStatus(self.id, True, "config 토큰")
-        return IntegrationStatus(self.id, False, "PAT 없음 (연결 필요)")
+            return IntegrationStatus(self.id, True, "config token")
+        return IntegrationStatus(self.id, False, "no PAT (connect required)")
 
     def test(self, config: Config) -> IntegrationStatus:
         token = self._token(config)
         if not token:
-            return IntegrationStatus(self.id, False, "PAT 없음 (연결 필요)")
+            return IntegrationStatus(self.id, False, "no PAT (connect required)")
         result = notion_auth.verify_token(token)
         if result["ok"]:
             name = result.get("name", "")
-            return IntegrationStatus(self.id, True, f"검증됨 ({name})" if name else "검증됨")
+            return IntegrationStatus(self.id, True, f"verified ({name})" if name else "verified")
         return IntegrationStatus(self.id, False, result["error"])
 
 
@@ -57,17 +57,17 @@ class AgentIntegration(Integration):
     def status(self, config: Config, *, refresh: bool = False) -> IntegrationStatus:
         backend = config.integration("agent").get("backend")
         if backend:
-            return IntegrationStatus(self.id, True, f"backend={backend} (설정됨)")
+            return IntegrationStatus(self.id, True, f"backend={backend} (configured)")
         errors = []
         for cand in self.BACKENDS:
             probe = detection.probe_cli(cand, refresh=refresh)
             if probe.ok:
                 detail = f"backend={cand} ({probe.version})"
                 if detection.dotfolder(cand):
-                    detail += f", ~/.{cand} 있음"
+                    detail += f", ~/.{cand} present"
                 return IntegrationStatus(self.id, True, detail)
             errors.append(f"{cand}: {probe.error}")
-        return IntegrationStatus(self.id, False, f"claude/codex 미감지 ({'; '.join(errors)})")
+        return IntegrationStatus(self.id, False, f"claude/codex not detected ({'; '.join(errors)})")
 
     def test(self, config: Config) -> IntegrationStatus:
         return self.status(config, refresh=True)
@@ -82,7 +82,7 @@ class GitIntegration(Integration):
     동작하는 연동**이 대시보드에 빨갛게 떴다. gh 는 이제 detail 에만 나오는 선택 항목이다.
     """
 
-    id, name = "git", "git 커밋 캡처"
+    id, name = "git", "git commit capture"
 
     def _hooked_repos(self, config: Config) -> tuple[int, int] | None:
         """(훅 걸린 리포 수, 등록된 리포 수). 레지스트리를 못 읽으면 None."""
@@ -95,29 +95,29 @@ class GitIntegration(Integration):
     def _gh_note(self, refresh: bool) -> str:
         probe = detection.probe_cli("gh", refresh=refresh)
         if probe.ok:
-            return "gh 있음(선택 — 커밋 링크 보강)"
-        return "gh 없음(선택 — 링크는 git remote 로 대체)"
+            return "gh present (optional — enriches commit links)"
+        return "gh absent (optional — links fall back to git remote)"
 
     def status(self, config: Config, *, refresh: bool = False) -> IntegrationStatus:
         probe = detection.probe_cli("git", refresh=refresh)
         if not probe.ok:
-            return IntegrationStatus(self.id, False, f"git 미설치 ({probe.error})")
+            return IntegrationStatus(self.id, False, f"git not installed ({probe.error})")
 
         counts = self._hooked_repos(config)
         if counts is None:
             return IntegrationStatus(
-                self.id, False, f"{probe.version}, 리포 레지스트리를 읽을 수 없습니다")
+                self.id, False, f"{probe.version}, cannot read the repo registry")
 
         hooked, registered = counts
         gh = self._gh_note(refresh)
         if not hooked:
-            hint = "훅 설치된 리포 없음 — `notionmemory git install` 로 리포를 등록하세요"
+            hint = "no repos with hooks — register a repo with `notionmemory git install`"
             if registered:
-                hint = (f"등록 {registered}개 리포에 훅이 없습니다 — "
-                        "`notionmemory git install` 로 다시 설치하세요")
+                hint = (f"{registered} registered repo(s) have no hook — "
+                        "reinstall with `notionmemory git install`")
             return IntegrationStatus(self.id, False, f"{probe.version}, {hint}")
         return IntegrationStatus(self.id, True,
-                                 f"{probe.version}, 훅 {hooked}개 리포, {gh}")
+                                 f"{probe.version}, {hooked} repo(s) with hooks, {gh}")
 
     def test(self, config: Config) -> IntegrationStatus:
         return self.status(config, refresh=True)

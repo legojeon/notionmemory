@@ -79,7 +79,8 @@ def test_packages_are_explicitly_declared_not_auto_discovered():
 def test_pyproject_has_publish_metadata():
     raw = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     proj = raw["project"]
-    assert proj["version"] == "0.1.0"
+    import re
+    assert re.match(r"^\d+\.\d+\.\d+$", proj["version"]), f"version not semver: {proj['version']!r}"
     assert proj.get("description", "").strip(), "missing description"
     assert proj.get("authors"), "missing authors"
     assert proj["authors"][0].get("name") and proj["authors"][0].get("email")

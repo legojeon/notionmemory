@@ -21,7 +21,7 @@ class TemplatesSkill(Skill):
     requires = ["notion"]
     usage = "notionmemory templates register/list/show/query/add/update/archive/refresh/remove"
     runnable = True                 # run()=템플릿 등록(액션) — 대시보드가 실행 버튼을 그린다
-    run_label = "템플릿 등록"
+    run_label = "Register template"
 
     def __init__(self, config: Config):
         self.config = config
@@ -29,23 +29,23 @@ class TemplatesSkill(Skill):
     def options_schema(self) -> dict:
         return {
             "target": {"type": "str", "default": "",
-                       "label": "템플릿 페이지 URL / ID / 이름",
-                       "help": "Notion 에서 복제하고 integration 에 공유한 페이지."},
+                       "label": "template page URL / ID / name",
+                       "help": "A page duplicated in Notion and shared with the integration."},
             "slug": {"type": "str", "default": "",
-                     "label": "슬러그(선택)",
-                     "help": "비우면 페이지 제목에서 유도. 명시하면 같은 이름 덮어쓰기 "
-                             "(재등록)."},
+                     "label": "slug (optional)",
+                     "help": "Leave blank to derive from the page title. Set it "
+                             "explicitly to overwrite the same name (re-register)."},
         }
 
     def run(self, options: dict, log: Callable[[str], None]) -> RunResult:
         target = str((options or {}).get("target") or "").strip()
         if not target:
-            return RunResult(False, "등록할 템플릿이 없습니다 — target 에 페이지 URL/ID/이름을 "
-                                    "지정하세요")
+            return RunResult(False, "no template to register — set target to a "
+                                    "page URL/ID/name")
         try:
             runtime = build_runtime(self.config)
         except AgentRuntimeError as exc:
-            log(f"  ! agent 런타임 미감지({exc}) — 사용 노트 없이 등록합니다")
+            log(f"  ! agent runtime not detected ({exc}) — registering without usage notes")
             runtime = None
         try:
             p = introspect.register(NotionSession(log=log), target,
@@ -57,5 +57,5 @@ class TemplatesSkill(Skill):
             # HTTP 호출이라 requests.exceptions.* 등 예상 밖 예외가 나올 수 있다. run() 은
             # CLI 의 _cmd_run 에서 try/except 없이 호출되므로 여기서 삼키지 않으면 사용자에게
             # 생 traceback 이 그대로 노출된다(notes/skill.py:87 과 동일한 이유).
-            return RunResult(False, f"등록 중 오류가 발생했습니다: {exc}")
-        return RunResult(True, f"{p.slug} 등록 완료 — 데이터베이스 {len(p.databases)}개")
+            return RunResult(False, f"an error occurred while registering: {exc}")
+        return RunResult(True, f"{p.slug} registered — {len(p.databases)} database(s)")

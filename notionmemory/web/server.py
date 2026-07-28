@@ -119,7 +119,7 @@ def create_app(registry: Registry) -> Flask:
     def notion_connect():
         token = str((request.get_json(silent=True) or {}).get("token", "")).strip()
         if not token:
-            return jsonify({"error": "token 필요"}), 400
+            return jsonify({"error": "token required"}), 400
         result = notion_auth.verify_token(token)
         if not result["ok"]:
             return jsonify({"error": result["error"]}), 401
@@ -165,7 +165,7 @@ def create_app(registry: Registry) -> Flask:
         incoming = request.get_json(silent=True) or {}
         name = str(incoming.get("name", "")).strip()
         if not name:
-            return jsonify({"error": "이름이 필요합니다"}), 400
+            return jsonify({"error": "name is required"}), 400
         from notionmemory.skills.templates.introspect import slugify
         slug = slugify(name)
         base, n = slug, 2
@@ -204,13 +204,13 @@ def create_app(registry: Registry) -> Flask:
         if not templates_profile.exists(slug):
             return jsonify({"error": "not found"}), 404
         if not templates_profile.load(slug).page_id:
-            return jsonify({"error": "프롬프트 전용 템플릿은 갱신할 연결 구조가 없습니다"}), 400
+            return jsonify({"error": "a prompt-only template has no linked structure to refresh"}), 400
         try:
             p = templates_introspect.refresh(NotionSession(), slug, log=lambda *_: None)
         except (RuntimeError, ValueError) as exc:
             return jsonify({"error": str(exc)}), 400
         except Exception as exc:  # noqa: BLE001 — 실제 Notion HTTP 라 예상 밖 예외 가능
-            return jsonify({"error": f"구조 갱신 실패: {exc}"}), 500
+            return jsonify({"error": f"structure refresh failed: {exc}"}), 500
         return jsonify(_template_dict(p))
 
     @app.post("/api/templates/register")
@@ -221,7 +221,7 @@ def create_app(registry: Registry) -> Flask:
         # 화이트리스트: url 만 — 임의 키가 register 로 새지 않게(토큰 장벽 규율).
         url = str((request.get_json(silent=True) or {}).get("url", "")).strip()
         if not url:
-            return jsonify({"error": "Notion URL 이 필요합니다"}), 400
+            return jsonify({"error": "a Notion URL is required"}), 400
         try:
             p = templates_introspect.register(NotionSession(), url,
                                               runtime=None, log=lambda *_: None)
@@ -234,7 +234,7 @@ def create_app(registry: Registry) -> Flask:
         except (RuntimeError, ValueError) as exc:   # 미공유·잘못된 URL 등
             return jsonify({"error": str(exc)}), 400
         except Exception as exc:  # noqa: BLE001 — 실제 Notion HTTP 라 예상 밖 예외 가능
-            return jsonify({"error": f"등록 실패: {exc}"}), 500
+            return jsonify({"error": f"registration failed: {exc}"}), 500
         return jsonify(_template_dict(p))
 
     @app.get("/")

@@ -24,11 +24,12 @@ class GitCaptureSkill(Skill):
                 "type": "select", "default": "auto",
                 "choices": ["auto", "ask", "off"],
                 "label": "Hook install policy",
-                "help": "auto: 세션 시작 시 현재 git 리포에 post-commit 캡처 훅을 "
-                        "자동 설치(제외 목록 존중). ask: 에이전트가 사용자에게 물어봄. "
-                        "off: 자동 설치 안 함. repos/exclude 목록은 CLI가 관리."},
+                "help": "auto: automatically installs a post-commit capture hook "
+                        "in the current git repo at session start (respects the "
+                        "exclude list). ask: the agent asks the user. off: never "
+                        "auto-installs. The repos/exclude list is managed by the CLI."},
         }
 
     def run(self, options: dict, log: Callable[[str], None]) -> RunResult:
-        return RunResult(False, "git은 CLI로 사용합니다: "
+        return RunResult(False, "git is used as a CLI: "
                                 "notionmemory git install|status|list|ack|flush")

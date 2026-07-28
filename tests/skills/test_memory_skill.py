@@ -31,7 +31,7 @@ def test_schema_contract():
 def test_run_points_to_cli_verbs():
     result = _skill().run({}, lambda *_: None)
     assert result.ok is False
-    assert result.message == "memory는 CLI verb로 사용합니다: notionmemory remember/recall/forget"
+    assert result.message == "memory is used as a CLI verb: notionmemory remember/recall/forget"
 
 
 def test_options_schema_exposes_parent_page_id():

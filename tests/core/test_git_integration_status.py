@@ -49,7 +49,7 @@ def test_connected_without_gh_when_a_repo_has_the_hook(cfg, cli, repos):
     st = integrations.GitIntegration().status(cfg)
 
     assert st.connected is True, st.detail
-    assert "gh" not in st.detail or "선택" in st.detail
+    assert "gh" not in st.detail or "optional" in st.detail
 
 
 def test_not_connected_when_git_cli_is_missing(cfg, cli, repos):

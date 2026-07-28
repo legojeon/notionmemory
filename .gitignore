@@ -15,3 +15,4 @@ config.yaml
 data/
 notion/
 DESIGN.md
+.sweep-report.md

@@ -397,6 +397,11 @@ button.skill[disabled] {
   margin: 0;
 }
 
+/* 제목 + 상태를 한 세로 컬럼으로 — 오른쪽 액션(Test)이 이 묶음의 세로중앙에 오도록 */
+#modal-body .int-textcol {
+  min-width: 0;
+}
+
 #modal-body .int-actions {
   display: flex;
   flex: 0 0 auto;
@@ -412,8 +417,10 @@ button.skill[disabled] {
   color: var(--ink-secondary);
 }
 
-#modal-body .int-status + form,
-#modal-body .int-status + .field-col {
+/* 상태는 이제 .int-head 안에 있으므로, 뒤따르는 폼/안내는 head 기준으로 간격을 준다 */
+#modal-body .int-head + form,
+#modal-body .int-head + .field-col,
+#modal-body .int-head + .field {
   margin-top: var(--space-md);
 }
 

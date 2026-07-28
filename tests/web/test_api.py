@@ -389,7 +389,7 @@ def test_refresh_on_prompt_only_returns_error(tmp_path, monkeypatch):
     client = create_app(build_registry(str(tmp_path / "none.yaml"))).test_client()
     r = client.post("/api/templates/bp/refresh")
     assert r.status_code == 400
-    assert "프롬프트 전용" in r.get_json()["error"]
+    assert "prompt-only" in r.get_json()["error"]
 
 
 def _register_client(tmp_path, monkeypatch, fake_register):

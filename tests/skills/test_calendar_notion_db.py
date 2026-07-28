@@ -45,8 +45,8 @@ def test_setup_steps_cover_three_app_steps_and_color_tip():
     # 앱 자동 설정은 불가(공개 API 없음) — 안내가 유일한 수단이므로 3단계가 모두 있어야 한다
     assert "Add Notion workspace" in text          # ① 워크스페이스 연결
     assert "Add Notion database" in text           # ② DB 추가
-    assert "기본 캘린더" in text and "default" in text.lower()   # ③ 기본 캘린더 지정(핵심)
-    assert "색" in text                             # 색상 변경 팁
+    assert "Make default calendar" in text          # ③ 기본 캘린더 지정(핵심)
+    assert "color" in text                           # 색상 변경 팁
     assert DB_TITLE in text
 
 
@@ -89,7 +89,7 @@ def test_ensure_rebootstraps_on_404_and_logs_hint():
     assert create[:2] == ("POST", "/databases")
     assert create[2]["parent"] == {"type": "workspace", "workspace": True}
     assert create[2]["initial_data_source"]["properties"] == PROPERTIES
-    assert any("Notion Calendar 앱" in l for l in logs)  # 연결 안내 출력
+    assert any("Notion Calendar app" in l for l in logs)  # 연결 안내 출력
 
 
 def test_ensure_uses_page_parent_when_given():

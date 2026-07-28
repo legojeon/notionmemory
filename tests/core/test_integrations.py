@@ -50,7 +50,7 @@ def test_agent_falls_back_to_codex(monkeypatch):
 def test_agent_undetected_reports_reason():
     st = ints_status(Config({}), "agent")  # 전역 안전망: which → None
     assert st.connected is False
-    assert "미감지" in st.detail
+    assert "not detected" in st.detail
 
 
 def test_agent_installed_but_broken_is_disconnected(monkeypatch):
@@ -70,7 +70,7 @@ def test_agent_installed_but_broken_is_disconnected(monkeypatch):
 def test_git_not_installed():
     st = ints_status(Config({}), "git")  # 전역 안전망: which → None
     assert st.connected is False
-    assert "미설치" in st.detail
+    assert "not installed" in st.detail
 
 
 # ── notion ─────────────────────────────────────────────

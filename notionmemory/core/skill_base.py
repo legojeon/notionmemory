@@ -33,7 +33,7 @@ class Skill(ABC):
     # 설정 저장 폼 대신 **실행 패널**(파라미터 입력 + 실행 버튼 + 진행표시)을 그린다.
     # False(기본, memory/calendar/git)면 run() 은 no-op 이고 options 는 저장 설정이다.
     runnable: bool = False
-    run_label: str = "실행"
+    run_label: str = "Run"
 
     @abstractmethod
     def options_schema(self) -> dict: ...
@@ -65,13 +65,14 @@ class Skill(ABC):
                     cleaned[key] = int(value)
                 except (TypeError, ValueError):
                     raise ValueError(
-                        f"옵션 --{key} 값이 숫자가 아닙니다: {value!r} (값을 붙여서 --{key} 5 처럼 지정)")
+                        f"option --{key} value is not a number: {value!r} "
+                        f"(pass a value like --{key} 5)")
             elif field_type == "select":
                 choices = field.get("choices") or []
                 if choices and value not in choices:
                     raise ValueError(
-                        f"옵션 --{key} 값이 허용된 선택지가 아닙니다: {value!r} "
-                        f"(허용: {', '.join(choices)})")
+                        f"option --{key} value is not an allowed choice: {value!r} "
+                        f"(allowed: {', '.join(choices)})")
                 cleaned[key] = value
             else:
                 cleaned[key] = value

@@ -99,7 +99,7 @@ def test_setup_prints_steps_without_touching_notion(tmp_path, capsys, monkeypatc
     cfg.write_text("skills:\n  calendar:\n    database_id: abc123\n", encoding="utf-8")
     assert cli.main(["calendar", "setup", "--config", str(cfg)]) == 0
     out = capsys.readouterr().out
-    assert "Add Notion database" in out and "기본 캘린더" in out
+    assert "Add Notion database" in out and "default calendar" in out
     assert "https://www.notion.so/abc123" in out   # DB 바로가기
 
 

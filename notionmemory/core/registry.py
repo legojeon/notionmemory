@@ -17,7 +17,7 @@ class SkillCard:
     setup_steps: list[str] = field(default_factory=list)
     surface: str = "agent"
     runnable: bool = False
-    run_label: str = "실행"
+    run_label: str = "Run"
 
 
 class Registry:

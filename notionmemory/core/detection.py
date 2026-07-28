@@ -61,7 +61,7 @@ def probe_cli(cmd: str, *, refresh: bool = False) -> Probe:
         return hit[1]
     found = shutil.which(cmd, path=login_shell_path())
     if not found:
-        probe = Probe(ok=False, error="PATH에 없음")
+        probe = Probe(ok=False, error="not on PATH")
     else:
         try:
             out = subprocess.run([found, "--version"],
@@ -71,11 +71,11 @@ def probe_cli(cmd: str, *, refresh: bool = False) -> Probe:
             if out.returncode == 0:
                 probe = Probe(ok=True, path=found, version=first)
             else:
-                probe = Probe(ok=False, path=found, error=f"실행 실패(exit {out.returncode})")
+                probe = Probe(ok=False, path=found, error=f"run failed (exit {out.returncode})")
         except subprocess.TimeoutExpired:
-            probe = Probe(ok=False, path=found, error="실행 시간 초과")
+            probe = Probe(ok=False, path=found, error="run timed out")
         except OSError as exc:
-            probe = Probe(ok=False, path=found, error=f"실행 불가: {exc}")
+            probe = Probe(ok=False, path=found, error=f"cannot run: {exc}")
     _probe_cache[cmd] = (now, probe)
     return probe
 
@@ -92,7 +92,7 @@ def run_cli(argv: list[str], timeout: float = 5.0, *,
         out = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
         result = (out.returncode, (out.stdout + out.stderr).strip())
     except subprocess.TimeoutExpired:
-        result = (124, "실행 시간 초과")
+        result = (124, "run timed out")
     except OSError as exc:
         result = (127, str(exc))
     if cache_key:

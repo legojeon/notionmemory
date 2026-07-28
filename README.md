@@ -16,7 +16,18 @@ automatically.
 pipx install notionmemory      # or: uv tool install notionmemory / pip install --user notionmemory
 ```
 
-2a) Claude Code (plugin):
+2) Connect Notion — do this first, before using any skill:
+
+```bash
+notionmemory serve      # opens the settings dashboard at http://localhost:8765
+```
+
+In the dashboard, click the **Notion** connection and paste your Notion integration
+token (`ntn_...`). Create one at <https://www.notion.so/my-integrations>, and share
+the Notion pages/DBs you want notionmemory to use with that integration. The token is
+stored in your OS keyring, never in config. Without this, the skills can't reach Notion.
+
+3a) Claude Code (plugin):
 
 ```bash
 /plugin marketplace add legojeon/notionmemory
@@ -25,7 +36,7 @@ pipx install notionmemory      # or: uv tool install notionmemory / pip install 
 # Do NOT also run `notionmemory install --claude` (the plugin already installs skills + hooks).
 ```
 
-2b) Codex (plugin + hooks):
+3b) Codex (plugin + hooks):
 
 ```bash
 codex plugin marketplace add legojeon/notionmemory
@@ -46,9 +57,6 @@ Codex users: `notionmemory install` will tell you to also run `notionmemory inst
 The marketplace source is this repository. If you're working from a local clone
 before it's reachable as `legojeon/notionmemory`, add it by path instead:
 `codex plugin marketplace add "$(pwd)"` / `claude plugin marketplace add "$(pwd)"`.
-
-Run `notionmemory serve` to open the settings dashboard and connect your Notion
-token (stored in your OS keyring, never in config).
 
 ## Skills
 

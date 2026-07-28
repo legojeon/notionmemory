@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "notionmemory"
-version = "0.1.0"
+version = "0.1.1"
 description = "Notion as a second-brain hub for coding agents: memory, calendar, templates, and library skills."
 license = "MIT"
 license-files = ["LICENSE"]

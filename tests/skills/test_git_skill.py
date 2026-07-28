@@ -16,7 +16,7 @@ def test_run_points_to_cli():
     s = GitCaptureSkill(Config({"skills": {}}))
     result = s.run({}, print)
     assert result.ok is False
-    assert result.message == ("git은 CLI로 사용합니다: "
+    assert result.message == ("git is used as a CLI: "
                               "notionmemory git install|status|list|ack|flush")
 
 
