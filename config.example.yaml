@@ -1,0 +1,55 @@
+# notionmemory 설정 예시 — 복사해서 config.yaml로 사용하세요.
+#   cp config.example.yaml config.yaml
+
+integrations:
+  # notion: PAT는 대시보드("연동" 카드)에서 연결합니다. 토큰은 keyring(서비스
+  # notionmemory.notion)에만 저장되고 config.yaml에는 절대 기록되지 않습니다
+  # (연결하면 auth_mode/workspace_name만 자동으로 기록됨). 여기엔 토큰을 넣지 마세요.
+  # agent: 별도 설정 없이 claude/codex CLI를 자동 감지합니다. 특정 백엔드로
+  # 강제하려면 backend 키를 지정하세요(예: backend: claude).
+  agent: {}
+
+skills:
+  notes:
+    # --- 실행 옵션(대시보드 실행 폼에서도 지정 가능; 여기 값은 기본값) ---
+    quality: balanced        # fast | balanced | thorough — 정리 품질/비용 트레이드오프
+    tone: ""                 # 문체 프리셋 이름(비우면 기본 문체)
+    language: ko              # 출력 언어
+    auto_classify: false      # true면 에이전트가 space/document 유형을 자동 분류
+    dry_run: false             # true면 노션에 내보내지 않고 파이프라인만 실행
+    limit: 0                   # 0=제한 없음, N이면 앞 N개 파일만 처리(스모크 테스트용)
+
+    # --- 처리 옵션(runner.py / organizer.py) ---
+    include_code_files: true   # 코드 파일도 함께 수집할지 여부
+    group_by_folder: true      # 입력 폴더의 최상위 폴더명을 강의/주제 그룹으로 사용
+    skip_unchanged: true       # 이전 실행과 지문(fingerprint)이 같으면 재처리 스킵
+    state_file: .notes_state.json   # 처리 상태(지문) 저장 파일
+    render_dpi: 200             # PDF 페이지 렌더링 해상도
+    vision_batch_pages: 10      # VLM 추출 시 한 번에 보낼 페이지 수
+    visual_density: rich        # VLM 추출 텍스트 밀도
+    max_image_ratio: 0.55       # 문서 페이지 대비 최대 첨부 이미지 비율
+    max_figures: 120            # 노트 하나에 첨부할 최대 그림 수
+    scaffold_chunk_chars: 14000 # 긴 문서를 나눠 정리할 청크 글자 수
+    verify_output: true         # 출력이 원문 근거를 벗어나지 않는지 검증·수정 패스 실행
+
+    # --- Notion 내보내기 옵션(notion_exporter.py) ---
+    parent_page_id: ""          # 생성된 노트를 넣을 노션 상위 페이지 ID(대시보드 연결 후 지정)
+    parent_data_source_id: ""   # (선택) DB 형태로 내보낼 때 사용할 데이터 소스 ID
+    library_mode: page           # page | database — 상위 컨테이너 형태
+    library_name: "Study & Research"  # 라이브러리 루트 페이지/DB 이름
+    image_hosting: upload        # upload(직접 업로드) | local_md(로컬 저장 후 자리표시자)
+
+  memory:
+    capture_mode: auto        # auto | manual — 에이전트 자율 저장(remember --auto) 허용 여부
+    top_n: 5                  # recall이 에이전트에 반환하는 최대 결과 수
+    default_project: ""       # remember --project 미지정 시 사용할 프로젝트명
+    parent_page_id: ""        # Second Brain DB 부모 페이지 ID(비우면 워크스페이스 최상위에 생성)
+
+  git:
+    install_policy: auto        # auto | ask | off — 세션 시작 시 훅 자동 설치 정책
+    repos: []                   # 훅 설치된 리포 목록 (CLI install 이 관리)
+    exclude: []                 # 자동 설치 제외 리포 (uninstall 이 등록)
+
+  calendar:
+    parent_page_id: ""          # Calendar DB를 만들 부모 페이지 ID(비우면 워크스페이스 최상위)
+    # database_id/data_source_id 는 최초 사용 시 CLI가 자동 기록

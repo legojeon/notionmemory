@@ -1,0 +1,119 @@
+/* design.css — global design tokens, generated from DESIGN.md ("Notion Analysis").
+   Single source of truth: components in styles.css must only consume these tokens. */
+
+:root {
+  /* colors */
+  --primary: #0075de;
+  --primary-active: #005bab;
+  --secondary: #213183;
+  --on-primary: #ffffff;
+  --canvas: #ffffff;
+  --canvas-soft: #f6f5f4;
+  --surface: #ffffff;
+  --ink: #000000;
+  --ink-secondary: #31302e;
+  --ink-muted: #615d59;
+  --ink-faint: #a39e98;
+  --hairline: #e6e6e6;
+  --accent-sky: #62aef0;
+  --accent-purple: #d6b6f6;
+  --accent-purple-deep: #391c57;
+  --accent-pink: #ff64c8;
+  --accent-orange: #dd5b00;
+  --accent-orange-deep: #793400;
+  --accent-teal: #2a9d99;
+  --accent-green: #1aae39;
+  --accent-brown: #523410;
+
+  /* typography (NotionInter -> Inter substitute stack) */
+  --font-family: Inter, -apple-system, system-ui, "Segoe UI", Helvetica, Arial,
+    sans-serif;
+  --display-1: 700 64px/1.0 var(--font-family);
+  --display-1-tracking: -2.125px;
+  --display-2: 700 54px/1.04 var(--font-family);
+  --display-2-tracking: -1.875px;
+  --heading-1: 700 40px/1.1 var(--font-family);
+  --heading-1-tracking: -1px;
+  --heading-2: 700 26px/1.23 var(--font-family);
+  --heading-2-tracking: -0.625px;
+  --heading-3: 700 22px/1.27 var(--font-family);
+  --heading-3-tracking: -0.25px;
+  --title: 600 20px/1.4 var(--font-family);
+  --title-tracking: -0.125px;
+  --body-md: 400 16px/1.5 var(--font-family);
+  --body-sm: 400 15px/1.33 var(--font-family);
+  --button: 500 16px/1.5 var(--font-family);
+  --caption: 400 14px/1.43 var(--font-family);
+  --eyebrow: 600 12px/1.33 var(--font-family);
+  --eyebrow-tracking: 0.125px;
+
+  /* rounded */
+  --rounded-xs: 4px;
+  --rounded-sm: 5px;
+  --rounded-md: 8px;
+  --rounded-lg: 12px;
+  --rounded-xl: 16px;
+  --rounded-full: 9999px;
+
+  /* spacing */
+  --space-xxs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 28px;
+  --space-xxl: 32px;
+
+  /* elevation — barely-there layered shadows */
+  --shadow-soft: rgba(0, 0, 0, 0.01) 0 0.175px 1.041px,
+    rgba(0, 0, 0, 0.02) 0 0.8px 2.925px, rgba(0, 0, 0, 0.027) 0 2.025px 7.847px,
+    rgba(0, 0, 0, 0.04) 0 4px 18px;
+  --shadow-elevated: rgba(0, 0, 0, 0.02) 0 1px 3px, rgba(0, 0, 0, 0.03) 0 4px 10px,
+    rgba(0, 0, 0, 0.05) 0 23px 52px;
+}
+
+/* global base — warm paper canvas, near-black ink */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--canvas-soft);
+  color: var(--ink);
+  font: var(--body-md);
+}
+
+h1 {
+  font: var(--heading-1);
+  letter-spacing: var(--heading-1-tracking);
+  margin: 0;
+}
+
+h2 {
+  font: var(--eyebrow);
+  letter-spacing: var(--eyebrow-tracking);
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin: 0 0 var(--space-sm);
+}
+
+h3 {
+  font: var(--heading-3);
+  letter-spacing: var(--heading-3-tracking);
+  margin: 0 0 var(--space-md);
+}
+
+button {
+  font: var(--button);
+  color: var(--ink);
+}
+
+input {
+  font: var(--body-sm);
+  color: var(--ink);
+}
+
+a {
+  color: var(--primary);
+}

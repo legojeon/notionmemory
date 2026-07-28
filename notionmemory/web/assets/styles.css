@@ -1,0 +1,617 @@
+/* styles.css — dashboard components. Consumes tokens from design.css only. */
+
+body {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--space-xxl) var(--space-lg) 80px;
+}
+
+.page-header {
+  margin-bottom: var(--space-xxl);
+}
+
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.lang-select {
+  font: var(--body-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--rounded-sm);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.tagline {
+  font: var(--body-sm);
+  color: var(--ink-muted);
+  margin: var(--space-xs) 0 0;
+}
+
+section {
+  margin-bottom: var(--space-xxl);
+}
+
+/* integrations — quiet pill chips, status carried by a sticker-palette dot */
+#integration-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+button.chip {
+  cursor: pointer;
+}
+
+button.chip:hover {
+  box-shadow: var(--shadow-soft);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--rounded-full);
+  padding: var(--space-xxs) var(--space-sm);
+  font: var(--caption);
+  color: var(--ink-secondary);
+}
+
+.chip .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--rounded-full);
+  background: var(--ink-faint);
+}
+
+.chip.on .dot {
+  background: var(--accent-green);
+}
+
+.chip small {
+  font: var(--eyebrow);
+  letter-spacing: var(--eyebrow-tracking);
+  color: var(--ink-faint);
+}
+
+.chip.on small {
+  color: var(--accent-green);
+}
+
+/* skill/template grid — 흰 카드가 따뜻한 캔버스 위에. 스킬·git·템플릿 모두 같은 카드로
+   한 그리드에 놓고, 백그라운드 서비스(git)는 카드 태그(.card-tag)로만 가볍게 구분한다. */
+.skill-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-md);
+  margin-top: var(--space-sm);
+}
+
+button.skill {
+  position: relative;         /* .card-tag 절대배치 기준 */
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--rounded-lg);
+  padding: var(--space-lg);
+  cursor: pointer;
+  transition: box-shadow 0.15s ease;
+}
+
+button.skill:hover:not([disabled]) {
+  box-shadow: var(--shadow-soft);
+}
+
+button.skill strong {
+  display: block;
+  font: var(--title);
+  letter-spacing: var(--title-tracking);
+}
+
+button.skill small {
+  display: block;
+  margin-top: var(--space-xxs);
+  font: var(--eyebrow);
+  letter-spacing: var(--eyebrow-tracking);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+button.skill[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.badge {
+  display: inline-block;
+  margin-top: var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--rounded-full);
+  padding: var(--space-xxs) var(--space-xs);
+  font: var(--eyebrow);
+  letter-spacing: var(--eyebrow-tracking);
+  font-style: normal;
+  color: var(--accent-orange);
+}
+
+.empty {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--rounded-xl);
+  padding: var(--space-xxl);
+  text-align: center;
+  font: var(--body-md);
+  color: var(--ink-muted);
+}
+
+/* 상세 뷰 — 컨테이너 chrome 은 .modal-dialog 가 담당(구 #panel base 규칙 대체).
+   아래 규칙들은 모달 본문(#modal-body) 안의 폼·필드·토글·안내를 스타일한다
+   (label-left / control-right 행 레이아웃). */
+#modal-body form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+#modal-body form > .btn-primary {
+  margin-top: var(--space-md);
+}
+
+/* skill settings — label + hint on the left, control on the right, hairline-separated rows */
+.field {
+  display: flex;
+  align-items: center;        /* 컨트롤을 필드 전체(제목+설명) height 중앙에 — 제목 옆
+                                 최상단에 떠 보이던 것 교정 */
+  justify-content: space-between;
+  gap: var(--space-lg);
+  width: 100%;
+  padding: var(--space-md) 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.field:first-of-type {
+  padding-top: 0;
+  border-top: none;
+}
+
+.field-text {
+  min-width: 0;
+}
+
+.field-label {
+  display: block;
+  font: 600 15px/1.33 var(--font-family);
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+
+.hint {
+  display: block;
+  font: var(--caption);
+  color: var(--ink-muted);
+}
+
+.field-ctl {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.field-ctl select,
+.field-ctl input:not([type="checkbox"]) {   /* 체크박스는 제외 — 160px 로 늘어나 우측 공백이 생기던 것 */
+  width: 160px;
+}
+
+/* integration form (Notion PAT) keeps the simple stacked label layout */
+#modal-body label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  font: var(--caption);
+  color: var(--ink-secondary);
+  width: 100%;
+  max-width: 360px;
+}
+
+#modal-body input,
+#modal-body select {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--rounded-xs);
+  padding: 6px var(--space-xs);
+  font: var(--body-sm);
+  color: var(--ink);
+}
+
+#modal-body input:focus,
+#modal-body select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: var(--shadow-soft);
+}
+
+/* dropdown — tight text-input chrome + a quiet custom chevron */
+#modal-body select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 28px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' stroke='%23615d59' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-xs) center;
+  background-size: 12px;
+}
+
+/* boolean — Notion-style toggle switch, right-aligned in its row.
+   Scoped under #modal-body to outrank the integration-form label rule. */
+#modal-body .switch {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  height: 20px;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch .slider {
+  position: absolute;
+  inset: 0;
+  background: var(--ink-faint);
+  border-radius: var(--rounded-full);
+  transition: background 0.15s ease;
+}
+
+.switch .slider::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: var(--on-primary);
+  border-radius: var(--rounded-full);
+  box-shadow: var(--shadow-soft);
+  transition: transform 0.15s ease;
+}
+
+.switch input:checked + .slider {
+  background: var(--primary);
+}
+
+.switch input:checked + .slider::after {
+  transform: translateX(14px);
+}
+
+.switch input:focus-visible + .slider {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--on-primary);
+  border: none;
+  border-radius: var(--rounded-full);
+  padding: var(--space-xs) var(--space-lg);
+  cursor: pointer;
+}
+
+.btn-primary:active {
+  background: var(--primary-active);
+  transform: scale(0.98);
+}
+
+#out {
+  background: var(--canvas-soft);
+  border-radius: var(--rounded-md);
+  padding: var(--space-sm) var(--space-md);
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ink-secondary);
+  white-space: pre-wrap;
+}
+
+#out:empty {
+  display: none;
+}
+
+.btn-quiet {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--hairline);
+  border-radius: var(--rounded-full);
+  padding: var(--space-xxs) var(--space-md);
+  cursor: pointer;
+}
+
+.btn-quiet:active {
+  background: var(--canvas-soft);
+}
+
+.detail {
+  font: var(--caption);
+  color: var(--ink-muted);
+  margin: 0 0 var(--space-sm);
+}
+
+#modal-body .install-hint {
+  margin: 0 0 var(--space-md);
+}
+
+#modal-body .install-hint p {
+  font: var(--caption);
+  color: var(--ink-muted);
+  margin: 0 0 var(--space-xxs);
+}
+
+#modal-body .install-hint pre {
+  background: var(--canvas-soft);
+  border: 1px solid var(--hairline);
+  border-radius: var(--rounded-md);
+  padding: var(--space-sm) var(--space-md);
+  margin: 0 0 var(--space-xs);
+  overflow-x: auto;
+}
+
+#modal-body .install-hint code {
+  font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ink-secondary);
+}
+
+#modal-body .install-hint a {
+  color: var(--primary);
+}
+
+#modal-body .install-hint ol {
+  font: var(--caption);
+  color: var(--ink-muted);
+  margin: 0 0 var(--space-xs);
+  padding-left: 22px;
+}
+
+#modal-body .install-hint li {
+  margin-bottom: var(--space-xxs);
+}
+
+/* integration panel — 헤더(제목+우측 액션) / 상태 한 줄 / 안내·폼 rows */
+#modal-body .int-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+#modal-body .int-head h3 {
+  margin: 0;
+}
+
+#modal-body .int-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--space-xs);
+}
+
+#modal-body .int-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: var(--space-xs) 0 0;
+  font: var(--body-sm);
+  color: var(--ink-secondary);
+}
+
+#modal-body .int-status + form,
+#modal-body .int-status + .field-col {
+  margin-top: var(--space-md);
+}
+
+#modal-body .int-status .status-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--rounded-full);
+  background: var(--ink-faint);
+}
+
+#modal-body .int-status.on .status-dot {
+  background: var(--accent-green);
+}
+
+#modal-body .field-col {
+  display: block;
+}
+
+#modal-body .field-col .install-hint {
+  margin: var(--space-xs) 0 0;
+}
+
+#modal-body .field-ctl input.wide {
+  width: 280px;
+}
+
+#modal-body .adv {
+  width: 100%;
+}
+
+#modal-body .adv summary {
+  font: var(--caption);
+  color: var(--ink-muted);
+  cursor: pointer;
+  padding: var(--space-md) 0;
+  border-top: 1px solid var(--hairline);
+}
+
+#modal-body .adv summary:hover {
+  color: var(--ink-secondary);
+}
+
+/* 템플릿 목록 — 스킬 그리드와 동일한 카드 배치(카드 자체는 button.skill 재사용) */
+#template-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-md);
+  margin-top: var(--space-sm);
+}
+
+/* 공용 모달 — 스킬/연결/템플릿 상세를 화면 중앙 팝업으로.
+   최하단 고정 패널이 카드가 많아지면 화면 밖으로 밀리던 문제를 해결한다. */
+#modal[hidden] { display: none; }
+#modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+}
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+}
+.modal-dialog {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 640px;
+  max-height: 92vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--rounded-xl);
+  padding: var(--space-xl);
+  box-shadow: var(--shadow-elevated);
+}
+.modal-close {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--ink-faint);
+  cursor: pointer;
+  border-radius: var(--rounded-full);
+}
+.modal-close:hover { background: var(--canvas-soft); color: var(--ink); }
+.modal-sub {
+  font: var(--eyebrow);
+  letter-spacing: var(--eyebrow-tracking);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.modal-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+/* 파괴적 보조 동작(등록 해제) — 우측으로 밀고 은은한 위험색 */
+.tpl-remove {
+  margin-left: auto;
+  color: #b3261e;
+}
+.tpl-remove:hover {
+  border-color: #b3261e;
+  color: #b3261e;
+}
+
+/* 템플릿 모달 프롬프트 편집기 */
+.tpl-prompt {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 16em;
+  line-height: 1.65;
+  margin-top: var(--space-xs);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--rounded-xs);
+  padding: var(--space-sm) var(--space-xs);
+  font: var(--body-sm);
+  color: var(--ink);
+}
+.tpl-prompt:focus { outline: none; border-color: var(--primary); }
+#modal-body .tpl-mode {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;   /* 폼의 가운데 정렬을 이기고 좌측 정렬 */
+  gap: var(--space-xs);
+  width: 100%;
+  margin-bottom: var(--space-md);
+}
+/* #modal-body label(id 셀렉터)의 column-stack 을 이기려면 같은 특정도로 덮어야 한다 */
+#modal-body .tpl-mode label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-xs);
+  width: auto;
+  max-width: none;
+  font: var(--body-sm);
+  color: var(--ink);
+  cursor: pointer;
+}
+#modal-body .tpl-mode input[type="radio"] {
+  width: auto;               /* input 폭 100% 규칙 상쇄 */
+  margin: 0;
+}
+.reg-error:not(:empty) {
+  color: #c0392b;
+  white-space: pre-wrap;   /* 모호 후보 목록의 줄바꿈 보존 */
+}
+
+/* 카드 태그 — git 같은 백그라운드 서비스 구분(예전 별도 h3 섹션 대체).
+   절대배치로 카드 흐름 높이에 영향 주지 않아 카드 높이가 통일된다. */
+.card-tag {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  border-radius: var(--rounded-full);
+  padding: 1px var(--space-xs);
+  font: var(--eyebrow);
+  letter-spacing: var(--eyebrow-tracking);
+  background: var(--canvas-soft);
+  color: var(--ink-muted);
+}
+
+/* 템플릿 모달 — 구조(읽기전용) 블록 + 필드 간격 */
+.tpl-field {
+  margin: var(--space-md) 0;
+}
+.tpl-struct {
+  margin: var(--space-xs) 0 0;
+  padding-left: 1.1em;
+  font: var(--body-sm);
+  color: var(--ink-secondary);
+}
+.tpl-struct li {
+  margin: 2px 0;
+}
+
+/* 실행 패널의 bool 파라미터 — 저장 토글(.switch)과 구분되는 평범한 체크박스 */
+.run-check {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+

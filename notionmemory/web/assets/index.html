@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>notionmemory</title>
+<link rel="stylesheet" href="/assets/design.css">
+<link rel="stylesheet" href="/assets/styles.css"></head>
+<body>
+  <header class="page-header">
+    <div class="header-top">
+      <h1>notionmemory</h1>
+      <select id="lang-select" class="lang-select" aria-label="Language" data-i18n-aria="lang.label">
+        <option value="en">English</option>
+        <option value="ko">한국어</option>
+      </select>
+    </div>
+    <p class="tagline" data-i18n="app.tagline">A second-brain hub that gathers many sources into one Notion</p>
+  </header>
+  <section id="integrations"><h2 data-i18n="section.integrations">Connections</h2><div id="integration-list"></div></section>
+  <section id="skills"><h2 data-i18n="section.skills">Skills</h2><div id="skill-grid"></div></section>
+  <section id="templates">
+    <h2 data-i18n="section.templates">Templates</h2>
+    <div id="template-list"></div>
+  </section>
+  <div id="modal" hidden>
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog" role="dialog" aria-modal="true">
+      <button type="button" class="modal-close" aria-label="Close" data-i18n-aria="modal.close">&times;</button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+  <script src="/assets/app.js"></script>
+</body></html>
