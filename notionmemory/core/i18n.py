@@ -16,3 +16,12 @@ def t(catalog: dict, key: str, lang: str, **fmt) -> str:
     if msg is None:
         msg = (catalog.get(DEFAULT) or {}).get(key, key)
     return msg.format(**fmt) if fmt else msg
+
+
+def tui(lang, key, en, **fmt):
+    """대시보드 서버 문자열: ko 오버레이. lang=='ko' 이고 UI_KO 에 key 있으면 ko, 아니면 en(소스)."""
+    from notionmemory.core.messages import UI_KO
+    s = UI_KO.get(key) if lang == "ko" else None
+    if s is None:
+        s = en
+    return s.format(**fmt) if fmt else s

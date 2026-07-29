@@ -10,6 +10,7 @@ from notionmemory.core.skill_base import RunResult, Skill
 class MemorySkill(Skill):
     id = "memory"
     name = "Memory"
+    summary = "Save and recall long-term decisions, patterns, and preferences in your Notion Second Brain."
     kinds = ("capture", "recall")
     requires = ["notion"]
     usage = "notionmemory remember/recall/forget"

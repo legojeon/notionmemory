@@ -13,6 +13,7 @@ from notionmemory.skills.templates import introspect
 class TemplatesSkill(Skill):
     id = "templates"
     name = "Templates"
+    summary = "Look up, add, update, and author against your registered Notion templates and databases."
     kinds = ("recall", "action")
     surface = "agent"
     # notion 만이다. agent 는 등록 시 본문 생성에만 쓰이고 실패해도 프로필이 저장되므로

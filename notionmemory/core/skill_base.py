@@ -22,6 +22,8 @@ class Skill(ABC):
     name: str = ""
     kinds: tuple[str, ...] = ()
     requires: list[str] = []
+    # 이 스킬이 무엇을 하는지 한 줄 설명 — 대시보드 설정 모달 맨 위에 보여준다.
+    summary: str = ""
     # 사용법 한 줄 — verb 스킬(memory/calendar/git)은 `run`으로 실행되지 않으므로
     # 대시보드가 일괄 안내 대신 이 값을 보여준다. 비우면 기본 `run` 안내로 폴백.
     usage: str = ""

@@ -1,7 +1,8 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from notionmemory.core import detection, notion_auth
+from notionmemory.core import detection, i18n, notion_auth
+from notionmemory.core.i18n import tui
 from notionmemory.core.config import Config
 from notionmemory.skills.git import hooks as gc_hooks
 
@@ -31,22 +32,31 @@ class NotionIntegration(Integration):
         return notion_auth.load_pat() or config.integration("notion").get("token") or ""
 
     def status(self, config: Config) -> IntegrationStatus:
+        lang = i18n.language(config)
         meta = config.integration("notion")
         if notion_auth.load_pat():
             ws = meta.get("workspace_name")
-            return IntegrationStatus(self.id, True, f"PAT ({ws})" if ws else "PAT saved")
+            detail = f"PAT ({ws})" if ws else tui(lang, "ui.int.notion.pat_saved", "PAT saved")
+            return IntegrationStatus(self.id, True, detail)
         if meta.get("token"):
-            return IntegrationStatus(self.id, True, "config token")
-        return IntegrationStatus(self.id, False, "no PAT (connect required)")
+            return IntegrationStatus(self.id, True, tui(lang, "ui.int.notion.config_token", "config token"))
+        return IntegrationStatus(self.id, False,
+                                 tui(lang, "ui.int.notion.no_pat", "no PAT (connect required)"))
 
     def test(self, config: Config) -> IntegrationStatus:
+        lang = i18n.language(config)
         token = self._token(config)
         if not token:
-            return IntegrationStatus(self.id, False, "no PAT (connect required)")
+            return IntegrationStatus(self.id, False,
+                                     tui(lang, "ui.int.notion.no_pat", "no PAT (connect required)"))
         result = notion_auth.verify_token(token)
         if result["ok"]:
             name = result.get("name", "")
-            return IntegrationStatus(self.id, True, f"verified ({name})" if name else "verified")
+            if name:
+                detail = tui(lang, "ui.int.notion.verified_named", "verified ({name})", name=name)
+            else:
+                detail = tui(lang, "ui.int.notion.verified", "verified")
+            return IntegrationStatus(self.id, True, detail)
         return IntegrationStatus(self.id, False, result["error"])
 
 
@@ -55,19 +65,27 @@ class AgentIntegration(Integration):
     BACKENDS = ("claude", "codex")
 
     def status(self, config: Config, *, refresh: bool = False) -> IntegrationStatus:
+        lang = i18n.language(config)
         backend = config.integration("agent").get("backend")
         if backend:
-            return IntegrationStatus(self.id, True, f"backend={backend} (configured)")
+            return IntegrationStatus(self.id, True,
+                                     tui(lang, "ui.int.agent.backend_configured",
+                                        "backend={backend} (configured)", backend=backend))
         errors = []
         for cand in self.BACKENDS:
             probe = detection.probe_cli(cand, refresh=refresh)
             if probe.ok:
                 detail = f"backend={cand} ({probe.version})"
                 if detection.dotfolder(cand):
-                    detail += f", ~/.{cand} present"
+                    detail += tui(lang, "ui.int.agent.dotfolder_present",
+                                 ", ~/.{cand} present", cand=cand)
                 return IntegrationStatus(self.id, True, detail)
-            errors.append(f"{cand}: {probe.error}")
-        return IntegrationStatus(self.id, False, f"claude/codex not detected ({'; '.join(errors)})")
+            err = tui(lang, probe.error_key, probe.error)
+            errors.append(f"{cand}: {err}")
+        return IntegrationStatus(self.id, False,
+                                 tui(lang, "ui.int.agent.not_detected",
+                                    "claude/codex not detected ({errors})",
+                                    errors="; ".join(errors)))
 
     def test(self, config: Config) -> IntegrationStatus:
         return self.status(config, refresh=True)
@@ -92,32 +110,46 @@ class GitIntegration(Integration):
             return None
         return sum(1 for r in rows if r.get("installed")), len(rows)
 
-    def _gh_note(self, refresh: bool) -> str:
+    def _gh_note(self, refresh: bool, lang: str) -> str:
         probe = detection.probe_cli("gh", refresh=refresh)
         if probe.ok:
-            return "gh present (optional — enriches commit links)"
-        return "gh absent (optional — links fall back to git remote)"
+            return tui(lang, "ui.int.git.gh_present",
+                      "gh present (optional — enriches commit links)")
+        return tui(lang, "ui.int.git.gh_absent",
+                  "gh absent (optional — links fall back to git remote)")
 
     def status(self, config: Config, *, refresh: bool = False) -> IntegrationStatus:
+        lang = i18n.language(config)
         probe = detection.probe_cli("git", refresh=refresh)
         if not probe.ok:
-            return IntegrationStatus(self.id, False, f"git not installed ({probe.error})")
+            err = tui(lang, probe.error_key, probe.error)
+            return IntegrationStatus(self.id, False,
+                                     tui(lang, "ui.int.git.not_installed",
+                                        "git not installed ({error})", error=err))
 
         counts = self._hooked_repos(config)
         if counts is None:
             return IntegrationStatus(
-                self.id, False, f"{probe.version}, cannot read the repo registry")
+                self.id, False, tui(lang, "ui.int.git.no_registry",
+                                    "{version}, cannot read the repo registry",
+                                    version=probe.version))
 
         hooked, registered = counts
-        gh = self._gh_note(refresh)
+        gh = self._gh_note(refresh, lang)
         if not hooked:
-            hint = "no repos with hooks — register a repo with `notionmemory git install`"
             if registered:
-                hint = (f"{registered} registered repo(s) have no hook — "
-                        "reinstall with `notionmemory git install`")
+                hint = tui(lang, "ui.int.git.hook_missing_registered",
+                          "{registered} registered repo(s) have no hook — "
+                          "reinstall with `notionmemory git install`", registered=registered)
+            else:
+                hint = tui(lang, "ui.int.git.hook_missing_none",
+                          "no repos hooked yet — a hook auto-installs when you open an "
+                          "agent session in a git repo (or run `notionmemory git install`)")
             return IntegrationStatus(self.id, False, f"{probe.version}, {hint}")
         return IntegrationStatus(self.id, True,
-                                 f"{probe.version}, {hooked} repo(s) with hooks, {gh}")
+                                 tui(lang, "ui.int.git.hooks_ok",
+                                     "{version}, {hooked} repo(s) with hooks, {gh}",
+                                     version=probe.version, hooked=hooked, gh=gh))
 
     def test(self, config: Config) -> IntegrationStatus:
         return self.status(config, refresh=True)

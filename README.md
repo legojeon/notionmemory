@@ -16,18 +16,7 @@ automatically.
 pipx install notionmemory      # or: uv tool install notionmemory / pip install --user notionmemory
 ```
 
-2) Connect Notion — do this first, before using any skill:
-
-```bash
-notionmemory serve      # opens the settings dashboard at http://localhost:8765
-```
-
-In the dashboard, click the **Notion** connection and paste your Notion integration
-token (`ntn_...`). Create one at <https://www.notion.so/my-integrations>, and share
-the Notion pages/DBs you want notionmemory to use with that integration. The token is
-stored in your OS keyring, never in config. Without this, the skills can't reach Notion.
-
-3a) Claude Code (plugin):
+2a) Claude Code (plugin):
 
 ```bash
 /plugin marketplace add legojeon/notionmemory
@@ -36,7 +25,7 @@ stored in your OS keyring, never in config. Without this, the skills can't reach
 # Do NOT also run `notionmemory install --claude` (the plugin already installs skills + hooks).
 ```
 
-3b) Codex (plugin + hooks):
+2b) Codex (plugin + hooks):
 
 ```bash
 codex plugin marketplace add legojeon/notionmemory
@@ -45,6 +34,23 @@ notionmemory install --codex --skip-skills --trust-codex-hooks   # hooks + trust
 # --skip-skills: don't mirror skills, the plugin already provides them
 # --trust-codex-hooks: required or Codex will silently not fire the installed hooks
 ```
+
+3) Open settings and connect — required before the skills can reach your workspace:
+
+Once the plugin is installed, just ask your agent to open the settings dashboard —
+it runs the **`notionmemory:settings`** skill for you. Or open it directly from a
+terminal:
+
+```bash
+notionmemory serve      # opens the settings dashboard at http://localhost:8765
+```
+
+In the dashboard, click the **Notion** connection and paste your Notion integration
+token (`ntn_...`). Create one at <https://www.notion.so/my-integrations>, and share
+the Notion pages/DBs you want notionmemory to use with that integration. The token is
+stored in your OS keyring, never in config. This same dashboard shows the **Agent**
+(Claude Code / Codex) and **git** (gh) connections so you can verify them in one place.
+Until Notion is connected, the skills load but can't read or write Notion.
 
 Prefer no plugin? One uniform command sets up both harnesses (skills unnamespaced):
 

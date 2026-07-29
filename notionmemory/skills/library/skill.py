@@ -13,6 +13,7 @@ from notionmemory.skills.library import crawl
 class LibrarySkill(Skill):
     id = "library"
     name = "Library"
+    summary = "Search your whole Notion by content to find where things are organized."
     kinds = ("recall",)
     surface = "agent"
     requires = ["notion"]

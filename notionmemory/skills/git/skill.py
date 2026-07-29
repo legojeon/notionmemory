@@ -10,6 +10,7 @@ from notionmemory.core.skill_base import RunResult, Skill
 class GitCaptureSkill(Skill):
     id = "git"
     name = "Git"
+    summary = "Automatically capture commits into the memory queue (background, via a post-commit hook)."
     kinds = ("capture",)
     usage = "notionmemory git install/status/list/ack/flush"
     requires = ["notion"]

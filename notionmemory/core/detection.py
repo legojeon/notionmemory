@@ -23,6 +23,10 @@ class Probe:
     path: str = ""
     version: str = ""
     error: str = ""
+    # 안정 키 — ko 오버레이가 `tui(lang, error_key, error)`로 error 를 재조회할 수 있게
+    # 한다(messages.UI_KO). exit code/exc 를 담은 두 케이스는 포맷 인자를 여기서 못
+    # 채우므로 의도적으로 UI_KO 항목이 없다 — 그 경우 tui() 는 error(영어)로 폴백한다.
+    error_key: str = ""
 
 
 def clear_cache() -> None:
@@ -61,7 +65,7 @@ def probe_cli(cmd: str, *, refresh: bool = False) -> Probe:
         return hit[1]
     found = shutil.which(cmd, path=login_shell_path())
     if not found:
-        probe = Probe(ok=False, error="not on PATH")
+        probe = Probe(ok=False, error="not on PATH", error_key="detect.not_on_path")
     else:
         try:
             out = subprocess.run([found, "--version"],
@@ -71,11 +75,13 @@ def probe_cli(cmd: str, *, refresh: bool = False) -> Probe:
             if out.returncode == 0:
                 probe = Probe(ok=True, path=found, version=first)
             else:
-                probe = Probe(ok=False, path=found, error=f"run failed (exit {out.returncode})")
+                probe = Probe(ok=False, path=found, error=f"run failed (exit {out.returncode})",
+                              error_key="detect.run_failed")
         except subprocess.TimeoutExpired:
-            probe = Probe(ok=False, path=found, error="run timed out")
+            probe = Probe(ok=False, path=found, error="run timed out", error_key="detect.timeout")
         except OSError as exc:
-            probe = Probe(ok=False, path=found, error=f"cannot run: {exc}")
+            probe = Probe(ok=False, path=found, error=f"cannot run: {exc}",
+                          error_key="detect.cannot_run")
     _probe_cache[cmd] = (now, probe)
     return probe
 

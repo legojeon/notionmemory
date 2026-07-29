@@ -157,3 +157,96 @@ CATALOG = {
         "hook.watermark_unknown": "(미상)",
     },
 }
+
+# 대시보드 서버 문자열 ko 오버레이 — `i18n.tui(lang, key, en, **fmt)` 가 소비한다.
+# 위 CATALOG(온보딩 임계 CLI)와 달리 en/ko 키셋이 대칭일 필요는 없다: 키가 없으면
+# tui() 가 en 인자로 폴백한다(예: exit code/exc 를 담은 detection 에러 일부는 의도적으로
+# 미번역 — 포맷 인자를 여기서 못 채우는 자리). 값은 ccf53f6(0.1.1 영어화 스윕) 직전의
+# 원본 한국어에서 그대로 가져왔다 — `git show ccf53f6^:<path>` 로 대조 가능.
+UI_KO: dict[str, str] = {
+    # --- core/integrations.py ---
+    "ui.int.notion.pat_saved": "PAT 저장됨",
+    "ui.int.notion.config_token": "config 토큰",
+    "ui.int.notion.no_pat": "PAT 없음 (연결 필요)",
+    "ui.int.notion.verified": "검증됨",
+    "ui.int.notion.verified_named": "검증됨 ({name})",
+    "ui.int.agent.backend_configured": "backend={backend} (설정됨)",
+    "ui.int.agent.dotfolder_present": ", ~/.{cand} 있음",
+    "ui.int.agent.not_detected": "claude/codex 미감지 ({errors})",
+    "ui.int.git.not_installed": "git 미설치 ({error})",
+    "ui.int.git.no_registry": "{version}, 리포 레지스트리를 읽을 수 없습니다",
+    "ui.int.git.gh_present": "gh 있음(선택 — 커밋 링크 보강)",
+    "ui.int.git.gh_absent": "gh 없음(선택 — 링크는 git remote 로 대체)",
+    "ui.int.git.hook_missing_registered": (
+        "등록 {registered}개 리포에 훅이 없습니다 — "
+        "`notionmemory git install` 로 다시 설치하세요"),
+    "ui.int.git.hook_missing_none": (
+        "아직 훅이 걸린 리포 없음 — git 리포에서 에이전트 세션을 열면 "
+        "자동 설치됩니다(수동: `notionmemory git install`)"),
+    "ui.int.git.hooks_ok": "{version}, 훅 걸린 리포 {hooked}개, {gh}",
+    "ui.int.git.name": "git 커밋 캡처",
+    # --- core/detection.py (Probe.error_key) ---
+    "detect.not_on_path": "PATH에 없음",
+    "detect.timeout": "실행 시간 초과",
+    # --- core/registry.py cards() (skill summary / run_label / setup_steps) ---
+    "ui.card.memory.summary": "결정·패턴·선호를 Notion Second Brain 에 장기 저장하고 검색합니다.",
+    "ui.card.calendar.summary": "Notion Calendar 에서 일정을 조회·등록·변경·취소합니다.",
+    "ui.card.library.summary": "내 Notion 전체를 내용으로 검색해 무엇을 어디에 정리했는지 찾습니다.",
+    "ui.card.templates.summary": "등록한 Notion 템플릿·데이터베이스를 조회·추가·수정·작성합니다.",
+    "ui.card.git.summary": "커밋을 자동 캡처해 기억 큐에 적재합니다 (post-commit 훅, 백그라운드).",
+    "ui.card.calendar.run_label": "실행",
+    "ui.card.calendar.setup.0": "앱 Settings → Add Notion workspace 로 워크스페이스를 연결합니다",
+    "ui.card.calendar.setup.1": (
+        "사이드바에서 워크스페이스 ••• → Add Notion database → 'Calendar' 를 추가합니다"),
+    "ui.card.calendar.setup.2": (
+        "'Calendar' 위에 마우스 → ••• → Make default calendar 로 기본 캘린더를 지정합니다 "
+        "(중요: 지정하지 않으면 앱에서 만든 일정이 Google 계정에 저장돼 에이전트가 읽지 못합니다)"),
+    "ui.card.calendar.setup.3": (
+        "색을 바꾸려면 'Calendar' 위에 마우스 → ••• → 원하는 색 선택 (색은 DB 단위입니다)"),
+    "ui.card.git.run_label": "실행",
+    "ui.card.library.run_label": "재색인 실행",
+    "ui.card.memory.run_label": "실행",
+    "ui.card.templates.run_label": "템플릿 등록",
+    # --- skills/*/skill.py options_schema() label/help (overlaid in web/server.py GET options) ---
+    "ui.opt.calendar.parent_page_id.label": "부모 페이지 ID",
+    "ui.opt.calendar.parent_page_id.help": (
+        "Calendar DB를 만들 부모 페이지 ID. 비우면 워크스페이스 최상위에 직접 생성."),
+    "ui.opt.calendar.write_target.label": "일정 쓰기 대상",
+    "ui.opt.calendar.write_target.help": (
+        "비우면 등록된 템플릿과 겹칠 때 매번 되묻습니다. `calendar` = 내장 Calendar DB로 "
+        "고정. `template:<slug>/<db-key>` = 그 템플릿으로 안내 (calendar 가 대신 쓰지는 "
+        "않습니다)."),
+    "ui.opt.git.install_policy.label": "훅 설치 정책",
+    "ui.opt.git.install_policy.help": (
+        "auto: 세션 시작 시 현재 git 리포에 post-commit 캡처 훅을 자동 설치(제외 목록 "
+        "존중). ask: 에이전트가 사용자에게 물어봄. off: 자동 설치 안 함. repos/exclude "
+        "목록은 CLI가 관리."),
+    "ui.opt.library.full.label": "전체 재색인",
+    "ui.opt.library.full.help": (
+        "체크하면 공유 페이지 전량을 다시 훑고 공유 해제분을 정리합니다. 비우면 마지막 "
+        "갱신 이후 변경분만(빠름)."),
+    "ui.opt.memory.capture_mode.label": "캡처 모드",
+    "ui.opt.memory.capture_mode.help": (
+        "auto: 에이전트가 스스로 판단한 저장(remember --auto)을 허용. manual: --auto "
+        "저장을 CLI가 거부(exit 2) — 사용자가 직접 요청한 저장만 통과. 설정은 CLI가 "
+        "기계적으로 강제한다."),
+    "ui.opt.memory.top_n.label": "recall 상위 N개",
+    "ui.opt.memory.top_n.help": "recall이 에이전트 컨텍스트로 반환하는 최대 결과 수.",
+    "ui.opt.memory.default_project.label": "기본 프로젝트",
+    "ui.opt.memory.default_project.help": "remember 시 --project 미지정이면 이 값을 사용.",
+    "ui.opt.memory.parent_page_id.label": "부모 페이지 ID",
+    "ui.opt.memory.parent_page_id.help": (
+        "Second Brain DB를 만들 부모 페이지 ID. 비우면 워크스페이스 최상위에 직접 생성."),
+    "ui.opt.templates.target.label": "템플릿 페이지 URL / ID / 이름",
+    "ui.opt.templates.target.help": "Notion 에서 복제하고 integration 에 공유한 페이지.",
+    "ui.opt.templates.slug.label": "슬러그(선택)",
+    "ui.opt.templates.slug.help": (
+        "비우면 페이지 제목에서 유도. 명시하면 같은 이름 덮어쓰기 (재등록)."),
+    # --- web/server.py jsonify error strings ---
+    "ui.err.token_required": "token 필요",
+    "ui.err.name_required": "이름이 필요합니다",
+    "ui.err.prompt_only_no_structure": "프롬프트 전용 템플릿은 갱신할 연결 구조가 없습니다",
+    "ui.err.refresh_failed": "구조 갱신 실패: {exc}",
+    "ui.err.url_required": "Notion URL 이 필요합니다",
+    "ui.err.registration_failed": "등록 실패: {exc}",
+}

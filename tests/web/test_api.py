@@ -471,3 +471,49 @@ def test_templates_list_includes_page_id_for_modal_contract(tmp_path, monkeypatc
     got = {t["slug"]: t for t in client.get("/api/templates").get_json()}
     assert got["inst"]["page_id"] == "pg_1"      # 인스턴스는 page_id 전달
     assert got["bp"]["page_id"] == ""            # 청사진은 빈 값
+
+
+# ── ko 오버레이 (config language: ko) ─────────────────────
+
+def _memory_client(cfg_dict):
+    from notionmemory.skills.memory.skill import MemorySkill
+    cfg = Config(cfg_dict)
+    reg = Registry([MemorySkill(cfg)], build_integrations(cfg), cfg)
+    return create_app(reg).test_client()
+
+
+def _calendar_client(cfg_dict):
+    from notionmemory.skills.calendar.skill import CalendarSkill
+    cfg = Config(cfg_dict)
+    reg = Registry([CalendarSkill(cfg)], build_integrations(cfg), cfg)
+    return create_app(reg).test_client()
+
+
+def test_option_label_is_korean_when_lang_ko():
+    schema = _calendar_client({"language": "ko"}).get("/api/skills/calendar/options").get_json()
+    assert schema["write_target"]["label"] == "일정 쓰기 대상"
+
+
+def test_option_label_is_english_by_default():
+    schema = _calendar_client({}).get("/api/skills/calendar/options").get_json()
+    assert schema["write_target"]["label"] == "event write target"
+
+
+def test_option_help_is_korean_when_lang_ko():
+    schema = _memory_client({"language": "ko"}).get("/api/skills/memory/options").get_json()
+    assert schema["capture_mode"]["help"].startswith("auto: 에이전트가 스스로")
+
+
+def test_option_help_is_english_by_default():
+    schema = _memory_client({}).get("/api/skills/memory/options").get_json()
+    assert schema["capture_mode"]["help"].startswith("auto: allows the agent")
+
+
+def test_server_error_is_korean_when_lang_ko():
+    r = _client({"language": "ko"}).post("/api/integrations/notion/connect", json={"token": ""})
+    assert r.get_json()["error"] == "token 필요"
+
+
+def test_server_error_is_english_by_default():
+    r = _client({}).post("/api/integrations/notion/connect", json={"token": ""})
+    assert r.get_json()["error"] == "token required"

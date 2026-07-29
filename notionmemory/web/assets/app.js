@@ -84,8 +84,10 @@ async function renderTemplates() {
     b.addEventListener("click", () => openTemplate(b.dataset.slug)));
 }
 
-function openNewTemplate() {
+function openNewTemplate(summary) {
+  const summaryRow = summary ? html`<p class="detail">${summary}</p>` : "";
   const body = openModal(html`<h3>${tr("tpl.new_title")}</h3>
+    ${raw(summaryRow)}
     <div class="tpl-mode">
       <label><input type="radio" name="tpl-mode" value="register" checked> ${tr("tpl.mode_register")}</label>
       <label><input type="radio" name="tpl-mode" value="blueprint"> ${tr("tpl.mode_blueprint")}</label>
@@ -228,9 +230,9 @@ async function openSkill(id) {
   // 템플릿 카드 = "템플릿 추가"(기존 URL 등록 | 프롬프트 청사진). 별도 '+ 템플릿' 버튼을
   // 없애고 카드 클릭으로 통합 — settings 는 등록·프롬프트 작성이 전부(agent 사용 노트
   // 생성은 여기 몫이 아님). 실행 패널(agent 노트 등록)은 web 에서 거치지 않는다.
-  if (id === "templates") return openNewTemplate();
   const cards = await j("/api/skills");
   const card0 = cards.find(c => c.id === id) || {};
+  if (id === "templates") return openNewTemplate(card0.summary);
   if (card0.runnable) return openRunPanel(id, card0);   // 실행형(library)은 실행 패널로
   const schema = await j(`/api/skills/${id}/options`);
   const saved = await j(`/api/skills/${id}/config`);
@@ -256,11 +258,13 @@ async function openSkill(id) {
       <div class="field-text"><span class="field-label">${label}</span>${raw(help)}</div>
       <div class="field-ctl">${raw(control)}</div></div>`;
   }).join("");
+  // 맨 위: 이 스킬이 무엇인지 짧은 설명(있으면). 그 아래에 패널/사용 안내를 작게.
+  const summaryRow = card0.summary ? html`<p class="detail">${card0.summary}</p>` : "";
   // 카드가 선언한 사용법/설정 절차 — verb 스킬은 `run`으로 실행되지 않으므로
   // 일괄 안내를 쓰면 동작하지 않는 명령을 알려주게 된다 (card0 은 위에서 이미 조회)
   const usageRow = card0.usage
-    ? html`<p class="detail">${tr("skill.usage_prefix")} <code>${card0.usage}</code>. ${tr("skill.saves_defaults")}</p>`
-    : html`<p class="detail">${tr("skill.usage_none")}</p>`;
+    ? html`<p class="hint">${tr("skill.usage_prefix")} <code>${card0.usage}</code>. ${tr("skill.saves_defaults")}</p>`
+    : html`<p class="hint">${tr("skill.usage_none")}</p>`;
   // 외부 앱 설정처럼 API로 자동화할 수 없는 단계 — 설치자가 여기서 그대로 따라할 수 있게
   const steps = (card0.setup_steps || []).map(s => html`<li>${s}</li>`).join("");
   const setupRow = steps ? html`
@@ -269,7 +273,7 @@ async function openSkill(id) {
       <div class="install-hint"><ol>${raw(steps)}</ol></div>
     </div>` : "";
   openModal(html`<h3>${id} settings</h3>
-    ${raw(usageRow)}${raw(setupRow)}
+    ${raw(summaryRow)}${raw(usageRow)}${raw(setupRow)}
     <form id="opts">${raw(fields)}
     <button type="submit" class="btn-primary">${tr("common.save")}</button></form>
     <p id="out" class="detail"></p>`);
@@ -306,8 +310,10 @@ async function openRunPanel(id, card) {
       <div class="field-text"><span class="field-label">${label}</span>${raw(help)}</div>
       <div class="field-ctl">${raw(control)}</div></div>`;
   }).join("");
+  const summaryRow = card.summary ? html`<p class="detail">${card.summary}</p>` : "";
   const body = openModal(html`<h3>${card.name}</h3>
-    <p class="detail">${tr("run.is_runnable")}</p>
+    ${raw(summaryRow)}
+    <p class="hint">${tr("run.is_runnable")}</p>
     <form id="run-form">${raw(fields)}
       <button type="submit" class="btn-primary">${card.run_label || tr("run.run_btn")}</button></form>
     <p id="run-out" class="detail"></p>`);
@@ -359,12 +365,10 @@ async function openIntegration(id) {
   const disconnect = info.connected && id === "notion"
     ? html`<button type="button" class="btn-quiet" id="int-disconnect">${tr("int.disconnect")}</button>` : "";
   const head = html`
-    <div class="int-head">
-      <div class="int-textcol">
-        <h3>${info.name}</h3>
-        <div class="int-status ${info.connected ? "on" : "off"}">
-          <span class="status-dot"></span><span id="int-detail">${info.detail ?? ""}</span>
-        </div>
+    <h3 class="int-title">${info.name}</h3>
+    <div class="int-statusrow">
+      <div class="int-status ${info.connected ? "on" : "off"}">
+        <span class="status-dot"></span><span id="int-detail">${info.detail ?? ""}</span>
       </div>
       <div class="int-actions">
         <button type="button" class="btn-quiet" id="int-test">${tr("int.test")}</button>${raw(disconnect)}

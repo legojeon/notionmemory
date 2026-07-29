@@ -11,6 +11,7 @@ from notionmemory.skills.calendar.notion_db import SETUP_STEPS
 class CalendarSkill(Skill):
     id = "calendar"
     name = "Calendar"
+    summary = "List, add, update, and cancel events in your Notion Calendar."
     kinds = ("recall", "action")
     requires = ["notion"]
     usage = "notionmemory calendar list/add/update/cancel"

@@ -2,7 +2,8 @@ from __future__ import annotations
 import os
 from flask import Flask, jsonify, request
 from notionmemory.core.registry import Registry
-from notionmemory.core import notion_auth
+from notionmemory.core import i18n, notion_auth
+from notionmemory.core.i18n import tui
 from notionmemory.core.config import save_skill_options
 from notionmemory.core.notion_client import NotionSession
 from notionmemory.skills.templates import introspect as templates_introspect
@@ -19,20 +20,22 @@ def create_app(registry: Registry) -> Flask:
     @app.get("/api/integrations")
     def integrations():
         cfg = registry.config
+        lang = i18n.language(cfg)
         out = []
         for integ in registry.integrations().values():
             st = integ.status(cfg)
-            out.append({"id": integ.id, "name": integ.name,
+            name = tui(lang, f"ui.int.{integ.id}.name", integ.name)
+            out.append({"id": integ.id, "name": name,
                         "connected": st.connected, "detail": st.detail})
         return jsonify(out)
 
     @app.get("/api/skills")
     def skills():
-        return jsonify([c.__dict__ for c in registry.cards()])
+        lang = i18n.language(registry.config)
+        return jsonify([c.__dict__ for c in registry.cards(lang)])
 
     @app.get("/api/language")
     def get_language():
-        from notionmemory.core import i18n
         return jsonify({"language": i18n.language(registry.config)})
 
     @app.post("/api/language")
@@ -51,7 +54,17 @@ def create_app(registry: Registry) -> Flask:
         s = registry.get(sid)
         if not s:
             return jsonify({"error": "not found"}), 404
-        return jsonify(s.options_schema())
+        lang = i18n.language(registry.config)
+        schema = s.options_schema()
+        out = {}
+        for key, field_spec in schema.items():
+            f = dict(field_spec)
+            if "label" in f:
+                f["label"] = tui(lang, f"ui.opt.{sid}.{key}.label", f["label"])
+            if "help" in f:
+                f["help"] = tui(lang, f"ui.opt.{sid}.{key}.help", f["help"])
+            out[key] = f
+        return jsonify(out)
 
     @app.get("/api/skills/<sid>/config")
     def skill_config_get(sid):
@@ -119,7 +132,8 @@ def create_app(registry: Registry) -> Flask:
     def notion_connect():
         token = str((request.get_json(silent=True) or {}).get("token", "")).strip()
         if not token:
-            return jsonify({"error": "token required"}), 400
+            lang = i18n.language(registry.config)
+            return jsonify({"error": tui(lang, "ui.err.token_required", "token required")}), 400
         result = notion_auth.verify_token(token)
         if not result["ok"]:
             return jsonify({"error": result["error"]}), 401
@@ -165,7 +179,8 @@ def create_app(registry: Registry) -> Flask:
         incoming = request.get_json(silent=True) or {}
         name = str(incoming.get("name", "")).strip()
         if not name:
-            return jsonify({"error": "name is required"}), 400
+            lang = i18n.language(registry.config)
+            return jsonify({"error": tui(lang, "ui.err.name_required", "name is required")}), 400
         from notionmemory.skills.templates.introspect import slugify
         slug = slugify(name)
         base, n = slug, 2
@@ -203,14 +218,17 @@ def create_app(registry: Registry) -> Flask:
         # runtime=None 이라 agent 를 안 부른다: 빠르고 안전(Notion 읽기). prompt 는 보존.
         if not templates_profile.exists(slug):
             return jsonify({"error": "not found"}), 404
+        lang = i18n.language(registry.config)
         if not templates_profile.load(slug).page_id:
-            return jsonify({"error": "a prompt-only template has no linked structure to refresh"}), 400
+            return jsonify({"error": tui(lang, "ui.err.prompt_only_no_structure",
+                                         "a prompt-only template has no linked structure to refresh")}), 400
         try:
             p = templates_introspect.refresh(NotionSession(), slug, log=lambda *_: None)
         except (RuntimeError, ValueError) as exc:
             return jsonify({"error": str(exc)}), 400
         except Exception as exc:  # noqa: BLE001 — 실제 Notion HTTP 라 예상 밖 예외 가능
-            return jsonify({"error": f"structure refresh failed: {exc}"}), 500
+            return jsonify({"error": tui(lang, "ui.err.refresh_failed",
+                                         "structure refresh failed: {exc}", exc=exc)}), 500
         return jsonify(_template_dict(p))
 
     @app.post("/api/templates/register")
@@ -219,9 +237,11 @@ def create_app(registry: Registry) -> Flask:
         # 와 같은 introspect.register 를 쓴다(등록 본체 동일). 단 runtime=None: Flask 는
         # agent 가 아니라 사용 노트를 생성하지 않는다(CLI 도 런타임 미감지 시 같은 폴백).
         # 화이트리스트: url 만 — 임의 키가 register 로 새지 않게(토큰 장벽 규율).
+        lang = i18n.language(registry.config)
         url = str((request.get_json(silent=True) or {}).get("url", "")).strip()
         if not url:
-            return jsonify({"error": "a Notion URL is required"}), 400
+            return jsonify({"error": tui(lang, "ui.err.url_required",
+                                         "a Notion URL is required")}), 400
         try:
             p = templates_introspect.register(NotionSession(), url,
                                               runtime=None, log=lambda *_: None)
@@ -234,7 +254,8 @@ def create_app(registry: Registry) -> Flask:
         except (RuntimeError, ValueError) as exc:   # 미공유·잘못된 URL 등
             return jsonify({"error": str(exc)}), 400
         except Exception as exc:  # noqa: BLE001 — 실제 Notion HTTP 라 예상 밖 예외 가능
-            return jsonify({"error": f"registration failed: {exc}"}), 500
+            return jsonify({"error": tui(lang, "ui.err.registration_failed",
+                                         "registration failed: {exc}", exc=exc)}), 500
         return jsonify(_template_dict(p))
 
     @app.get("/")

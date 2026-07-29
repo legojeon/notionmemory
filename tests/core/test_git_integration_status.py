@@ -52,6 +52,20 @@ def test_connected_without_gh_when_a_repo_has_the_hook(cfg, cli, repos):
     assert "gh" not in st.detail or "optional" in st.detail
 
 
+def test_connected_detail_is_localized_in_korean(tmp_path, cli, repos):
+    """회귀: 정상(연결됨) 경로 문구도 ko 로 번역돼야 한다 — 예전엔 이 분기만 영어가 샜다."""
+    path = tmp_path / "config.yaml"
+    path.write_text("language: ko\n", encoding="utf-8")
+    cli["git"] = "git version 2.43.0"
+    repos.append({"repo": "/r/one", "exists": True, "installed": True})
+
+    st = integrations.GitIntegration().status(Config.load(str(path)))
+
+    assert st.connected is True, st.detail
+    assert "훅 걸린 리포" in st.detail
+    assert "repo(s) with hooks" not in st.detail
+
+
 def test_not_connected_when_git_cli_is_missing(cfg, cli, repos):
     repos.append({"repo": "/r/one", "exists": True, "installed": True})
 

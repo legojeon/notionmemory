@@ -97,6 +97,18 @@ def test_notion_disconnected_without_any_token():
     assert ints_status(Config({}), "notion").connected is False
 
 
+# ── ko 오버레이 (config language: ko) ─────────────────────
+
+def test_notion_status_detail_is_korean_when_lang_ko():
+    st = ints_status(Config({"language": "ko"}), "notion")
+    assert st.detail == "PAT 없음 (연결 필요)"
+
+
+def test_notion_status_detail_is_english_by_default():
+    st = ints_status(Config({}), "notion")
+    assert st.detail == "no PAT (connect required)"
+
+
 def test_notion_test_verifies_via_api(monkeypatch):
     notion_auth.save_pat("ntn_x")
     monkeypatch.setattr(notion_auth, "verify_token", lambda t: {"ok": True, "name": "WS"})

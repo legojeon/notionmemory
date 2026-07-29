@@ -129,6 +129,9 @@ def _queue_entry(qdir: Path, chash: str, repo_top: str) -> None:
 
 def test_git_queue_reminder_counts_and_includes_procedure(monkeypatch, tmp_path):
     ss = ss_mod
+    # config 격리 — 실 config 의 language 가 새면(사용자가 ko 로 두면) 리마인더가
+    # 한국어로 나와 영어 단언이 깨진다. 빈 tmp config → 기본 en.
+    monkeypatch.setattr(paths, "config_path", lambda: tmp_path / "config.yaml")
     monkeypatch.setattr(subprocess, "run", _real_run)
     repo = tmp_path / "myrepo"
     repo.mkdir()

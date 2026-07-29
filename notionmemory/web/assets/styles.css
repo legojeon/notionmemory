@@ -129,14 +129,16 @@ button.skill[disabled] {
 }
 
 .badge {
-  display: inline-block;
-  margin-top: var(--space-sm);
+  display: block;               /* 카드 폭에 맞춰 언어와 무관하게 크기 통일 */
+  margin-top: var(--space-md);
   border: 1px solid var(--hairline);
-  border-radius: var(--rounded-full);
-  padding: var(--space-xxs) var(--space-xs);
+  border-radius: var(--rounded-lg);
+  padding: var(--space-xs) var(--space-sm);
   font: var(--eyebrow);
   letter-spacing: var(--eyebrow-tracking);
   font-style: normal;
+  text-align: center;
+  line-height: 1.5;
   color: var(--accent-orange);
 }
 
@@ -386,20 +388,18 @@ button.skill[disabled] {
 }
 
 /* integration panel — 헤더(제목+우측 액션) / 상태 한 줄 / 안내·폼 rows */
-#modal-body .int-head {
+#modal-body .int-title {
+  margin: 0;
+}
+
+/* 제목은 위 한 줄, 상태줄+액션(Test)은 같은 행 — Test 가 상태 "내용" 높이의 중앙에
+   오도록(제목 제외). 스킬 폼의 필드 컨트롤이 필드 내용 중앙에 오는 것과 같은 규칙. */
+#modal-body .int-statusrow {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
-}
-
-#modal-body .int-head h3 {
-  margin: 0;
-}
-
-/* 제목 + 상태를 한 세로 컬럼으로 — 오른쪽 액션(Test)이 이 묶음의 세로중앙에 오도록 */
-#modal-body .int-textcol {
-  min-width: 0;
+  margin-top: var(--space-xs);
 }
 
 #modal-body .int-actions {
@@ -412,15 +412,16 @@ button.skill[disabled] {
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  margin: var(--space-xs) 0 0;
+  flex: 1 1 auto;
+  min-width: 0;
   font: var(--body-sm);
   color: var(--ink-secondary);
 }
 
-/* 상태는 이제 .int-head 안에 있으므로, 뒤따르는 폼/안내는 head 기준으로 간격을 준다 */
-#modal-body .int-head + form,
-#modal-body .int-head + .field-col,
-#modal-body .int-head + .field {
+/* 상태줄 다음의 폼/안내 간격 */
+#modal-body .int-statusrow + form,
+#modal-body .int-statusrow + .field-col,
+#modal-body .int-statusrow + .field {
   margin-top: var(--space-md);
 }
 
@@ -470,6 +471,17 @@ button.skill[disabled] {
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: var(--space-md);
   margin-top: var(--space-sm);
+}
+
+/* 템플릿이 없을 때의 안내는 박스(테두리·배경) 없이 전체 폭 평문으로 — 짧은 안내 한 줄에
+   카드 박스는 과하다. 편안한 읽기 폭으로 가운데 정렬. */
+#template-list .empty {
+  grid-column: 1 / -1;
+  max-width: 520px;
+  margin: 0 auto;
+  border: none;
+  background: none;
+  padding: var(--space-md) 0;
 }
 
 /* 공용 모달 — 스킬/연결/템플릿 상세를 화면 중앙 팝업으로.

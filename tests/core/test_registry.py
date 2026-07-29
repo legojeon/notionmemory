@@ -62,3 +62,21 @@ def test_registry_public_accessors():
     assert set(reg.integrations().keys()) == {"notion", "agent", "git"}
     reg.integrations().clear()  # 복사본이어야 함
     assert set(reg.integrations().keys()) == {"notion", "agent", "git"}
+
+
+# ── ko 오버레이 (cards(lang)) ──────────────────────────────
+
+def test_card_run_label_is_korean_when_lang_ko():
+    from notionmemory.skills.library.skill import LibrarySkill
+    cfg = Config({})
+    reg = Registry([LibrarySkill(cfg)], build_integrations(cfg), cfg)
+    card = reg.cards("ko")[0]
+    assert card.run_label == "재색인 실행"
+
+
+def test_card_run_label_is_english_by_default():
+    from notionmemory.skills.library.skill import LibrarySkill
+    cfg = Config({})
+    reg = Registry([LibrarySkill(cfg)], build_integrations(cfg), cfg)
+    card = reg.cards()[0]
+    assert card.run_label == "Reindex"
