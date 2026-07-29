@@ -19,7 +19,7 @@ class LibrarySkill(Skill):
     requires = ["notion"]
     usage = "notionmemory library search/read/refresh/status"
     runnable = True                 # run()=색인 갱신(액션) — 대시보드가 실행 버튼을 그린다
-    run_label = "Reindex"
+    run_label = "Rescan"
 
     def __init__(self, config: Config):
         self.config = config
@@ -27,7 +27,7 @@ class LibrarySkill(Skill):
     def options_schema(self) -> dict:
         return {
             "full": {"type": "bool", "default": False,
-                     "label": "Full reindex",
+                     "label": "Full scan",
                      "help": "Checked: rescan all shared pages and prune ones no "
                              "longer shared. Unchecked: only what changed since "
                              "the last refresh (faster)."},
@@ -40,6 +40,6 @@ class LibrarySkill(Skill):
         except (RuntimeError, ValueError) as exc:
             return RunResult(False, str(exc))
         except Exception as exc:      # noqa: BLE001 — run() 은 트레이스백을 흘리지 않는다
-            return RunResult(False, f"index refresh failed: {exc}")
-        return RunResult(True, f"library index: {summary['total']} entries "
-                               f"({summary['indexed']} indexed this run)")
+            return RunResult(False, f"scan refresh failed: {exc}")
+        return RunResult(True, f"library: {summary['total']} pages scanned "
+                               f"({summary['indexed']} newly scanned this run)")

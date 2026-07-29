@@ -71,7 +71,7 @@ def test_card_run_label_is_korean_when_lang_ko():
     cfg = Config({})
     reg = Registry([LibrarySkill(cfg)], build_integrations(cfg), cfg)
     card = reg.cards("ko")[0]
-    assert card.run_label == "재색인 실행"
+    assert card.run_label == "다시 훑기"
 
 
 def test_card_run_label_is_english_by_default():
@@ -79,4 +79,4 @@ def test_card_run_label_is_english_by_default():
     cfg = Config({})
     reg = Registry([LibrarySkill(cfg)], build_integrations(cfg), cfg)
     card = reg.cards()[0]
-    assert card.run_label == "Reindex"
+    assert card.run_label == "Rescan"

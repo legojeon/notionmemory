@@ -247,6 +247,29 @@ def test_skills_endpoint_exposes_usage_and_setup_steps():
     assert cards["memory"]["usage"].startswith("notionmemory remember")
 
 
+def test_skills_db_url_reflects_external_config_change(tmp_path):
+    """serve 실행 중 외부(CLI/에이전트)가 DB 를 바인딩하면 대시보드가 restart 없이 반영한다.
+    회귀: 서버가 시작-스냅샷 config 를 써서 외부 connect 후 db_url 이 stale 이던 버그."""
+    import json, yaml
+    from notionmemory.app import build_registry
+    from notionmemory.web.server import create_app
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text("skills: {}\n", encoding="utf-8")
+    client = create_app(build_registry(str(cfg_file))).test_client()
+
+    cards = {c["id"]: c for c in json.loads(client.get("/api/skills").data)}
+    assert cards["memory"]["db_url"] == ""          # 처음엔 미바인딩
+
+    # 외부 프로세스가 config 에 memory 바인딩을 씀(에이전트의 `memory connect --url` 상당)
+    cfg_file.write_text(yaml.safe_dump({"skills": {"memory": {
+        "database_id": "0123456789abcdef0123456789abcdef",
+        "data_source_id": "dab2c5caf5dec45579bd20428f158d84"}}}), encoding="utf-8")
+
+    # 같은 client(=restart 없음)로 재요청 → 반영돼야 함
+    cards = {c["id"]: c for c in json.loads(client.get("/api/skills").data)}
+    assert "0123456789abcdef0123456789abcdef" in cards["memory"]["db_url"]
+
+
 def test_cards_expose_function_kinds():
     from notionmemory.app import build_registry
     from notionmemory.web.server import create_app
@@ -487,6 +510,29 @@ def _calendar_client(cfg_dict):
     cfg = Config(cfg_dict)
     reg = Registry([CalendarSkill(cfg)], build_integrations(cfg), cfg)
     return create_app(reg).test_client()
+
+
+# ── task-7: /api/skills 의 calendar·memory 연동 DB 링크(db_url) ──────
+
+def test_skills_endpoint_includes_db_url_when_memory_bound():
+    # status.probe() 를 재사용 — DB 생성 0, config 의 database_id 만 읽는다.
+    card = _memory_client({"skills": {"memory": {"database_id": "abc123"}}}) \
+        .get("/api/skills").get_json()[0]
+    assert card["id"] == "memory"
+    assert card["db_url"] != "" and "abc123" in card["db_url"]
+
+
+def test_skills_endpoint_db_url_empty_when_calendar_unbound():
+    card = _calendar_client({}).get("/api/skills").get_json()[0]
+    assert card["id"] == "calendar"
+    assert card["db_url"] == ""
+
+
+def test_skills_endpoint_omits_db_url_for_other_skills():
+    # demo 는 calendar/memory 가 아니므로 db_url 필드 자체가 없어야 한다
+    # (app.js 쪽은 이 필드의 부재를 견뎌야 하고, 서버는 관계없는 카드에 억지로 채우지 않는다).
+    card = _client({}).get("/api/skills").get_json()[0]
+    assert "db_url" not in card
 
 
 def test_option_label_is_korean_when_lang_ko():

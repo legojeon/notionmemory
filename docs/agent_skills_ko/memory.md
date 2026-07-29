@@ -51,6 +51,29 @@ RIGHT: "일치하는 기억이 없습니다. `refresh token`, `session expiry`�
 - 스스로 판단한 저장에 `--auto`가 붙었다.
 - recall 결과를 있는 그대로 보고했다.
 
+## 연결 & 온보딩
+
+memory 작업 전(특히 세션의 첫 작업 전) 연결 상태를 확인한다:
+`notionmemory status`(전체 현황) 또는 `notionmemory memory connection`(이 스킬만).
+
+- **PAT 없음(Notion 미연결)**: 직접 고치려 하지 말고 settings 대시보드(`settings` 스킬
+  또는 `notionmemory serve` → `http://localhost:8765`)로 안내해 거기서 Notion을 연결하게
+  한다. **raw PAT/토큰을 채팅에 붙여넣게 해선 절대 안 된다** — PAT 입력용 CLI는 없고,
+  채팅에서 물어보는 순간 대시보드를 쓰는 이유가 사라진다. 사용자가 완료했다고 하면
+  `notionmemory status`를 다시 실행한다 — 이건 실제로 연결을 재검증(live verify)하므로
+  연결됨으로 나올 때만 진행한다. 이 통과 전에는 DB 설정을 시도하지 않는다.
+- **연결됐지만 미바인딩**(`memory connection`이 "not bound"로 나옴): 메뉴를 제시한다 —
+  1) 새 Second Brain DB 생성: `notionmemory memory connect --new`
+  2) 기존 DB 연결: `notionmemory memory connect --url <url>`
+  3) 지금은 건너뛰기.
+  `connect --url`은 memory에서 **엄격(strict)**하다 — 실제 notionmemory Second Brain
+  DB(스키마 일치)여야만 성공하므로, 무관한 DB를 잘못 가리켜도 안전하다. 성공하면 결과
+  DB 링크를 보고한다. 거부되면 사유를 그대로 전달하고 메뉴를 다시 제시한다 — 임의로
+  고치려 하지 않는다.
+- **설정 순서**: 여러 가지가 한꺼번에 미설정이면 이 순서로 처리한다 —
+  PAT(settings 대시보드) → memory → calendar → library("검색용으로 색인할까요?" →
+  `notionmemory library refresh`) → templates(사용법 안내만, 설정 불필요).
+
 ## 내용은 library로 찾는다
 
 "이거 어디 정리했지 / 전에 X 어떻게 했지"처럼 **내용으로 찾는 것**은 이 스킬이 아니라

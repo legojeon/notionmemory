@@ -38,6 +38,25 @@ function closeModal() { document.getElementById("modal").hidden = true; }
 
 let TEMPLATES = [];
 
+// calendar·memory 의 연동 DB 링크(db_url, "" 면 비바인딩) — 카드가 아니라 스킬 설정 모달
+// 상단에 detail 행으로 띄운다(카드에 두면 클릭형 카드 안 링크라 모호하고, 중첩 <a>/레이아웃
+// 문제가 생김). 다른 스킬은 db_url 필드가 없을 수 있어 falsy 로 안전 흡수. href/텍스트 모두
+// html`` 을 거쳐 이스케이프(raw 금지 — db_url 은 API 유래 문자열).
+const dbLinkHtml = url =>
+  url ? html`<p class="detail"><a class="db-link" href="${url}" target="_blank" rel="noopener">${tr("skill.db_link")} ↗</a></p>` : "";
+
+// 스킬·git·템플릿을 모두 한 그리드의 같은 카드로 — 에이전트/백그라운드 구분은
+// 카드 태그로만 가볍게 표시(예전엔 h3 하위 섹션으로 갈라 이중 헤딩이 무거웠다).
+// 최상위 함수로 둔 이유: node 테스트(tests/web/test_app_js.py)가 DOM 없이 직접 호출한다.
+const skillCard = s => {
+  const blocked = s.status !== "available";
+  const badge = blocked ? html`<em class="badge">${s.missing.join(", ")} ${tr("skill.connection_needed")}</em>` : "";
+  const tag = s.surface === "service"
+    ? html`<span class="card-tag" title="${tr("skill.background_title")}">${tr("skill.background")}</span>` : "";
+  return html`<button class="skill ${s.status}" data-id="${s.id}" ${blocked ? "disabled" : ""}>
+    <strong>${s.name}</strong><small>${(s.kinds || []).join(" · ")}</small>${raw(tag)}${raw(badge)}</button>`;
+};
+
 async function render() {
   const ints = await j("/api/integrations");
   document.getElementById("integration-list").innerHTML = ints.map(i =>
@@ -48,16 +67,6 @@ async function render() {
     b.addEventListener("click", () => openIntegration(b.dataset.id)));
 
   const skills = await j("/api/skills");
-  // 스킬·git·템플릿을 모두 한 그리드의 같은 카드로 — 에이전트/백그라운드 구분은
-  // 카드 태그로만 가볍게 표시(예전엔 h3 하위 섹션으로 갈라 이중 헤딩이 무거웠다).
-  const skillCard = s => {
-    const blocked = s.status !== "available";
-    const badge = blocked ? html`<em class="badge">${s.missing.join(", ")} ${tr("skill.connection_needed")}</em>` : "";
-    const tag = s.surface === "service"
-      ? html`<span class="card-tag" title="${tr("skill.background_title")}">${tr("skill.background")}</span>` : "";
-    return html`<button class="skill ${s.status}" data-id="${s.id}" ${blocked ? "disabled" : ""}>
-      <strong>${s.name}</strong><small>${(s.kinds || []).join(" · ")}</small>${raw(tag)}${raw(badge)}</button>`;
-  };
   document.getElementById("skill-grid").innerHTML = skills.length
     ? html`<div class="skill-group">${raw(skills.map(skillCard).join(""))}</div>`
     : html`<div class="empty">${tr("skills.empty")}</div>`;
@@ -273,7 +282,7 @@ async function openSkill(id) {
       <div class="install-hint"><ol>${raw(steps)}</ol></div>
     </div>` : "";
   openModal(html`<h3>${id} settings</h3>
-    ${raw(summaryRow)}${raw(usageRow)}${raw(setupRow)}
+    ${raw(summaryRow)}${raw(dbLinkHtml(card0.db_url))}${raw(usageRow)}${raw(setupRow)}
     <form id="opts">${raw(fields)}
     <button type="submit" class="btn-primary">${tr("common.save")}</button></form>
     <p id="out" class="detail"></p>`);
@@ -312,7 +321,7 @@ async function openRunPanel(id, card) {
   }).join("");
   const summaryRow = card.summary ? html`<p class="detail">${card.summary}</p>` : "";
   const body = openModal(html`<h3>${card.name}</h3>
-    ${raw(summaryRow)}
+    ${raw(summaryRow)}${raw(dbLinkHtml(card.db_url))}
     <p class="hint">${tr("run.is_runnable")}</p>
     <form id="run-form">${raw(fields)}
       <button type="submit" class="btn-primary">${card.run_label || tr("run.run_btn")}</button></form>

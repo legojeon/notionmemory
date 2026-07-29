@@ -147,6 +147,7 @@ def test_session_start_swallows_recall_timeout(monkeypatch, capsys):
         raise subprocess.TimeoutExpired("cmd", 12)
     monkeypatch.setattr(session_start.subprocess, "run", boom)
     monkeypatch.setattr(session_start, "library_injection", lambda: "")
+    monkeypatch.setattr(session_start, "onboarding_injection", lambda: "")
     monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"cwd": "/x/proj"})))
     assert session_start.main() == 0
     assert capsys.readouterr().out == ""
@@ -158,6 +159,7 @@ def test_session_start_silent_on_cli_failure(monkeypatch, capsys):
         lambda cmd, **kw: subprocess.CompletedProcess(
             cmd, 1, stdout="", stderr="Notion 토큰이 없습니다"))
     monkeypatch.setattr(session_start, "library_injection", lambda: "")
+    monkeypatch.setattr(session_start, "onboarding_injection", lambda: "")
     monkeypatch.setattr(sys, "stdin", io.StringIO("{}"))
     assert session_start.main() == 0
     assert capsys.readouterr().out == ""
@@ -171,6 +173,7 @@ def test_session_start_swallows_missing_cli_binary(monkeypatch, capsys):
         raise FileNotFoundError("no cli binary")
     monkeypatch.setattr(session_start.subprocess, "run", boom)
     monkeypatch.setattr(session_start, "library_injection", lambda: "")
+    monkeypatch.setattr(session_start, "onboarding_injection", lambda: "")
     monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"cwd": "/x/proj"})))
     assert session_start.main() == 0
     assert capsys.readouterr().out == ""
@@ -263,6 +266,7 @@ def test_session_start_silent_on_empty_stdout(monkeypatch, capsys):
         session_start.subprocess, "run",
         lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, stdout="", stderr=""))
     monkeypatch.setattr(session_start, "library_injection", lambda: "")
+    monkeypatch.setattr(session_start, "onboarding_injection", lambda: "")
     monkeypatch.setattr(sys, "stdin", io.StringIO("{}"))
     assert session_start.main() == 0
     assert capsys.readouterr().out == ""
@@ -277,6 +281,7 @@ def test_session_start_silent_on_empty_db_fallback_boilerplate(monkeypatch, caps
 
     monkeypatch.setattr(session_start.subprocess, "run", fake_run)
     monkeypatch.setattr(session_start, "library_injection", lambda: "")
+    monkeypatch.setattr(session_start, "onboarding_injection", lambda: "")
     monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"cwd": "/x/proj"})))
     assert session_start.main() == 0
     assert capsys.readouterr().out == ""  # 빈 DB 폴백 문구만 있으면 컨텍스트에 노이즈를 넣지 않는다

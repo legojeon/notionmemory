@@ -51,6 +51,29 @@ RIGHT: "No matching memories. Should I try searching for `refresh token` or `ses
 - `--auto` is attached when the agent decided to save on its own.
 - recall results were reported exactly as returned.
 
+## Connection & onboarding
+
+Before a memory operation (especially the first one in a session), check the connection:
+`notionmemory status` (whole-picture) or `notionmemory memory connection` (this skill only).
+
+- **No PAT (Notion not connected)**: don't try to fix this yourself. Guide the user to the
+  settings dashboard (the `settings` skill, or `notionmemory serve` → `http://localhost:8765`)
+  to connect Notion there. **The raw PAT/token must never be pasted into chat** — there is no
+  PAT-entry CLI, and asking for it defeats the point of the dashboard. After the user says
+  they're done, re-run `notionmemory status` — it live-verifies the connection — and only
+  proceed once it reports connected. Don't attempt DB setup before this passes.
+- **Connected but not bound** (`memory connection` shows "not bound"): present a menu —
+  1) create a new Second Brain DB: `notionmemory memory connect --new`
+  2) connect an existing one: `notionmemory memory connect --url <url>`
+  3) skip for now.
+  `connect --url` is **strict** for memory — it only succeeds against a real notionmemory
+  Second Brain DB (matching schema), so it's safe against pointing at an unrelated database.
+  Report the resulting DB link from a successful connect. If it refuses, relay the reason
+  verbatim and re-offer the menu — don't guess a fix.
+- **Setup sequence** when several things are unconfigured at once, do them in this order:
+  PAT (settings dashboard) → memory → calendar → library (ask "want me to index it for
+  search?" → `notionmemory library refresh`) → templates (usage note only, no setup needed).
+
 ## Find content with library
 
 Finding things **by content** — "where did I file this / how did I do X before" — is not

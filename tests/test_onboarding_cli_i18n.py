@@ -51,6 +51,6 @@ def test_teardown_output_language(home):
 def test_session_start_library_nudge_language(home, monkeypatch):
     from notionmemory.hooks import session_start
     _config(home, "en")
-    assert "library index" in session_start.library_injection()
+    assert "not scanned" in session_start.library_injection()
     _config(home, "ko")
-    assert "library 색인" in session_start.library_injection()
+    assert "훑어" in session_start.library_injection()

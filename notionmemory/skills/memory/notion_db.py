@@ -34,6 +34,12 @@ PROPERTIES = {
 }
 
 
+def db_url(database_id: str) -> str:
+    """database_id → Notion DB 바로가기 URL (하이픈 제거 형식). calendar/notion_db.py 와 동형
+    — status probe(core/status.py)가 두 skill 을 같은 방식으로 링크화한다."""
+    return f"https://www.notion.so/{database_id.replace('-', '')}" if database_id else ""
+
+
 def page_id_from_url(url: str) -> str:
     """Notion 페이지 URL 마지막 세그먼트의 32-hex → UUID."""
     tail = url.split("?", 1)[0].rstrip("/").rsplit("/", 1)[-1]
@@ -56,6 +62,10 @@ def _ms_name(name: str) -> str:
 
 def _date(ts: str) -> dict | None:
     return {"start": ts} if ts else None
+
+
+class NotASecondBrainError(ValueError):
+    """채택 대상이 notionmemory second brain 스키마가 아님."""
 
 
 def _related_rt(related_ids: list[str], link_page_ids: list[str]) -> list[dict]:
@@ -117,6 +127,24 @@ class SecondBrainDB:
         meta.set_meta("data_source_id", ds_id)
         self.log(f"  · Second Brain DB 생성: database={body['id']} data_source={ds_id}")
         return ds_id
+
+    def adopt(self, database_id: str, meta) -> list[str]:
+        """기존 Notion DB를 second brain 으로 채택(strict) — 비파괴, 누락 속성만 추가."""
+        db = self._req("GET", f"/databases/{database_id}").json()
+        ds_id = db["data_sources"][0]["id"]
+        props = self._req("GET", f"/data_sources/{ds_id}").json().get("properties") or {}
+        # strict: 식별 속성 존재 + 타입 일치
+        for name, want in (("Title", "title"), ("Mem ID", "rich_text")):
+            if (props.get(name) or {}).get("type") != want:
+                raise NotASecondBrainError(
+                    f"'{name}'({want}) 속성이 없어 notionmemory second brain 이 아닙니다 "
+                    f"— 새로 만들거나 이전 second brain DB URL 을 주세요")
+        missing = {k: v for k, v in PROPERTIES.items() if k not in props}
+        if missing:
+            self._req("PATCH", f"/data_sources/{ds_id}", json={"properties": missing})
+        meta.set_meta("database_id", db["id"])
+        meta.set_meta("data_source_id", ds_id)
+        return sorted(missing)
 
     # ---- 조회 ----
     def find_page_by_mem_id(self, data_source_id: str, mem_id: str) -> dict | None:

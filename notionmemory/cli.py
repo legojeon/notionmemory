@@ -7,18 +7,20 @@ from pathlib import Path
 import requests
 
 from notionmemory.app import build_app, build_registry
-from notionmemory.core import paths
+from notionmemory.core import i18n, paths, status as status_probe
 from notionmemory.core.config import Config
+from notionmemory.core.i18n import tui
 from notionmemory.core.notion_client import NotionSession
-from notionmemory.skills.memory.notion_db import ALL_TYPES
+from notionmemory.skills.memory.notion_db import (
+    ALL_TYPES, NotASecondBrainError, SecondBrainDB, db_url as mem_db_url)
 from notionmemory.skills.memory.store import MemoryStore
 from notionmemory.core.notion_markdown import markdown_to_blocks
 from notionmemory.skills.git import hooks as gc_hooks
 from notionmemory.skills.git import queue as gc_queue
 from notionmemory.skills.git.flusher import flush as gc_flush
 from notionmemory.skills.calendar.notion_db import (
-    SETUP_STEPS as cal_setup_steps, SOURCES as CAL_SOURCES, STATUSES as CAL_STATUSES,
-    db_url as cal_db_url)
+    CalendarDB, SchemaConflictError, SETUP_STEPS as cal_setup_steps,
+    SOURCES as CAL_SOURCES, STATUSES as CAL_STATUSES, db_url as cal_db_url)
 from notionmemory.skills.calendar.store import CalendarStore, format_event_line
 from notionmemory.skills.library import crawl as library_crawl
 from notionmemory.skills.library import index as library_index
@@ -255,6 +257,57 @@ def _cmd_git(args) -> int:
     return 2
 
 
+def _binding_line(skill_id: str, b: dict, lang: str) -> str:
+    """`status.probe()`의 한 스킬 바인딩(`{"bound","url"}`)을 사람이 읽는 한 줄로.
+
+    `notionmemory status`(`_format_status`)와 `notionmemory calendar/memory connection`이
+    이 하나만 공유한다 — 둘 다 같은 "bound/not bound" 개념이므로 문구를 두 벌로 두면
+    `language: ko` 사용자가 `status`에서는 `연결됨`을 보고 `connection`에서는 하드코딩된
+    영어 `bound`를 보는 드리프트가 난다(Fix round 1)."""
+    if b["bound"]:
+        return f"{skill_id}: {tui(lang, 'ui.status.bound', 'bound')} → {b['url']}"
+    return f"{skill_id}: {tui(lang, 'ui.status.not_bound', 'not bound')}"
+
+
+def _connect_db(db, config, skill_id: str, args, *, new_kwargs: dict, exc_types: tuple,
+                url_fn) -> int:
+    """calendar/memory 공용 connect 핸들러.
+
+    `--new` → `ensure(parent, meta, **new_kwargs)`(생성+바인딩). `--url` → `extract_page_id`
+    로 URL/ID 를 32-hex 로 파싱한 뒤 `adopt(dbid, meta)`(기존 DB 채택). argparse 가
+    `--new`/`--url` 을 상호배타 필수 그룹으로 강제하므로 여기서는 어느 쪽인지만 분기한다.
+    파싱 실패("" 반환, 즉 URL/ID 도 아닌 임의 문자열)는 adopt 를 부르기 *전에* 걸러
+    사용자에게 명확히 안내한다. adopt/ensure 가 던지는 깨끗한 예외(스키마 충돌·second
+    brain 아님 등, 전부 ValueError 하위)는 여기서 잡아 메시지만 찍고 traceback 없이
+    exit 2 — 원시 API 호출을 CLI 표면에 그대로 노출하지 않는다.
+
+    성공하면 `meta.get_meta("database_id")`로 갓 바인딩된 DB id를 되읽어 `url_fn`으로
+    링크를 붙인다 — 결과(생성/채택된 DB)를 알리는 것도 계약의 일부다(Fix round 1)."""
+    from notionmemory.core.config import SkillMeta
+    meta = SkillMeta(config, skill_id)
+    dbid = ""
+    if args.url:
+        dbid = templates_introspect.extract_page_id(args.url)
+        if not dbid:
+            print("유효한 Notion DB URL/ID 가 아닙니다")
+            return 2
+    try:
+        if args.new:
+            parent = str(config.skill_options(skill_id).get("parent_page_id") or "")
+            db.ensure(parent, meta, **new_kwargs)
+            tail = "(새로 생성)"
+        else:
+            added = db.adopt(dbid, meta)
+            tail = f" — 속성 추가: {', '.join(added)}" if added else ""
+        bound_id = str(meta.get_meta("database_id") or "")
+        link = f" → {url_fn(bound_id)}" if bound_id else ""
+        print(f"{skill_id} DB 연결 완료{tail}{link}")
+        return 0
+    except exc_types as e:
+        print(str(e))
+        return 2
+
+
 def _cmd_calendar(args) -> int:
     config = Config.load(args.config)
     if args.action == "setup":
@@ -283,6 +336,18 @@ def _cmd_calendar(args) -> int:
         meta.set_meta(routing.OPTION, routing.validate_target(args.value))
         print(f"calendar 쓰기 대상: {args.value or '(미결정)'}")
         return 0
+    if args.action == "connection":
+        # probe() 만 부른다 — DB 를 만들지 않는 조회 불변식(core/status.py). NotionSession
+        # 조차 필요 없어(config 만 읽음) 미연결·오프라인에서도 answer가 나온다.
+        lang = i18n.language(config)
+        print(_binding_line("calendar", status_probe.probe(config, verify=False)["calendar"],
+                            lang))
+        return 0
+    if args.action == "connect":
+        return _connect_db(CalendarDB(NotionSession(), log=print), config, "calendar", args,
+                           new_kwargs={"create": True},
+                           exc_types=(SchemaConflictError, ValueError, RuntimeError),
+                           url_fn=cal_db_url)
     store = CalendarStore(NotionSession(), config, log=print)
     if args.action == "list":
         if args.date_to and args.days:
@@ -326,6 +391,23 @@ def _cmd_calendar(args) -> int:
             return 1
         print(f"Canceled: {args.event_id} (휴지통 이동 — Notion에서 30일 내 복원 가능)")
         return 0
+    return 2
+
+
+def _cmd_memory(args) -> int:
+    """`memory` 신규 서브파서 그룹 — `connect`/`connection` 만 담는다. remember/recall/forget
+    은 top-level 로 그대로 둔다(브리프 명시: 여기로 옮기지 않는다)."""
+    config = Config.load(args.config)
+    if args.action == "connection":
+        lang = i18n.language(config)
+        print(_binding_line("memory", status_probe.probe(config, verify=False)["memory"],
+                            lang))
+        return 0
+    if args.action == "connect":
+        return _connect_db(SecondBrainDB(NotionSession(), log=print), config, "memory", args,
+                           new_kwargs={},
+                           exc_types=(NotASecondBrainError, ValueError, RuntimeError),
+                           url_fn=mem_db_url)
     return 2
 
 
@@ -676,7 +758,7 @@ def _cmd_library(args) -> int:
                                        args.query, limit=args.limit,
                                        sources=_library_sources(args.source))
         if not hits:
-            print("찾은 것이 없습니다 — 색인이 오래됐으면 `notionmemory library refresh`")
+            print("찾은 것이 없습니다 — 오래됐으면 `notionmemory library refresh`")
             return 0
         for h in hits:
             loc = f" > {h['section']}" if h["section"] else ""
@@ -689,21 +771,53 @@ def _cmd_library(args) -> int:
         return 0
     if args.action == "refresh":
         summary = library_crawl.refresh(NotionSession(), full=args.full, log=print)
-        print(f"library 색인: {summary['total']}건 (이번에 {summary['indexed']}건 색인, "
+        print(f"library: {summary['total']}건 훑어봄 (이번에 {summary['indexed']}건 새로, "
               f"{summary['pruned']}건 정리)")
         return 0
     if args.action == "status":
         idx = library_index.load()
         if not library_index.was_refreshed(idx):
-            print("library 색인: 없음 — `notionmemory library refresh` 로 만드세요")
+            print("library: 아직 안 훑어봄 — `notionmemory library refresh` 로 훑어두세요")
             return 0
         n = library_index.count(idx)
         if not n:
-            print("library 색인: 0건 (공유된 페이지가 없습니다)")
+            print("library: 0건 훑어봄 (공유된 페이지가 없습니다)")
             return 0
-        print(f"library 색인: {n}건, 마지막 갱신 {library_index.watermark(idx) or '(미상)'}")
+        print(f"library: {n}건 훑어봄, 마지막 갱신 {library_index.watermark(idx) or '(미상)'}")
         return 0
     return 2
+
+
+def _format_status(p: dict, lang: str) -> list[str]:
+    """`status.probe()` 결과를 사람이 읽는 줄로 — CLI·에이전트가 그대로 눈으로 확인."""
+    lines = []
+    n = p["notion"]
+    n_state = (tui(lang, "ui.status.notion.connected", "connected") if n["connected"]
+              else tui(lang, "ui.status.notion.not_connected", "not connected"))
+    lines.append(f"Notion: {n_state} ({n['detail']})" if n["detail"] else f"Notion: {n_state}")
+    for key in ("calendar", "memory"):
+        lines.append(_binding_line(key, p[key], lang))
+    lib = p["library"]
+    lines.append(f"{tui(lang, 'ui.status.library.label', 'library scan')}: {lib['detail']}")
+    return lines
+
+
+def _cmd_status(args) -> int:
+    """온보딩 상태 probe — PAT·바인딩·색인 나이를 한 화면에. DB 를 만들지 않는다.
+    실패해도 생 traceback 을 내지 않는다(견고성 계약) — `lang` 을 try 밖에서 기본값으로
+    잡아둬 Config.load 자체가 실패해도(예: config.yaml 파손) 예외 메시지를 en 으로라도
+    사람이 읽게 낸다."""
+    lang = "en"
+    try:
+        cfg = Config.load(args.config)
+        lang = i18n.language(cfg)
+        p = status_probe.probe(cfg)
+        for line in _format_status(p, lang):
+            print(line)
+        return 0
+    except Exception as e:  # noqa: BLE001 — 사람이 읽는 실패 메시지, traceback 금지
+        print(tui(lang, "ui.status.probe_failed", "status check failed: {err}", err=str(e)))
+        return 1
 
 
 def _resolve_install_language(args) -> None:
@@ -817,6 +931,24 @@ def main(argv=None) -> int:
     ct = cal_sub.add_parser("target")
     ct.add_argument("value", nargs="?", default=None)
     ct.add_argument("--config", default=DEFAULT_CONFIG)
+    ccn = cal_sub.add_parser("connect")
+    ccn_grp = ccn.add_mutually_exclusive_group(required=True)
+    ccn_grp.add_argument("--new", action="store_true", help="새 Calendar DB 를 만들어 바인딩")
+    ccn_grp.add_argument("--url", default="", help="기존 Notion DB URL/ID 를 채택")
+    ccn.add_argument("--config", default=DEFAULT_CONFIG)
+    ccon = cal_sub.add_parser("connection")
+    ccon.add_argument("--config", default=DEFAULT_CONFIG)
+
+    mem = sub.add_parser("memory")
+    mem_sub = mem.add_subparsers(dest="action", required=True)
+    mcn = mem_sub.add_parser("connect")
+    mcn_grp = mcn.add_mutually_exclusive_group(required=True)
+    mcn_grp.add_argument("--new", action="store_true",
+                         help="새 Second Brain DB 를 만들어 바인딩")
+    mcn_grp.add_argument("--url", default="", help="기존 Notion DB URL/ID 를 채택")
+    mcn.add_argument("--config", default=DEFAULT_CONFIG)
+    mcon = mem_sub.add_parser("connection")
+    mcon.add_argument("--config", default=DEFAULT_CONFIG)
 
     tpl = sub.add_parser("templates")
     tpl_sub = tpl.add_subparsers(dest="action", required=True)
@@ -924,6 +1056,9 @@ def main(argv=None) -> int:
     lf.add_argument("--config", default=DEFAULT_CONFIG)
     lib_sub.add_parser("status")
 
+    stc = sub.add_parser("status")
+    stc.add_argument("--config", default=DEFAULT_CONFIG)
+
     hook = sub.add_parser("hook")
     hook.add_argument("name", choices=["session-start", "save-reminder"])
     hook.add_argument("--harness", choices=["claude", "codex"], default="claude",
@@ -994,6 +1129,15 @@ def main(argv=None) -> int:
         except requests.RequestException as e:
             print(f"Notion API 요청 실패: {e}")
             return 1
+    if args.cmd == "memory":
+        try:
+            return _cmd_memory(args)
+        except (NotASecondBrainError, ValueError, RuntimeError) as e:
+            print(str(e))
+            return 2
+        except requests.RequestException as e:
+            print(f"Notion API 요청 실패: {e}")
+            return 1
     if args.cmd == "templates":
         try:
             return _cmd_templates(args)
@@ -1025,6 +1169,8 @@ def main(argv=None) -> int:
         except requests.RequestException as e:
             print(f"Notion API 요청 실패: {e}")
             return 1
+    if args.cmd == "status":
+        return _cmd_status(args)
     if args.cmd == "hook":
         from notionmemory.hooks import save_reminder, session_start
         return {"session-start": session_start.main,

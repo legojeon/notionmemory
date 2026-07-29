@@ -13,11 +13,13 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setattr(session_start, "resolve_toplevel", lambda cwd: "")
     monkeypatch.setattr(session_start, "maybe_install_git_hook", lambda top: "")
-    # recall 서브프로세스·library 색인 신호는 이 테스트의 관심사가 아니다(각각
-    # test_hook_cli.py / test_session_start_library.py 가 전담) — 여기선 templates만 본다.
+    # recall 서브프로세스·library 색인·온보딩 넛지 신호는 이 테스트의 관심사가 아니다(각각
+    # test_hook_cli.py / test_session_start_library.py / test_onboarding_nudge.py 가 전담)
+    # — 여기선 templates만 본다.
     monkeypatch.setattr(session_start.subprocess, "run",
                         lambda *a, **k: type("R", (), {"returncode": 1, "stdout": ""})())
     monkeypatch.setattr(session_start, "library_injection", lambda: "")
+    monkeypatch.setattr(session_start, "onboarding_injection", lambda: "")
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"cwd": str(tmp_path)})))
     return tmp_path
 

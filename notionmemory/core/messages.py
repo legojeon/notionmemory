@@ -79,10 +79,18 @@ CATALOG = {
             "(install_policy=auto — tell the user in one line. If unwanted, "
             "`{cli} git uninstall`)."),
         "hook.library_empty": (
-            "library index: none — run `notionmemory library refresh --full` "
+            "library: not scanned yet — run `notionmemory library refresh --full` "
             "before your first search"),
-        "hook.library_count": "library index: {n} entries, last refreshed {watermark}",
+        "hook.library_count": "library: {n} pages scanned, last refreshed {watermark}",
         "hook.watermark_unknown": "(unknown)",
+        "hook.onboarding_pat": (
+            "notionmemory: Notion isn't connected yet. Offer the user guided setup — "
+            "open the settings dashboard (the `settings` skill, or `{cli} serve`) to "
+            "connect Notion, then set up memory, calendar, library, and templates."),
+        "hook.onboarding_setup": (
+            "notionmemory: Notion is connected, but {skills} not set up yet. Offer the "
+            "user guided setup for {skills} via the settings dashboard (the `settings` "
+            "skill, or `{cli} serve`)."),
     },
     "ko": {
         # --- install ---
@@ -152,9 +160,17 @@ CATALOG = {
             "(install_policy=auto — 사용자에게 한 줄로 알려주세요. 원치 않으면 "
             "`{cli} git uninstall`)."),
         "hook.library_empty": (
-            "library 색인: 없음 — 첫 검색 전 `notionmemory library refresh --full` 필요"),
-        "hook.library_count": "library 색인: {n}건, 마지막 갱신 {watermark}",
+            "library: 아직 안 훑어봄 — 첫 검색 전 `notionmemory library refresh --full` 필요"),
+        "hook.library_count": "library: {n}건 훑어봄, 마지막 갱신 {watermark}",
         "hook.watermark_unknown": "(미상)",
+        "hook.onboarding_pat": (
+            "notionmemory: Notion 이 아직 연결되지 않았습니다. 사용자에게 안내 설정을 "
+            "제안하세요 — settings 대시보드(`settings` 스킬 또는 `{cli} serve`)를 열어 "
+            "Notion 을 연결한 뒤 memory·calendar·library·templates 순으로 설정하세요."),
+        "hook.onboarding_setup": (
+            "notionmemory: Notion 은 연결됐지만 {skills} 가 아직 설정되지 않았습니다. "
+            "settings 대시보드(`settings` 스킬 또는 `{cli} serve`)로 {skills} 안내 설정을 "
+            "제안하세요."),
     },
 }
 
@@ -204,7 +220,7 @@ UI_KO: dict[str, str] = {
     "ui.card.calendar.setup.3": (
         "색을 바꾸려면 'Calendar' 위에 마우스 → ••• → 원하는 색 선택 (색은 DB 단위입니다)"),
     "ui.card.git.run_label": "실행",
-    "ui.card.library.run_label": "재색인 실행",
+    "ui.card.library.run_label": "다시 훑기",
     "ui.card.memory.run_label": "실행",
     "ui.card.templates.run_label": "템플릿 등록",
     # --- skills/*/skill.py options_schema() label/help (overlaid in web/server.py GET options) ---
@@ -221,7 +237,7 @@ UI_KO: dict[str, str] = {
         "auto: 세션 시작 시 현재 git 리포에 post-commit 캡처 훅을 자동 설치(제외 목록 "
         "존중). ask: 에이전트가 사용자에게 물어봄. off: 자동 설치 안 함. repos/exclude "
         "목록은 CLI가 관리."),
-    "ui.opt.library.full.label": "전체 재색인",
+    "ui.opt.library.full.label": "전체 다시 훑기",
     "ui.opt.library.full.help": (
         "체크하면 공유 페이지 전량을 다시 훑고 공유 해제분을 정리합니다. 비우면 마지막 "
         "갱신 이후 변경분만(빠름)."),
@@ -249,4 +265,16 @@ UI_KO: dict[str, str] = {
     "ui.err.refresh_failed": "구조 갱신 실패: {exc}",
     "ui.err.url_required": "Notion URL 이 필요합니다",
     "ui.err.registration_failed": "등록 실패: {exc}",
+    # --- core/status.py (notionmemory status) ---
+    "ui.status.library.never": (
+        "아직 안 훑어봄 — `notionmemory library refresh --full` 로 훑어두세요"),
+    "ui.status.library.empty": "0건 훑어봄 (integration 에 공유된 페이지가 아직 없습니다)",
+    "ui.status.library.watermark_unknown": "(미상)",
+    "ui.status.library.count": "{n}건, 마지막 갱신 {watermark}",
+    "ui.status.notion.connected": "연결됨",
+    "ui.status.notion.not_connected": "미연결",
+    "ui.status.bound": "연결됨",
+    "ui.status.not_bound": "미연결",
+    "ui.status.library.label": "library 훑어보기",
+    "ui.status.probe_failed": "상태 조회 실패: {err}",
 }

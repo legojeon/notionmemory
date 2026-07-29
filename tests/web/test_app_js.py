@@ -24,6 +24,13 @@ console.log(JSON.stringify({
   rawpass: html`${raw("<i>ok</i>")}`,
   nested: html`<div>${raw(html`<em>${"<x>"}</em>`)}</div>`,
   nullish: html`[${null}|${undefined}]`,
+  cardWithDb: skillCard({id: "memory", name: "Memory", kinds: ["capture"],
+    status: "available", missing: [], surface: "agent",
+    db_url: "https://www.notion.so/abc123"}),
+  dbLinkOn: dbLinkHtml("https://www.notion.so/abc123"),
+  dbLinkOff: dbLinkHtml(""),
+  dbLinkMissing: dbLinkHtml(undefined),
+  dbLinkEscaped: dbLinkHtml('"><script>alert(1)</script>'),
 }));
 """
 
@@ -40,3 +47,12 @@ def test_esc_and_html_helpers(tmp_path):
     assert data["rawpass"] == "<i>ok</i>"                      # raw 는 통과
     assert data["nested"] == "<div><em>&lt;x&gt;</em></div>"   # 이중 이스케이프 없음
     assert data["nullish"] == "[|]"                            # null/undefined → 빈 문자열
+    # DB 링크는 카드가 아니라 설정 모달로 옮겼다 — 카드에는 앵커가 없어야 한다.
+    assert "<a " not in data["cardWithDb"]
+    # dbLinkHtml: 있으면 앵커(_blank·noopener) 렌더, 없거나(""/undefined) 안전하게 빈 문자열.
+    assert "<a " in data["dbLinkOn"] and 'href="https://www.notion.so/abc123"' in data["dbLinkOn"]
+    assert 'target="_blank"' in data["dbLinkOn"] and 'rel="noopener"' in data["dbLinkOn"]
+    assert data["dbLinkOff"] == "" and data["dbLinkMissing"] == ""
+    # html`` 이스케이프 경유(raw 아님) — href/텍스트에 삽입된 마크업이 그대로 새지 않는다
+    assert "<script>" not in data["dbLinkEscaped"]
+    assert "&lt;script&gt;" in data["dbLinkEscaped"]

@@ -242,6 +242,16 @@ filename or an invented summary. If a lecture number and topic are visible, use
 `Lecture N — original title`; never invent a missing number or title.
 ```
 
+## Connection & onboarding
+
+Unlike memory/calendar, templates has no built-in DB to connect — there is nothing to gate
+on a PAT check here, and no setup menu to run through onboarding. If the user's Notion isn't
+connected yet, that's memory/calendar's onboarding to handle (settings dashboard), not this
+skill's. All this skill needs on first use is a one-line explanation: templates registers
+**the user's own** Notion pages/databases (arbitrary schema) so they can be queried and
+edited by name — register one via the settings dashboard's "+ template" button, or just ask
+this skill to `templates register <page URL>`.
+
 ## Relationship to other skills — parallel sources
 
 Built-in skills (calendar / memory / git) and registered templates are **not competitors.**

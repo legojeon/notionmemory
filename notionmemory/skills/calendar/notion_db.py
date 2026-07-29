@@ -36,6 +36,10 @@ CONNECT_HINT = ("  · To also see it in the Notion Calendar app:\n"
                 + "\n".join(f"    {i}. {s}" for i, s in enumerate(SETUP_STEPS, 1)))
 
 
+class SchemaConflictError(ValueError):
+    """기존 속성이 다른 타입이라 안전하게 채택할 수 없음."""
+
+
 def db_url(database_id: str) -> str:
     """database_id → Notion DB 바로가기 URL (하이픈 제거 형식)."""
     return f"https://www.notion.so/{database_id.replace('-', '')}" if database_id else ""
@@ -92,6 +96,29 @@ class CalendarDB:
         self.log(f"  · Calendar DB 생성: database={body['id']} data_source={ds_id}")
         self.log(CONNECT_HINT)
         return ds_id
+
+    def adopt(self, database_id: str, meta) -> list[str]:
+        """기존 Notion DB를 Calendar로 채택 — 비파괴, 누락 속성만 추가·타입 충돌은 거부."""
+        db = self._req("GET", f"/databases/{database_id}").json()
+        ds_id = db["data_sources"][0]["id"]
+        props = self._req("GET", f"/data_sources/{ds_id}").json().get("properties") or {}
+        missing, conflicts = {}, []
+        for name, spec in PROPERTIES.items():
+            want = next(iter(spec))                 # {"date": {}} -> "date"
+            cur = (props.get(name) or {}).get("type")
+            if cur is None:
+                missing[name] = spec
+            elif cur != want:
+                conflicts.append(f"'{name}' 은 {want} 가 필요한데 {cur} 로 존재")
+        if conflicts:
+            raise SchemaConflictError(
+                "기존 DB 스키마 충돌 — " + "; ".join(conflicts)
+                + ". 에이전트로 연결하거나 새 DB 를 만드세요.")
+        if missing:
+            self._req("PATCH", f"/data_sources/{ds_id}", json={"properties": missing})
+        meta.set_meta("database_id", db["id"])
+        meta.set_meta("data_source_id", ds_id)
+        return sorted(missing)
 
     def find_page_by_event_id(self, data_source_id: str, event_id: str) -> dict | None:
         resp = self._req("POST", f"/data_sources/{data_source_id}/query", json={

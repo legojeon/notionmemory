@@ -3,6 +3,10 @@ import os
 from flask import Flask, jsonify, request
 from notionmemory.core.registry import Registry
 from notionmemory.core import i18n, notion_auth
+from notionmemory.core import status as status_probe  # 별칭 필수: 아래
+# `def status(sid, job_id)` 라우트가 create_app 지역 스코프에 `status` 이름을 만들어
+# (클로저는 정적 스코프라 나중에 정의돼도 동일 이름을 shadow 한다) 별칭 없이 쓰면
+# skills() 안의 `status.probe(...)` 가 이 모듈이 아니라 그 지역 함수를 가리키게 된다.
 from notionmemory.core.i18n import tui
 from notionmemory.core.config import save_skill_options
 from notionmemory.core.notion_client import NotionSession
@@ -16,6 +20,14 @@ ASSETS = os.path.join(os.path.dirname(__file__), "assets")
 def create_app(registry: Registry) -> Flask:
     app = Flask(__name__, static_folder=ASSETS, static_url_path="/assets")
     jobs = JobRegistry()
+
+    @app.before_request
+    def _refresh_config_from_disk():
+        # serve 는 시작 시 config 스냅샷을 들고 있다. 실행 중 외부 프로세스(CLI/에이전트가
+        # `connect --url` 로 DB 를 바인딩하는 등)가 config 를 바꾸면, 매 요청 디스크에서 다시
+        # 읽어 대시보드가 restart 없이 최신 상태를 반영하게 한다(대시보드 자체 저장은 디스크에
+        # 먼저 쓰므로 이 재로드로도 그대로 보인다).
+        registry.config.reload()
 
     @app.get("/api/integrations")
     def integrations():
@@ -32,7 +44,16 @@ def create_app(registry: Registry) -> Flask:
     @app.get("/api/skills")
     def skills():
         lang = i18n.language(registry.config)
-        return jsonify([c.__dict__ for c in registry.cards(lang)])
+        cards = [dict(c.__dict__) for c in registry.cards(lang)]
+        # calendar·memory 만 연동 DB 링크(db_url)를 붙인다 — status.probe() 의 바인딩
+        # 로직을 재사용해 URL 형식이 한 곳(단일 진실 소스)에서만 나오게 한다.
+        # verify=False: 대시보드 로드마다 도는 호출부라 live PAT 재검증(네트워크) 없이
+        # config 의 database_id 만 읽는다 — DB 를 만들지 않는다(조회 불변식).
+        p = status_probe.probe(registry.config, verify=False)
+        for c in cards:
+            if c["id"] in ("calendar", "memory"):
+                c["db_url"] = p[c["id"]]["url"]
+        return jsonify(cards)
 
     @app.get("/api/language")
     def get_language():

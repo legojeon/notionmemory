@@ -11,8 +11,8 @@ description: 내 Notion에 무엇을 어디에 정리해뒀는지 찾을 때 사
 ```
 notionmemory library search "<질의>" [--limit N]   # 랭킹된 포인터(출처·제목·섹션·id)
 notionmemory library read <page-id>                # 찾은 페이지 본문 라이브(블록 id 인라인)
-notionmemory library refresh [--full]              # 색인 갱신(전체는 --full)
-notionmemory library status                        # 색인 나이·건수
+notionmemory library refresh [--full]              # 훑어보기 갱신(전체는 --full)
+notionmemory library status                        # 훑어본 나이·건수
 ```
 
 `search`는 **본문이 아니라 포인터**를 돌려준다 — `content · [page-id] 제목 > 섹션`,
@@ -28,18 +28,18 @@ notionmemory library status                        # 색인 나이·건수
   서브에이전트가 후보를 읽고 **답 + 출처(id)만** 돌려주게 해 원본 본문이 메인 컨텍스트에
   안 쏟아지게 한다. (위임 3조건: 3+ 소스·종합 필요·읽기 전용. 출처 포인터는 반드시 반환.)
 
-## 색인이 비었거나 오래됐으면
+## 아직 안 훑어봤거나 오래됐으면
 
-세션 시작 시 "library 색인: 없음" 또는 오래된 나이가 주입되면 — 아직 색인이 없거나 낡은
-것이다. **사용자에게 "검색 색인을 만드는 중"이라 알리고** `library refresh --full`을 실행한
+세션 시작 시 "library: 아직 안 훑어봄" 또는 오래된 나이가 주입되면 — 아직 훑어본 적이 없거나
+낡은 것이다. **사용자에게 "Notion을 훑어보는 중"이라 알리고** `library refresh --full`을 실행한
 뒤 검색한다(워크스페이스 크롤이라 시간이 걸리므로 조용히 하지 마라). "오늘 쓴 거"처럼 최신이
 중요한 질의도 먼저 `refresh`.
 
 ## 한계
 
-- **색인은 제목·헤딩만** 안다. 내용이 오직 본문에만 있고 제목·헤딩엔 없는 페이지는 못 찾을 수
+- **훑어본 것은 제목·헤딩만** 안다. 내용이 오직 본문에만 있고 제목·헤딩엔 없는 페이지는 못 찾을 수
   있다 — 질의를 유의어로 넓혀 다시 검색하거나(예: "컨테이너 오케스트레이션" → "쿠버네티스"),
   사용자에게 어느 페이지인지 물어라.
-- 검색은 현재 색인 기준이라 **방금 만든 페이지는 refresh 전까진 안 걸릴 수 있다.**
+- 검색은 현재 훑어본 것 기준이라 **방금 만든 페이지는 refresh 전까진 안 걸릴 수 있다.**
 - **날짜·상태 필터**("내일 일정", "미완료 todo")는 library가 아니라 calendar/templates의
   구조 조회로. library는 "무엇에 관한 것"(텍스트)만 찾는다.

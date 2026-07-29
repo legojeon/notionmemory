@@ -22,7 +22,7 @@ def isolated(tmp_path, monkeypatch):
 def test_empty_index_injects_refresh_signal(capsys):
     assert session_start.main() == 0
     out = capsys.readouterr().out
-    assert "library index" in out and ("none" in out or "refresh" in out)
+    assert "not scanned" in out and "refresh" in out
 
 
 def test_populated_index_injects_age(capsys):
@@ -32,7 +32,7 @@ def test_populated_index_injects_age(capsys):
     I.save(idx)
     session_start.main()
     out = capsys.readouterr().out
-    assert "library index" in out and "1" in out
+    assert "scanned" in out and "1" in out
 
 
 def test_refreshed_but_empty_workspace_is_silent(capsys):
@@ -43,7 +43,7 @@ def test_refreshed_but_empty_workspace_is_silent(capsys):
     I.save(idx)
     session_start.main()
     out = capsys.readouterr().out
-    assert "library index" not in out
+    assert "not scanned" not in out
 
 
 def test_injection_prefix_is_not_json_sniffable(capsys):

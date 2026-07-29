@@ -128,6 +128,17 @@ button.skill[disabled] {
   cursor: not-allowed;
 }
 
+/* 연동 DB 링크 — 스킬 설정 모달 상단의 detail 행 안 앵커. */
+.db-link {
+  font: var(--eyebrow);
+  letter-spacing: var(--eyebrow-tracking);
+  text-decoration: none;
+}
+
+.db-link:hover {
+  text-decoration: underline;
+}
+
 .badge {
   display: block;               /* 카드 폭에 맞춰 언어와 무관하게 크기 통일 */
   margin-top: var(--space-md);

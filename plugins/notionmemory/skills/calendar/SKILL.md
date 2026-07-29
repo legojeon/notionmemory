@@ -56,6 +56,30 @@ and refuse — calendar does **not** write to another template's database. Follo
 it gives and use the `templates` commands instead. Always confirm property names with
 `templates show <slug>` — never guess them.
 
+## Connection & onboarding
+
+Before a calendar operation (especially the first one in a session), check the connection:
+`notionmemory status` (whole-picture) or `notionmemory calendar connection` (this skill only).
+
+- **No PAT (Notion not connected)**: don't try to fix this yourself. Guide the user to the
+  settings dashboard (the `settings` skill, or `notionmemory serve` → `http://localhost:8765`)
+  to connect Notion there. **The raw PAT/token must never be pasted into chat** — there is no
+  PAT-entry CLI, and asking for it defeats the point of the dashboard. After the user says
+  they're done, re-run `notionmemory status` — it live-verifies the connection — and only
+  proceed once it reports connected. Don't attempt DB setup before this passes.
+- **Connected but not bound** (`calendar connection` shows "not bound"): present a menu —
+  1) create a new Calendar DB: `notionmemory calendar connect --new`
+  2) connect an existing one: `notionmemory calendar connect --url <url>`
+  3) skip for now.
+  `connect --url` adopts an existing DB: it adds any missing columns the calendar schema
+  needs, but **refuses on a hard type conflict** (e.g. an existing property with the same
+  name but an incompatible type) rather than guessing. Report the resulting DB link and any
+  columns that were added. If it refuses, relay the reason verbatim and re-offer the menu —
+  don't guess a fix.
+- **Setup sequence** when several things are unconfigured at once, do them in this order:
+  PAT (settings dashboard) → memory → calendar → library (ask "want me to index it for
+  search?" → `notionmemory library refresh`) → templates (usage note only, no setup needed).
+
 ## Find content with library
 
 Finding things **by content** — "where did I file this / how did I do X before" — is not

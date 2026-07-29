@@ -12,8 +12,8 @@ it by content in one shot.
 ```
 notionmemory library search "<query>" [--limit N]   # ranked pointers (source · title · section · id)
 notionmemory library read <page-id>                 # live-read the found page's body (block ids inline)
-notionmemory library refresh [--full]                # refresh the index (--full for a full crawl)
-notionmemory library status                          # index age · count
+notionmemory library refresh [--full]                # refresh the scan (--full for a full crawl)
+notionmemory library status                          # scan age · count
 ```
 
 `search` returns **pointers, not body content** — `content · [page-id] title > section`,
@@ -30,19 +30,19 @@ notionmemory library status                          # index age · count
   raw body content doesn't flood the main context. (Delegation conditions: 3+ sources, synthesis
   needed, read-only. Source pointers must always be returned.)
 
-## If the index is empty or stale
+## If the scan is empty or stale
 
-If session start injects "library index: none" or a stale age, the index doesn't exist yet or is
-out of date. **Tell the user you're building the search index**, then run `library refresh --full`
+If session start injects "library: not scanned yet" or a stale age, the scan doesn't exist yet or
+is out of date. **Tell the user you're scanning their Notion**, then run `library refresh --full`
 before searching (this crawls the whole workspace and takes time, so don't do it silently). For
 queries where recency matters, like "what did I write today," also `refresh` first.
 
 ## Limits
 
-- **The index only knows titles and headings.** A page whose relevant content lives only in the
+- **The scan only knows titles and headings.** A page whose relevant content lives only in the
   body, not in the title or headings, may not be found — try broadening the query with synonyms
   (e.g., "container orchestration" → "Kubernetes"), or ask the user which page they mean.
-- Search reflects the current index, so **a page you just created may not show up until you
+- Search reflects the current scan, so **a page you just created may not show up until you
   refresh.**
 - **Date/status filters** ("tomorrow's schedule", "incomplete todos") belong to calendar/templates'
   structured queries, not library. library only finds things by "what they're about" (text).

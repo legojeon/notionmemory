@@ -16,6 +16,13 @@ class Config:
         with open(path, "r", encoding="utf-8") as f:
             return cls(yaml.safe_load(f) or {}, path)
 
+    def reload(self) -> None:
+        """디스크에서 data 를 다시 읽어 in-place 갱신 — serve 실행 중 외부(CLI/에이전트)
+        config 변경을 반영한다. path 가 없거나 파일이 없으면 무변경(in-memory 유지)."""
+        if self.path and os.path.exists(self.path):
+            with open(self.path, "r", encoding="utf-8") as f:
+                self.data = yaml.safe_load(f) or {}
+
     def get(self, key: str, default=None):
         return self.data.get(key, default)
 

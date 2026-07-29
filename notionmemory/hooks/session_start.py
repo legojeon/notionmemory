@@ -143,19 +143,45 @@ def library_injection() -> str:
     빈 색인은 무출력이 아니라 **신호**를 낸다(memory 의 suppress-when-empty 와 반대):
     설치 후 첫 세션에 에이전트가 이걸 보고 refresh 를 돌려 색인을 만든다(스펙 §4·§6).
     접두사를 고정한다 — 첫 글자가 '[' 나 '{' 이면 Claude Code 2.1.215+ 가 훅을 실패 처리한다.
+
+    3갈래 판정(미갱신/빈/색인됨) 자체는 `core/status.py`의 `library_state()`가 계산한다
+    — `notionmemory status`(에이전트 PAT 재확인·CLI)도 같은 판정을 쓰므로 여기서 다시
+    구현하지 않는다(중복 구현 금지, task-3 계약).
     """
     try:
-        from notionmemory.skills.library import index
-        idx = index.load()
-        if not index.was_refreshed(idx):
+        from notionmemory.core.status import library_state
+        st = library_state()
+        if not st["refreshed"]:
             return _m("hook.library_empty")
-        n = index.count(idx)
-        if not n:
+        if not st["count"]:
             # refresh 는 돌았는데 공유 페이지가 0개 — 넛지하지 않는다(빈 워크스페이스를 매
             # 세션 닦달하지 않기 위해; templates/memory 의 suppress-when-empty 와 같은 침묵).
             return ""
-        wm = index.watermark(idx) or _m("hook.watermark_unknown")
-        return _m("hook.library_count", n=n, watermark=wm)
+        wm = st["watermark"] or _m("hook.watermark_unknown")
+        return _m("hook.library_count", n=st["count"], watermark=wm)
+    except Exception:
+        return ""
+
+
+def onboarding_injection() -> str:
+    """PAT 미연결 / calendar·memory 미바인딩이면 온보딩 넛지 한 블록(settings 대시보드로
+    안내). 전부 설정돼 있으면 "" — 매 세션 닦달하지 않는다.
+
+    `status.probe(config, verify=False)`를 쓴다 — `verify=True`는 live HTTP 왕복이라
+    세션마다 도는 이 훅에는 못 쓴다(task-3 계약, `test_injection_makes_no_network_call`).
+    PAT 미연결이 최우선 조건이다 — DB 바인딩보다 먼저 풀어야 하는 게이팅 전제이기 때문에,
+    PAT 안내와 DB 설정 안내를 동시에 찍지 않고 PAT 쪽을 먼저 반환한다."""
+    try:
+        from notionmemory.core import status as status_mod
+        from notionmemory.core.config import Config
+        config = Config.load(str(paths.config_path()))
+        st = status_mod.probe(config, verify=False)
+        if not st["notion"]["connected"]:
+            return _m("hook.onboarding_pat", cli=CLI)
+        missing = [name for name in ("calendar", "memory") if not st[name]["bound"]]
+        if missing:
+            return _m("hook.onboarding_setup", skills=", ".join(missing), cli=CLI)
+        return ""
     except Exception:
         return ""
 
@@ -201,6 +227,9 @@ def main(harness: str = "claude") -> int:
         lib = library_injection()
         if lib:
             print(lib)
+        onboarding = onboarding_injection()
+        if onboarding:
+            print(onboarding)
     except Exception:
         pass
     try:

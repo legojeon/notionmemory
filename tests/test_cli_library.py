@@ -97,7 +97,7 @@ def test_status_prints_count_and_age(capsys):
 
 def test_status_empty_index(capsys):
     assert cli.main(["library", "status"]) == 0
-    assert "없" in capsys.readouterr().out or "0" in capsys.readouterr().out
+    assert "훑" in capsys.readouterr().out or "0" in capsys.readouterr().out
 
 
 def test_status_refreshed_but_empty_workspace(capsys):
