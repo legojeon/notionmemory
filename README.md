@@ -35,22 +35,29 @@ notionmemory install --codex --skip-skills --trust-codex-hooks   # hooks + trust
 # --trust-codex-hooks: required or Codex will silently not fire the installed hooks
 ```
 
-3) Open settings and connect — required before the skills can reach your workspace:
+3) Get set up — run guided onboarding:
 
-Once the plugin is installed, just ask your agent to open the settings dashboard —
-it runs the **`notionmemory:settings`** skill for you. Or open it directly from a
-terminal:
+Once installed, just ask your agent to **onboard you** — it runs the
+**`notionmemory:onboard`** skill. On your first session the agent also offers this
+automatically. Onboarding walks you through connecting Notion and setting up memory,
+calendar, and library as guided choices, and skips anything already done.
+
+When it reaches the **Notion token** step it sends you to the settings dashboard to
+paste your integration token (`ntn_...`) — the token is entered there, never in chat.
+Create one at <https://www.notion.so/my-integrations>, and share the Notion pages/DBs
+you want notionmemory to use with that integration. It's stored in your OS keyring,
+never in config.
+
+You can open that dashboard anytime — ask the agent for the **`notionmemory:settings`**
+skill, or run it from a terminal:
 
 ```bash
 notionmemory serve      # opens the settings dashboard at http://localhost:8765
 ```
 
-In the dashboard, click the **Notion** connection and paste your Notion integration
-token (`ntn_...`). Create one at <https://www.notion.so/my-integrations>, and share
-the Notion pages/DBs you want notionmemory to use with that integration. The token is
-stored in your OS keyring, never in config. This same dashboard shows the **Agent**
-(Claude Code / Codex) and **git** (gh) connections so you can verify them in one place.
-Until Notion is connected, the skills load but can't read or write Notion.
+It shows your **Notion**, **Agent** (Claude Code / Codex), and **git** (gh) connections
+in one place so you can verify them. Until Notion is connected, the skills load but
+can't read or write Notion.
 
 Prefer no plugin? One uniform command sets up both harnesses (skills unnamespaced):
 
@@ -66,6 +73,7 @@ before it's reachable as `legojeon/notionmemory`, add it by path instead:
 
 ## Skills
 
+- **onboard** — first-time guided setup: connect Notion and set up memory, calendar & library
 - **memory** — save/recall long-term decisions & patterns in a Notion Second Brain
 - **calendar** — read/create/move events in a Notion calendar DB
 - **templates** — CRUD over your registered Notion templates & databases
