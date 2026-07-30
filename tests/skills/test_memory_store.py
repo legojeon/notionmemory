@@ -40,25 +40,35 @@ def test_score_ascii_token_uses_word_boundary_korean_uses_substring():
 
 
 def test_build_filter_active_plus_type_without_project():
+    # Status: Active뿐 아니라 Draft도 회수 대상 — Second Brain v2에서 새 메모리는
+    # Draft로 시작해 consolidation이 나중에 Active로 승격한다(2026-07-29 스레딩).
     assert build_filter() == {"and": [
-        {"property": "Status", "select": {"equals": "Active"}}]}
+        {"or": [{"property": "Status", "select": {"equals": "Active"}},
+                {"property": "Status", "select": {"equals": "Draft"}}]},
+        {"property": "Type", "select": {"does_not_equal": "brief"}}]}
     f = build_filter(mem_type="bug")
     assert {"property": "Type", "select": {"equals": "bug"}} in f["and"]
+    # brief 는 consolidation 예약 Type — mem_type 지정 여부와 무관하게 항상 제외
+    assert {"property": "Type", "select": {"does_not_equal": "brief"}} in f["and"]
     # Project 옵션은 저장 시점에 동적으로 생기므로, 스키마에 없는 값으로 select 필터를
     # 걸면 Notion이 400을 낸다 — 서버 필터에서 제외하고 recall이 클라이언트에서 거른다.
     assert "Project" not in json.dumps(f)
 
 
 def _page(mem_id, title, concepts=(), excerpt="", edited="2026-07-16T00:00:00.000Z",
-          project="p"):
-    return {"id": f"pg_{mem_id}", "last_edited_time": edited, "properties": {
+          project="p", status="Active", strength=None):
+    props = {
         "Mem ID": {"rich_text": [{"plain_text": mem_id}]},
         "Title": {"title": [{"plain_text": title}]},
         "Type": {"select": {"name": "fact"}},
         "Concepts": {"multi_select": [{"name": c} for c in concepts]},
         "Excerpt": {"rich_text": [{"plain_text": excerpt}]},
         "Project": {"select": {"name": project} if project else None},
-    }}
+        "Status": {"select": {"name": status}},
+    }
+    if strength is not None:
+        props["Strength"] = {"number": strength}
+    return {"id": f"pg_{mem_id}", "last_edited_time": edited, "properties": props}
 
 
 def test_page_summary_extracts_fields():
@@ -256,6 +266,72 @@ def test_get_returns_summary_with_content():
 
 def test_get_missing_returns_none():
     assert _store(FakeDB(page=None)).get("mem_x") is None
+
+
+# ── project_brief / top_memories (Second Brain v2 Phase 2a Task 5) ────
+
+def test_project_brief_returns_body_when_page_found():
+    db = FakeDB(page={"id": "pg_brief"}, content="핵심 결정 롤업")
+    assert _store(db).project_brief("proj") == "핵심 결정 롤업"
+
+
+def test_project_brief_empty_when_no_page():
+    db = FakeDB(page=None)
+    assert _store(db).project_brief("proj") == ""
+
+
+def test_top_memories_filters_active_and_min_strength_then_sorts_desc():
+    pages = [
+        _page("low", "low strength", status="Active", strength=5),
+        _page("high", "high strength", status="Active", strength=9),
+        _page("draft", "draft item", status="Draft", strength=10),
+        _page("mid", "mid strength", status="Active", strength=8),
+    ]
+    out = _store(FakeDB(pages=pages)).top_memories("p", min_strength=8, limit=5)
+    assert [m["mem_id"] for m in out] == ["high", "mid"]
+
+
+def test_top_memories_respects_limit():
+    pages = [_page(f"m{i}", f"t{i}", status="Active", strength=9) for i in range(5)]
+    out = _store(FakeDB(pages=pages)).top_memories("p", min_strength=8, limit=2)
+    assert len(out) == 2
+
+
+def test_top_memories_scopes_project_client_side():
+    pages = [_page("mine", "t", project="p", status="Active", strength=9),
+             _page("shared", "t", project="", status="Active", strength=9),
+             _page("other", "t", project="q", status="Active", strength=9)]
+    out = _store(FakeDB(pages=pages)).top_memories("p", min_strength=8, limit=5)
+    assert sorted(m["mem_id"] for m in out) == ["mine", "shared"]
+
+
+def test_top_memories_passes_build_filter_excluding_brief():
+    db = FakeDB(pages=[])
+    _store(db).top_memories("p", min_strength=8, limit=5)
+    assert db.last_filter == build_filter()
+
+
+def test_manual_remember_strength_clears_gate_auto_draft_does_not():
+    """fix round 1 — cli.py 의 특권(수동=8, --auto=7)이 실제로 SessionStart 게이트
+    (top_memories, min_strength=8)를 가르는지 왕복 확인한다. remember()가 쓴 값을
+    query() 응답으로 되먹여(FakeDB는 저장·조회가 분리돼 있으므로 수동으로 잇는다)
+    수동 저장만 top_memories 에 나타나고 auto 초안(Draft·7)은 여전히 숨는지 본다."""
+    write_db = FakeDB()
+    store = _store(write_db)
+    store.remember("수동 저장", mem_type="fact", project="p", status="Active", strength=8)
+    manual = write_db.created[0]
+    store.remember("자동 초안", mem_type="fact", project="p", status="Draft", strength=7)
+    auto = write_db.created[1]
+    assert manual["strength"] == 8 and auto["strength"] == 7
+
+    pages = [
+        _page(manual["id"], manual["title"], project="p", status="Active",
+              strength=manual["strength"]),
+        _page(auto["id"], auto["title"], project="p", status="Draft",
+              strength=auto["strength"]),
+    ]
+    out = _store(FakeDB(pages=pages)).top_memories("p", min_strength=8, limit=5)
+    assert [m["mem_id"] for m in out] == [manual["id"]]
 
 
 def test_forget_sets_status_or_false():

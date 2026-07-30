@@ -65,12 +65,18 @@ def HOOK_EVENTS(cli_path: str, harness: str = "claude") -> dict:
         if harness != "claude":
             cmd += f" --harness {harness}"
         return {"hooks": [{"type": "command", "command": cmd, "timeout": 20}]}
-    # Stop 은 등록하지 않는다 — 매 턴 발화하는데 그 시점엔 에이전트가 이미 턴을 끝냈고
-    # Stop 에는 컨텍스트 주입 채널이 없다(Codex 스키마상 hookSpecificOutput 이 없다).
-    # 남는 systemMessage 는 화면 전용이라 Codex 가 `warning:` 으로 매 턴 띄웠고, 정작
-    # 실행 주체인 에이전트에게는 닿지 않았다. 근거 있는 큐 안내는 SessionStart 로 옮겼다.
+    # Stop 은 컨텍스트 주입용으로는 등록하지 않는다 — 매 턴 발화하는데 그 시점엔
+    # 에이전트가 이미 턴을 끝냈고 Codex 스키마상 hookSpecificOutput 이 없다(위와 같은
+    # 이유로 SessionStart 로 안내를 옮긴 내력은 그대로다). 하지만 Second Brain v2 는
+    # Stop 을 **큐잉 전용**(session-stop, 무출력·비블로킹)으로 쓴다 — 컨텍스트를
+    # 주입하지 않으므로 위 제약과 충돌하지 않는다.
     return {"SessionStart": [entry("session-start")],
-            "PreCompact": [entry("save-reminder")]}
+            "PreCompact": [entry("save-reminder")],
+            "Stop": [entry("session-stop")],
+            # UserPromptSubmit 은 메시지마다 로컬 memory 색인만 훑어 관련성 게이트를
+            # 넘을 때만 힌트를 주입한다(네트워크 0, task-3 계약) — Stop 과 달리
+            # additionalContext 채널이 있어 컨텍스트 주입에 써도 된다.
+            "UserPromptSubmit": [entry("user-prompt")]}
 
 
 def codex_trust_spec() -> ArtifactSpec:

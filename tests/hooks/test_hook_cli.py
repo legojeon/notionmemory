@@ -14,7 +14,7 @@ def _isolate_home(tmp_path, monkeypatch):
     """실기 HOME 상태(설치된 templates 프로필·git 큐·library 색인)로부터 격리한다.
 
     이게 없으면 SessionStart 의 `out == ""` 침묵 단언이 이 머신의 실제 주입에 오염될 수
-    있다(Task 5 리뷰가 지목한 pre-existing 위생 결함). save_reminder/resolve_cli 테스트는
+    있다(Task 5 리뷰가 지목한 pre-existing 위생 결함). save_reminder 테스트는
     payload cwd 로 config 를 찾으므로 HOME 이동에 영향받지 않는다."""
     monkeypatch.setenv("HOME", str(tmp_path))
 
@@ -137,171 +137,17 @@ def test_hook_cli_harness_defaults_to_claude(tmp_path, monkeypatch, capsys):
     assert not out.lstrip().startswith(("[", "{"))
 
 
-# ── session_start — 예외 흡수 ("세션 시작을 막지 않는다" 계약) ──────────
-# 구 tests/scripts/test_memory_hooks.py (dc382a3) 에서 이관. _load() 파일-경로
-# 동적 로딩 대신 패키지 import 로, ss.subprocess 대신 session_start.subprocess 로
-# 몽키패치한다. 무엇을 검증하는지는 원본과 동일하게 유지한다.
-
-def test_session_start_swallows_recall_timeout(monkeypatch, capsys):
-    def boom(*a, **k):
-        raise subprocess.TimeoutExpired("cmd", 12)
-    monkeypatch.setattr(session_start.subprocess, "run", boom)
-    monkeypatch.setattr(session_start, "library_injection", lambda: "")
-    monkeypatch.setattr(session_start, "onboarding_injection", lambda: "")
-    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"cwd": "/x/proj"})))
-    assert session_start.main() == 0
-    assert capsys.readouterr().out == ""
-
-
-def test_session_start_silent_on_cli_failure(monkeypatch, capsys):
-    monkeypatch.setattr(
-        session_start.subprocess, "run",
-        lambda cmd, **kw: subprocess.CompletedProcess(
-            cmd, 1, stdout="", stderr="Notion 토큰이 없습니다"))
-    monkeypatch.setattr(session_start, "library_injection", lambda: "")
-    monkeypatch.setattr(session_start, "onboarding_injection", lambda: "")
-    monkeypatch.setattr(sys, "stdin", io.StringIO("{}"))
-    assert session_start.main() == 0
-    assert capsys.readouterr().out == ""
-
-
-def test_session_start_swallows_missing_cli_binary(monkeypatch, capsys):
-    # resolve_cli() 가 argv[0]/PATH 양쪽에서 해석에 실패해도(둘 다 없는 극단적
-    # 상황) subprocess.run 자체가 FileNotFoundError 를 던질 수 있다 — 이 흡수는
-    # 그 경로의 안전망이다.
-    def boom(*a, **k):
-        raise FileNotFoundError("no cli binary")
-    monkeypatch.setattr(session_start.subprocess, "run", boom)
-    monkeypatch.setattr(session_start, "library_injection", lambda: "")
-    monkeypatch.setattr(session_start, "onboarding_injection", lambda: "")
-    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"cwd": "/x/proj"})))
-    assert session_start.main() == 0
-    assert capsys.readouterr().out == ""
-
-
-# ── session_start — 출력 동작 ────────────────────────────────────────
-
-def test_session_start_injects_recall_output(monkeypatch, capsys):
-    calls = []
-
-    def fake_run(cmd, **kw):
-        calls.append(cmd)
-        if cmd[0] == "git":
-            return subprocess.CompletedProcess(cmd, 0, stdout="/x/proj\n", stderr="")
-        return subprocess.CompletedProcess(cmd, 0, stdout="[fact] m1 · T\n", stderr="")
-
-    monkeypatch.setattr(session_start.subprocess, "run", fake_run)
-    # install 이 훅 명령에 박아둔 절대경로로 실행되면 이 프로세스의 sys.argv[0] 이
-    # 곧 그 경로다 — resolve_cli() 가 이걸 쓰도록 실제 값처럼 흉내낸다.
-    monkeypatch.setattr(session_start.sys, "argv",
-                        ["/opt/venv/bin/notionmemory", "hook", "session-start"])
-    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"cwd": "/x/proj"})))
-    assert session_start.main() == 0
-    out = capsys.readouterr().out
-    assert "notionmemory recall — project=proj:" in out and "[fact] m1 · T" in out
-    assert not out.lstrip().startswith(("[", "{"))  # JSON 스니핑 회피 회귀 가드
-    recall_cmd = next(c for c in calls if "recall" in c)
-    assert recall_cmd[1:] == ["recall", "--project", "proj"]
-    # 이 프로세스 자신의 경로(설치 시 훅 명령에 박힌 절대경로)로 재호출해야 한다 —
-    # bare "notionmemory" 는 PATH 에 없을 수 있다(실기에서 확인된 실패 원인: hook
-    # 은 절대경로라 실행되지만 그 안의 recall 서브프로세스가 bare 이름으로 PATH
-    # 조회에 실패해 FileNotFoundError 로 조용히 삼켜졌다).
-    assert recall_cmd[0] == "/opt/venv/bin/notionmemory"
-
-
-# ── session_start.resolve_cli — 이슈 #2: recall 서브프로세스가 bare 이름으로 ──
-# PATH 조회에 실패해 조용히 무력화되던 것의 회귀 가드.
-
-def test_resolve_cli_prefers_own_argv0_when_it_looks_like_a_path(monkeypatch):
-    monkeypatch.setattr(session_start.sys, "argv",
-                        ["/opt/venv/bin/notionmemory", "hook", "session-start"])
-    # bare 이름이 PATH 에 있어도(있을 수도, 없을 수도) argv[0] 이 경로처럼 보이면
-    # 그게 우선이다 — 이 프로세스 자신이 실행된 그 경로가 가장 신뢰할 수 있다.
-    monkeypatch.setattr(session_start.shutil, "which", lambda _: "/usr/local/bin/notionmemory")
-    assert session_start.resolve_cli() == "/opt/venv/bin/notionmemory"
-
-
-def test_resolve_cli_falls_back_to_which_when_argv0_is_not_a_path(monkeypatch):
-    monkeypatch.setattr(session_start.sys, "argv", ["-c"])
-    monkeypatch.setattr(session_start.shutil, "which", lambda _: "/usr/local/bin/notionmemory")
-    assert session_start.resolve_cli() == "/usr/local/bin/notionmemory"
-
-
-def test_resolve_cli_falls_back_to_bare_name_as_last_resort(monkeypatch):
-    monkeypatch.setattr(session_start.sys, "argv", ["-c"])
-    monkeypatch.setattr(session_start.shutil, "which", lambda _: None)
-    assert session_start.resolve_cli() == "notionmemory"
-
-
-def test_session_start_recall_uses_resolved_executable_when_bare_name_missing_from_path(
-        monkeypatch, capsys):
-    """이슈 #2 그 자체의 회귀 가드 — bare 'notionmemory' 가 PATH 에 없어도(실기
-    재현 상황) recall 서브프로세스는 이 프로세스 자신의 경로로 호출돼야 한다."""
-    calls = []
-
-    def fake_run(cmd, **kw):
-        calls.append(cmd)
-        if cmd[0] == "git":
-            return subprocess.CompletedProcess(cmd, 0, stdout="/x/proj\n", stderr="")
-        return subprocess.CompletedProcess(cmd, 0, stdout="[fact] m1 · T\n", stderr="")
-
-    monkeypatch.setattr(session_start.subprocess, "run", fake_run)
-    monkeypatch.setattr(session_start.sys, "argv",
-                        ["/opt/venv/bin/notionmemory", "hook", "session-start"])
-    monkeypatch.setattr(session_start.shutil, "which", lambda _: None)  # bare 이름 PATH 에 없음
-    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"cwd": "/x/proj"})))
-    assert session_start.main() == 0
-    recall_cmd = next(c for c in calls if "recall" in c)
-    assert recall_cmd[0] == "/opt/venv/bin/notionmemory"
-
+# ── session_start — memory 섹션(브리프+고Strength+pending nudge) ────────
+# 옛 recall 서브프로세스(resolve_cli/PATH 폴백 포함) 회귀 가드는 그 메커니즘 자체가
+# Second Brain v2 Phase 2a Task 5 로 대체되며 함께 은퇴했다 — 새 동작의 전담 테스트는
+# tests/hooks/test_session_start_brief.py (브리프/고Strength/pending nudge/침묵/
+# Notion 에러 흡수). "세션 시작을 막지 않는다" 예외 흡수 계약 자체는 그 파일의
+# test_notion_error_is_silent_no_raise 가 이어받는다.
 
 def test_session_start_cli_guidance_constant_stays_bare_name():
     """사용자 안내 문구에 넣는 CLI 이름은 절대경로로 바뀌면 안 된다 — 그대로
-    따라 칠 수 있어야 한다(subprocess 호출 경로 해석과는 별개 관심사)."""
+    따라 칠 수 있어야 한다."""
     assert session_start.CLI == "notionmemory"
-
-
-def test_session_start_silent_on_empty_stdout(monkeypatch, capsys):
-    monkeypatch.setattr(
-        session_start.subprocess, "run",
-        lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, stdout="", stderr=""))
-    monkeypatch.setattr(session_start, "library_injection", lambda: "")
-    monkeypatch.setattr(session_start, "onboarding_injection", lambda: "")
-    monkeypatch.setattr(sys, "stdin", io.StringIO("{}"))
-    assert session_start.main() == 0
-    assert capsys.readouterr().out == ""
-
-
-def test_session_start_silent_on_empty_db_fallback_boilerplate(monkeypatch, capsys):
-    def fake_run(cmd, **kw):
-        if cmd[0] == "git":
-            return subprocess.CompletedProcess(cmd, 0, stdout="/x/proj\n", stderr="")
-        return subprocess.CompletedProcess(
-            cmd, 0, stdout="결과 없음 — 최근 0건:\n(저장된 memory 없음)\n", stderr="")
-
-    monkeypatch.setattr(session_start.subprocess, "run", fake_run)
-    monkeypatch.setattr(session_start, "library_injection", lambda: "")
-    monkeypatch.setattr(session_start, "onboarding_injection", lambda: "")
-    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"cwd": "/x/proj"})))
-    assert session_start.main() == 0
-    assert capsys.readouterr().out == ""  # 빈 DB 폴백 문구만 있으면 컨텍스트에 노이즈를 넣지 않는다
-
-
-def test_session_start_injects_real_fallback_results(monkeypatch, capsys):
-    # 폴백(fallback)이어도 실제 memory 줄이 있으면 여전히 주입한다 — 노이즈 억제는
-    # "저장된 memory 없음" 케이스에만 한정된다.
-    def fake_run(cmd, **kw):
-        if cmd[0] == "git":
-            return subprocess.CompletedProcess(cmd, 0, stdout="/x/proj\n", stderr="")
-        return subprocess.CompletedProcess(
-            cmd, 0, stdout="결과 없음 — 최근 1건:\n[fact] m1 · T\n", stderr="")
-
-    monkeypatch.setattr(session_start.subprocess, "run", fake_run)
-    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"cwd": "/x/proj"})))
-    assert session_start.main() == 0
-    out = capsys.readouterr().out
-    assert "notionmemory recall — project=proj:" in out and "[fact] m1 · T" in out
-    assert not out.lstrip().startswith(("[", "{"))  # JSON 스니핑 회피 회귀 가드
 
 
 # ── session_start — 프로젝트 이름 해석 ──────────────────────────────

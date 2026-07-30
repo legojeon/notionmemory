@@ -74,7 +74,7 @@ calendar 작업 전(특히 세션의 첫 작업 전) 연결 상태를 확인한�
   거부한다. 결과 DB 링크와 추가된 컬럼을 보고한다. 거부되면 사유를 그대로 전달하고 메뉴를
   다시 제시한다 — 임의로 고치려 하지 않는다.
 - **설정 순서**: 여러 가지가 한꺼번에 미설정이면 이 순서로 처리한다 —
-  PAT(settings 대시보드) → memory → calendar → library("검색용으로 색인할까요?" →
+  PAT(settings 대시보드) → memory → calendar → library("검색용으로 훑어둘까요?" →
   `notionmemory library refresh`) → templates(사용법 안내만, 설정 불필요).
 
 ## 내용은 library로 찾는다

@@ -11,8 +11,10 @@ from notionmemory.core import i18n, paths, status as status_probe
 from notionmemory.core.config import Config
 from notionmemory.core.i18n import tui
 from notionmemory.core.notion_client import NotionSession
+from notionmemory.skills.memory import consolidate as mem_consolidate
+from notionmemory.skills.memory import reindex as mem_reindex
 from notionmemory.skills.memory.notion_db import (
-    ALL_TYPES, NotASecondBrainError, SecondBrainDB, db_url as mem_db_url)
+    CAPTURE_TYPES, NotASecondBrainError, SecondBrainDB, db_url as mem_db_url)
 from notionmemory.skills.memory.store import MemoryStore
 from notionmemory.core.notion_markdown import markdown_to_blocks
 from notionmemory.skills.git import hooks as gc_hooks
@@ -132,12 +134,24 @@ def _cmd_remember(args) -> int:
         return 2
     store = MemoryStore(NotionSession(), config)
     concepts = _split_csv(args.concepts)
+    # 수동 특권: --auto 없이 저장한 건 사용자가 직접 요청한 것이므로 Active로
+    # 바로 들어간다. --auto (에이전트 자체 판단)는 Draft — consolidation 전까지
+    # 회수는 되지만(빌드 필터가 Draft도 포함) 아직 "확정"은 아니다.
+    # Strength도 같은 특권을 반영한다: 사용자가 명시적으로 "기억해" 라고 한 건
+    # 정의상 고신호이므로 SessionStart의 top_memories 게이트(≥8)를 바로 넘긴다.
+    # --auto 초안은 7(플레이스홀더) — consolidation이 실제 값을 매길 때까지는
+    # Draft라 애초에 top_memories 대상이 아니다(Status=Active만 본다). 이걸 안
+    # 하면 수동 저장이 Active-7로 영구 고정돼 SessionStart에서 다시는 안 보이는
+    # 회귀가 난다(consolidation은 Draft만 승격하고 이미 Active인 행은 건드리지
+    # 않으며, Strength를 다시 매길 CLI도 없다).
+    status = "Draft" if args.auto else "Active"
+    strength = 7 if args.auto else 8
     result = store.remember(
         args.content, mem_type=args.type, concepts=concepts,
         project=args.project or str(opts.get("default_project") or ""),
         files=_split_csv(args.files), source=args.source,
         related=_split_csv(args.related), links=args.link,
-        supersedes=args.supersedes, url=args.url)
+        supersedes=args.supersedes, url=args.url, status=status, strength=strength)
     line = f"Saved {result['mem_id']} with {len(result['concepts'])} concepts"
     if result["concepts"]:
         line += ": " + ", ".join(result["concepts"])
@@ -395,8 +409,9 @@ def _cmd_calendar(args) -> int:
 
 
 def _cmd_memory(args) -> int:
-    """`memory` 신규 서브파서 그룹 — `connect`/`connection` 만 담는다. remember/recall/forget
-    은 top-level 로 그대로 둔다(브리프 명시: 여기로 옮기지 않는다)."""
+    """`memory` 신규 서브파서 그룹 — `connect`/`connection`/`consolidate`/`reindex` 를
+    담는다. remember/recall/forget 은 top-level 로 그대로 둔다(브리프 명시: 여기로
+    옮기지 않는다)."""
     config = Config.load(args.config)
     if args.action == "connection":
         lang = i18n.language(config)
@@ -408,6 +423,19 @@ def _cmd_memory(args) -> int:
                            new_kwargs={},
                            exc_types=(NotASecondBrainError, ValueError, RuntimeError),
                            url_fn=mem_db_url)
+    if args.action == "consolidate":
+        res = mem_consolidate.run(config, print, project=args.project or "")
+        if res.get("error"):
+            return 1
+        print(f"승격 {res['promoted']}건 · 드롭 {res['dropped']}건 · 병합 {res['merged']}건"
+             f" · 브리프 갱신 {'예' if res['brief_updated'] else '아니오'}")
+        return 0
+    if args.action == "reindex":
+        count = mem_reindex.run(config, print)
+        if count < 0:
+            return 1
+        print(f"memory reindex 완료 — {count}건 색인")
+        return 0
     return 2
 
 
@@ -852,7 +880,7 @@ def main(argv=None) -> int:
 
     rem = sub.add_parser("remember")
     rem.add_argument("content")
-    rem.add_argument("--type", required=True, choices=list(ALL_TYPES))
+    rem.add_argument("--type", required=True, choices=list(CAPTURE_TYPES))
     rem.add_argument("--concepts", default="")
     rem.add_argument("--project", default="")
     rem.add_argument("--files", default="")
@@ -949,6 +977,12 @@ def main(argv=None) -> int:
     mcn.add_argument("--config", default=DEFAULT_CONFIG)
     mcon = mem_sub.add_parser("connection")
     mcon.add_argument("--config", default=DEFAULT_CONFIG)
+    mco = mem_sub.add_parser("consolidate")
+    mco.add_argument("--project", default="",
+                     help="이 프로젝트의 큐 잡만 처리(미지정이면 큐에 있는 전체 프로젝트)")
+    mco.add_argument("--config", default=DEFAULT_CONFIG)
+    mri = mem_sub.add_parser("reindex")
+    mri.add_argument("--config", default=DEFAULT_CONFIG)
 
     tpl = sub.add_parser("templates")
     tpl_sub = tpl.add_subparsers(dest="action", required=True)
@@ -1060,7 +1094,8 @@ def main(argv=None) -> int:
     stc.add_argument("--config", default=DEFAULT_CONFIG)
 
     hook = sub.add_parser("hook")
-    hook.add_argument("name", choices=["session-start", "save-reminder"])
+    hook.add_argument("name", choices=["session-start", "save-reminder", "session-stop",
+                                       "user-prompt"])
     hook.add_argument("--harness", choices=["claude", "codex"], default="claude",
                       help="호출한 하네스 — 훅 stdout 형태가 이벤트별로 달라서 필요"
                            "(기본값 claude, 안 주면 지금까지 동작 그대로)")
@@ -1172,9 +1207,11 @@ def main(argv=None) -> int:
     if args.cmd == "status":
         return _cmd_status(args)
     if args.cmd == "hook":
-        from notionmemory.hooks import save_reminder, session_start
+        from notionmemory.hooks import save_reminder, session_start, session_stop, user_prompt
         return {"session-start": session_start.main,
-                "save-reminder": save_reminder.main}[args.name](harness=args.harness)
+                "save-reminder": save_reminder.main,
+                "session-stop": session_stop.main,
+                "user-prompt": user_prompt.main}[args.name](harness=args.harness)
     if args.cmd == "install":
         from notionmemory.core.install import runner
         _resolve_install_language(args)

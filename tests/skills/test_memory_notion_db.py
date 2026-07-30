@@ -40,7 +40,8 @@ class Meta:
 
 
 def test_all_types_owned_here():
-    assert ALL_TYPES == ("pattern", "preference", "architecture", "bug", "workflow", "fact")
+    assert ALL_TYPES == ("pattern", "preference", "architecture", "bug", "workflow", "fact",
+                         "brief")
 
 
 def test_properties_include_excerpt():
@@ -227,3 +228,66 @@ def test_error_raises():
     fs = FakeSession([(400, {"message": "bad"})])
     with pytest.raises(RuntimeError):
         SecondBrainDB(fs).set_status("pg_1", "Stale")
+
+
+# ── query_drafts / replace_content (Second Brain v2 consolidation) ──────
+
+def _draft_page(page_id, mem_id, project, content="c", concepts=("a",)):
+    return {"id": page_id, "properties": {
+        "Mem ID": {"rich_text": [{"plain_text": mem_id}]},
+        "Type": {"select": {"name": "fact"}},
+        "Concepts": {"multi_select": [{"name": c} for c in concepts]},
+        "Excerpt": {"rich_text": [{"plain_text": content}]},
+        "Project": {"select": {"name": project} if project else None},
+    }}
+
+
+def test_query_drafts_sends_status_filter_and_matches_project_client_side():
+    fs = FakeSession([(200, {"results": [
+        _draft_page("pg_1", "m1", "proj"),
+        _draft_page("pg_2", "m2", "other"),
+    ], "has_more": False})])
+    drafts = SecondBrainDB(fs).query_drafts("ds_1", "proj")
+    assert [d["mem_id"] for d in drafts] == ["m1"]
+    assert drafts[0] == {"page_id": "pg_1", "mem_id": "m1", "type": "fact",
+                         "concepts": ["a"], "content": "c", "project": "proj"}
+    _, path, payload, _ = fs.calls[0]
+    assert path == "/data_sources/ds_1/query"
+    assert payload["filter"] == {"property": "Status", "select": {"equals": "Draft"}}
+
+
+def test_query_drafts_empty_project_returns_all_projects():
+    fs = FakeSession([(200, {"results": [
+        _draft_page("pg_1", "m1", "a"),
+        _draft_page("pg_2", "m2", ""),
+    ], "has_more": False})])
+    drafts = SecondBrainDB(fs).query_drafts("ds_1", "")
+    assert {d["mem_id"] for d in drafts} == {"m1", "m2"}
+
+
+def test_replace_content_deletes_existing_children_then_appends():
+    fs = FakeSession([
+        (200, {"results": [{"id": "b1"}, {"id": "b2"}], "has_more": False}),  # GET children
+        (200, {}),   # DELETE b1
+        (200, {}),   # DELETE b2
+        (200, {}),   # PATCH children (새 블록)
+    ])
+    SecondBrainDB(fs).replace_content("pg_1", "새 본문")
+    methods_paths = [c[:2] for c in fs.calls]
+    assert methods_paths[0] == ("GET", "/blocks/pg_1/children")
+    assert ("DELETE", "/blocks/b1") in methods_paths
+    assert ("DELETE", "/blocks/b2") in methods_paths
+    assert methods_paths[-1] == ("PATCH", "/blocks/pg_1/children")
+    assert fs.calls[-1][2]["children"][0]["paragraph"]["rich_text"][0]["text"]["content"] \
+        == "새 본문"
+
+
+def test_replace_content_handles_zero_existing_blocks():
+    fs = FakeSession([
+        (200, {"results": [], "has_more": False}),  # GET children — 비어 있음
+        (200, {}),                                    # PATCH children (append)
+    ])
+    SecondBrainDB(fs).replace_content("pg_1", "본문")
+    assert len(fs.calls) == 2
+    assert fs.calls[0][:2] == ("GET", "/blocks/pg_1/children")
+    assert fs.calls[1][:2] == ("PATCH", "/blocks/pg_1/children")

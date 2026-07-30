@@ -91,6 +91,14 @@ CATALOG = {
             "notionmemory: Notion is connected, but {skills} not set up yet. Offer the "
             "user guided setup for {skills} via the settings dashboard (the `settings` "
             "skill, or `{cli} serve`)."),
+        "hook.memory_brief": "project brief ({project}):\n{brief}",
+        "hook.memory_top": "high-strength memories ({project}): {items}",
+        "hook.memory_pending_consolidation": (
+            "unconsolidated memory activity in this project — run `{cli} memory "
+            "consolidate` to refine drafts"),
+        "hook.memory_index_empty": (
+            "memory: local search index is empty — run `notionmemory memory reindex` "
+            "to fill it (needed for per-message recall hints)"),
     },
     "ko": {
         # --- install ---
@@ -171,6 +179,13 @@ CATALOG = {
             "notionmemory: Notion 은 연결됐지만 {skills} 가 아직 설정되지 않았습니다. "
             "settings 대시보드(`settings` 스킬 또는 `{cli} serve`)로 {skills} 안내 설정을 "
             "제안하세요."),
+        "hook.memory_brief": "프로젝트 브리프({project}):\n{brief}",
+        "hook.memory_top": "고Strength 메모리({project}): {items}",
+        "hook.memory_pending_consolidation": (
+            "이 프로젝트에 미정리 항목 있음 — `{cli} memory consolidate` 로 정리하세요"),
+        "hook.memory_index_empty": (
+            "memory 색인 없음 — `notionmemory memory reindex` 로 채우세요"
+            "(메시지당 회수 힌트에 필요)"),
     },
 }
 

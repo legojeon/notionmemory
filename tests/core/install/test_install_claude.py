@@ -26,11 +26,11 @@ def test_install_claude_creates_skills_and_hooks(fake_home):
     for name in ("memory", "calendar", "templates", "settings"):
         assert (skills / name / "SKILL.md").is_file(), name
     settings = json.loads((fake_home / ".claude" / "settings.json").read_text(encoding="utf-8"))
-    for event in ("SessionStart", "PreCompact"):
+    for event in ("SessionStart", "PreCompact", "Stop"):
         assert "notionmemory hook" in json.dumps(settings["hooks"][event])
-    # Stop 은 더 이상 등록하지 않는다 — 매 턴 발화하는데 그 시점엔 에이전트가 이미
-    # 턴을 끝냈고 주입 채널도 없다(save_reminder 모듈 docstring 참조).
-    assert "Stop" not in settings["hooks"]
+    # Stop 은 컨텍스트 주입용으로는 여전히 안 쓴다(주입 채널이 없다) — 대신
+    # Second Brain v2 부터 큐잉 전용(session-stop, 비블로킹)으로 등록된다.
+    assert "notionmemory hook session-stop" in json.dumps(settings["hooks"]["Stop"])
 
 
 def test_install_hook_command_is_absolute(fake_home):

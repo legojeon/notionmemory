@@ -71,11 +71,14 @@ class CalendarDB:
         if cached:
             r = self.session.request("GET", f"/data_sources/{cached}")
             if r.status_code == 200:
-                # 스키마 진화가 필요해지면 SecondBrainDB.ensure()의 evolutions 패턴 도입
-                return cached
-            if r.status_code == 404:
-                if not create:
-                    return ""
+                body = r.json()
+                # 휴지통/아카이브된 data source 는 GET 만 200 이고 쓰기는 다 실패한다 —
+                # 무효 캐시로 보고 재부트스트랩(create=False면 아래에서 "" 반환).
+                if not (body.get("in_trash") or body.get("archived")):
+                    # 스키마 진화가 필요해지면 SecondBrainDB.ensure()의 evolutions 패턴 도입
+                    return cached
+                self.log(f"  ! 저장된 data source({cached})가 휴지통/아카이브 상태 → 재부트스트랩")
+            elif r.status_code == 404:
                 self.log(f"  ! 저장된 data source({cached}) 접근 불가(404) → 재부트스트랩")
             else:
                 raise RuntimeError(

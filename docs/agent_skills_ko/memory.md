@@ -24,6 +24,50 @@ notionmemory forget <mem_id>
 6. **에이전트가 스스로 판단해 저장할 때는 반드시 `--auto`를 붙인다.** 사용자가 명시적으로 요청한 저장은 `--auto` 없이. exit 2("자동 저장 꺼짐")가 나오면 저장을 포기하고 조용히 넘어간다.
 7. 기존 기억을 대체하면 `--supersedes <mem_id>`(원본은 Superseded로 보존), 관련 기억은 `--related <mem_id>`, 관련 Notion 페이지는 `--link <url>`.
 8. 저장 후 출력된 mem_id와 concepts를 사용자에게 그대로 에코한다 — 그것이 미래의 검색어다.
+9. **누가 결정했느냐에 따라 상태가 다르다.** `--auto` 저장(에이전트 자체 판단)은 **Draft**로
+   들어간다 — 회수는 되지만 아직 "확정"은 아니고, 나중에 `memory consolidate`가 Draft를
+   검토·정제해 실제 Strength를 매기고, 잡동사니는 드롭하고, 중복은 병합한다. `--auto`
+   **없는** 저장(사용자가 명시적으로 "기억해"라고 요청)은 즉시 **Active**로 들어가고
+   바로 중요한 것으로 취급된다 — 이건 consolidation이 필요 없다.
+
+## consolidation (Draft → Active)
+
+자동 캡처된 기억은 Draft로 시작하고, 나중에 한 번 더 손봐야 Strength가 매겨진 정식
+Active 기억이 된다(혹은 드롭/병합된다). 그 작업이 `notionmemory memory consolidate
+[--project <p>]`다 — LLM을 호출해 한 프로젝트의 Draft들을 검토한 뒤 결과를 Notion에
+반영한다(Active로 승격하며 Strength 1~10 부여, 가치 낮은 건 Forgotten으로 드롭, 중복은
+Superseded로 병합) — 그리고 그 프로젝트의 롤업 브리프를 갱신한다.
+
+- **이 명령은 비중첩으로 실행해야 한다** — 사용자 본인의 터미널이나 cron에서, 에이전트
+  세션 안에서가 아니다(자체 agent-runtime 호출이 필요하고, 에이전트 세션 안에 또 다른
+  에이전트 세션을 중첩하는 건 지원하지 않는다). 사용자가 지금 실행하길 원하면 도구 호출로
+  대신 돌리지 말고 평범한 터미널에서 직접 실행하라고 안내한다.
+- 이걸 먼저 나서서 돌릴 필요는 없다. SessionStart 컨텍스트에 미정리 Draft 안내(`미정리
+  초안 N개 — notionmemory memory consolidate 로 정리하세요`)가 뜨면, 그냥 사용자에게
+  전달만 하고 실행 시점은 사용자가 정하게 둔다.
+- SessionStart는 이 프로젝트의 브리프(consolidation이 유지하는 롤업 요약)와 고Strength
+  Active 기억도 있으면 함께 주입한다 — 이건 다시 `recall`할 필요 없는 공짜 배경 맥락으로
+  취급한다.
+
+## 메시지당 힌트(로컬 색인)
+
+로컬 memory 색인(`notionmemory memory reindex`로 만들고, `memory consolidate` 끝에
+자동 갱신됨)이 가벼운 메시지당 확인을 뒷받침한다: 일부 턴에서는 세션 컨텍스트에
+`relevant memory — "<title>" (recall for detail): notionmemory recall --get <mem_id>`
+같은 줄이 나타날 수 있다. 이건 권위 있는 주입이 아니라 힌트다 — best-effort 로컬
+어휘 매칭(임베딩 없음)이고, 메시지마다 뜨며, 없을 수도 있고 부정확할 수도 있다.
+
+- **답이 아니라 포인터로 취급한다.** 힌트로 뜬 제목이 실제로 사용자가 방금 물은 것과
+  관련 있어 보이면, 그걸 쓰기 전에 주어진 `recall --get <mem_id>`(또는 일반 `recall`)로
+  전체 내용을 가져온다. 힌트의 제목/id를 마치 회수한 내용인 것처럼 사용자에게 그대로
+  보여주지 않는다.
+- **관련 없으면 조용히 무시한다.** 무관한 힌트를 사용자에게 언급하거나 대화에 억지로
+  끼워넣지 않는다.
+- 대신 세션 컨텍스트에 색인이 비어 있다는 안내(예: "로컬 검색 색인이 비어 있습니다 —
+  `notionmemory memory reindex`로 채우세요")가 뜨면, 사용자에게 전달하거나
+  `notionmemory memory reindex` 실행을 제안한다 — 이 안내는 memory가 바인딩된
+  경우에만 뜬다. 실제 조회는 여전히 `recall`을 거친다 — 색인은 이 메시지당 힌트를
+  뒷받침하는 것일 뿐이다.
 
 ## recall 규약
 
@@ -71,7 +115,7 @@ memory 작업 전(특히 세션의 첫 작업 전) 연결 상태를 확인한다
   DB 링크를 보고한다. 거부되면 사유를 그대로 전달하고 메뉴를 다시 제시한다 — 임의로
   고치려 하지 않는다.
 - **설정 순서**: 여러 가지가 한꺼번에 미설정이면 이 순서로 처리한다 —
-  PAT(settings 대시보드) → memory → calendar → library("검색용으로 색인할까요?" →
+  PAT(settings 대시보드) → memory → calendar → library("검색용으로 훑어둘까요?" →
   `notionmemory library refresh`) → templates(사용법 안내만, 설정 불필요).
 
 ## 내용은 library로 찾는다

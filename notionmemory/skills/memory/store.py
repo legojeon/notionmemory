@@ -62,7 +62,17 @@ def build_filter(mem_type: str = "") -> dict:
     # Status/Type 옵션은 스키마에 시드되어 있어 서버 필터가 안전하다. Project 옵션은
     # 저장 시점에 동적으로 생기므로 스키마에 없는 값으로 select 필터를 걸면 Notion이
     # 400을 낸다 — recall이 클라이언트에서 project를 거른다.
-    clauses: list[dict] = [{"property": "Status", "select": {"equals": "Active"}}]
+    # Status: Active뿐 아니라 Draft도 포함 — Second Brain v2에서 새 메모리는 Draft로
+    # 시작해 consolidation(별도 배치)이 Active로 승격/가지치기한다. Active만 걸면
+    # consolidation 전까지 방금 저장한 메모리가 recall에서 보이지 않는다.
+    clauses: list[dict] = [{"or": [
+        {"property": "Status", "select": {"equals": "Active"}},
+        {"property": "Status", "select": {"equals": "Draft"}},
+    ]}]
+    # Type=brief 는 consolidation 이 소유하는 프로젝트 롤업 예약 행(mem_id=brief-<project>)
+    # — 일반 회수 결과로 절대 새어나가면 안 된다(notion_db.ALL_TYPES 에 브리프 추가 시
+    # 이 제외절도 같이 추가됨).
+    clauses.append({"property": "Type", "select": {"does_not_equal": "brief"}})
     if mem_type:
         clauses.append({"property": "Type", "select": {"equals": mem_type}})
     return {"and": clauses}
@@ -101,18 +111,32 @@ class ConfigMeta(SkillMeta):
 
 
 class MemoryStore:
+    # 인스턴스당 캐시 — 클래스 속성 기본값이라 테스트의 `MemoryStore.__new__(...)`
+    # (=__init__ 우회) 헬퍼에서도 안전하게 조회된다.
+    _ds_cache: str = ""
+
     def __init__(self, session, config: Config, log=None):
         self.db = SecondBrainDB(session, log=log)
         self.config = config
         self.meta = ConfigMeta(config)
 
     def _data_source(self) -> str:
-        opts = self.config.skill_options("memory")
-        return self.db.ensure(str(opts.get("parent_page_id") or ""), self.meta)
+        """data_source id — 인스턴스당 최대 1회만 `db.ensure()`(Notion GET 왕복)를
+        타도록 캐시한다. ensure()는 캐시된 id가 살아있는지 매번 확인하는 네트워크
+        호출이라, 캐시가 없으면 같은 인스턴스에서 project_brief 뒤에 top_memories
+        를 부르는 것만으로도 이 왕복이 두 배가 된다(SessionStart memory_injection
+        이 바로 이 패턴 — task-5 fix round 1). MemoryStore 는 CLI 커맨드/훅 호출/
+        consolidate 실행 하나당 새로 만들어지고 그 이상 오래 살지 않으므로, 인스턴스
+        수명 동안 데이터소스가 바뀔 일은 없다 — 캐시가 안전하다."""
+        if not self._ds_cache:
+            opts = self.config.skill_options("memory")
+            self._ds_cache = self.db.ensure(str(opts.get("parent_page_id") or ""), self.meta)
+        return self._ds_cache
 
     def remember(self, content: str, *, mem_type: str, concepts=(), project: str = "",
                  files=(), source: str = "manual", related=(), links=(),
-                 supersedes: str = "", url: str = "") -> dict:
+                 supersedes: str = "", url: str = "",
+                 status: str = "Active", strength: int = 7) -> dict:
         ds = self._data_source()
         old = None
         if supersedes:
@@ -126,7 +150,8 @@ class MemoryStore:
         title = re.sub(r"^#+\s*", "", first_line).strip()[:200] or mem_id
         memory = {
             "id": mem_id, "title": title, "content": content, "type": mem_type,
-            "concepts": list(concepts), "strength": 7, "source": source,
+            "concepts": list(concepts), "strength": strength, "status": status,
+            "source": source,
             "project": project, "files": list(files), "version": 1,
             "relatedIds": list(related),
             "linkPageIds": [page_id_from_url(u) for u in links],
@@ -159,6 +184,39 @@ class MemoryStore:
             return {"results": [s for _, s in hits[:top]], "fallback": False}
         recent = sorted(summaries, key=lambda s: s["last_edited"], reverse=True)
         return {"results": recent[:top], "fallback": True}
+
+    def project_brief(self, project: str) -> str:
+        """프로젝트 롤업 브리프 본문(mem_id=f"brief-{project}") — 없으면 "".
+
+        SessionStart 훅(Task 5)의 헤더 주입 전용. 일반 recall/top_memories 는
+        Type=brief 를 제외하므로(build_filter) 여기서만 조회한다."""
+        page = self.db.find_page_by_mem_id(self._data_source(), f"brief-{project}")
+        if page is None:
+            return ""
+        return self.db.page_content(page["id"])
+
+    def top_memories(self, project: str, *, min_strength: int = 8, limit: int = 3) -> list[dict]:
+        """고Strength Active 메모리 top-K(Strength desc). Type=brief 는 build_filter 가
+        이미 제외한다 — 브리프는 project_brief 전용 경로로만 노출된다(recall 과 동일
+        규율). Draft 는 아직 정제 전이라 제외(Status=Active 만)."""
+        ds = self._data_source()
+        pages = self.db.query(ds, build_filter())
+        hits = []
+        for p in pages:
+            props = p.get("properties", {})
+            status = (props.get("Status", {}).get("select") or {}).get("name", "")
+            if status != "Active":
+                continue
+            strength = (props.get("Strength", {}) or {}).get("number") or 0
+            if strength < min_strength:
+                continue
+            summary = page_summary(p)
+            if project and summary["project"] not in ("", project):
+                continue
+            summary["strength"] = strength
+            hits.append(summary)
+        hits.sort(key=lambda s: s["strength"], reverse=True)
+        return hits[:limit]
 
     def get(self, mem_id: str) -> dict | None:
         page = self.db.find_page_by_mem_id(self._data_source(), mem_id)

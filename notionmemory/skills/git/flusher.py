@@ -17,7 +17,7 @@ from notionmemory.core.agent_runtime import AgentRuntimeError, build_runtime
 from notionmemory.core.config import Config
 from notionmemory.core.notion_client import NotionSession
 from notionmemory.skills.git import queue
-from notionmemory.skills.memory.notion_db import ALL_TYPES
+from notionmemory.skills.memory.notion_db import CAPTURE_TYPES
 from notionmemory.skills.memory.store import MemoryStore
 
 DIFF_CAP = 4000  # 커밋당 git show 첨부 상한(문자)
@@ -26,7 +26,7 @@ SYSTEM = (
     "너는 git 커밋들을 장기 기억으로 요약하는 도우미다. 커밋 목록(+diff)을 읽고 "
     "의미 단위로 묶어 JSON 배열만 출력하라. 설명·코드펜스 금지. 각 원소: "
     '{"content": "첫 줄=제목, 이후 무엇을 왜 바꿨는지 요약(끝에 커밋 해시 나열)", '
-    f'"type": "{"|".join(ALL_TYPES)}" 중 하나, '
+    f'"type": "{"|".join(CAPTURE_TYPES)}" 중 하나, '
     '"concepts": ["소문자", "2~5개"], "hashes": ["묶인 커밋 전체 해시"]}. '
     "사소한 커밋들은 하나로 묶고, 서로 다른 주제는 원소를 나눠라. "
     "커밋들 중 장기 기억으로 남길 가치가 있는 내용이 하나도 없다면(예: 전부 사소하거나 "
@@ -121,7 +121,7 @@ def flush(config: Config, log, repo: str = "") -> int:
                 hashes = [h for h in (u.get("hashes") or []) if h in files_by_hash]
                 files = sorted({f for h in hashes for f in files_by_hash[h]}) or \
                     sorted({f for fs in files_by_hash.values() for f in fs})
-                mem_type = u["type"] if u.get("type") in ALL_TYPES else "fact"
+                mem_type = u["type"] if u.get("type") in CAPTURE_TYPES else "fact"
                 url = f"{base_url}/commit/{hashes[0]}" if base_url and hashes else ""
                 store.remember(
                     u["content"], mem_type=mem_type,

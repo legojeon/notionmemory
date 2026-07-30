@@ -77,7 +77,7 @@ Before a calendar operation (especially the first one in a session), check the c
   columns that were added. If it refuses, relay the reason verbatim and re-offer the menu —
   don't guess a fix.
 - **Setup sequence** when several things are unconfigured at once, do them in this order:
-  PAT (settings dashboard) → memory → calendar → library (ask "want me to index it for
+  PAT (settings dashboard) → memory → calendar → library (ask "want me to scan it for
   search?" → `notionmemory library refresh`) → templates (usage note only, no setup needed).
 
 ## Find content with library
