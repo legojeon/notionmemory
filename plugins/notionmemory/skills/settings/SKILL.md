@@ -39,4 +39,4 @@ open http://localhost:8765
 
 ## Notes
 
-- The port is fixed at `8765`. The server keeps running in the background, so let the user know to stop it with the `pkill` command above once they're done.
+- The port is fixed at `8765`. The server keeps running in the background — the user can just ask you to close settings (you run the `pkill` above), or run `pkill -f "notionmemory serve"` themselves if they prefer. Mention this once so they're not left with an orphaned server.

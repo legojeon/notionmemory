@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 220" role="img" aria-label="notionmemory — Notion as a second brain for coding agents">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f1f1f"/>
+      <stop offset="1" stop-color="#0e0e0e"/>
+    </linearGradient>
+  </defs>
+  <rect width="880" height="220" rx="20" fill="url(#bg)"/>
+
+  <!-- Notion-style rounded-square "N" mark -->
+  <g transform="translate(60,58)">
+    <rect width="104" height="104" rx="24" fill="#ffffff"/>
+    <text x="52" y="78" font-family="Georgia, 'Times New Roman', serif" font-size="74" font-weight="700"
+          fill="#191919" text-anchor="middle">N</text>
+  </g>
+
+  <!-- memory: a small connected-node graph, tucked into the top-right corner -->
+  <g stroke="#2e75cc" stroke-width="3" fill="#2e75cc">
+    <line x1="820" y1="34" x2="820" y2="70" stroke-opacity="0.55"/>
+    <line x1="820" y1="70" x2="792" y2="98" stroke-opacity="0.55"/>
+    <line x1="820" y1="70" x2="848" y2="98" stroke-opacity="0.55"/>
+    <circle cx="820" cy="34" r="7"/>
+    <circle cx="820" cy="70" r="7"/>
+    <circle cx="792" cy="98" r="7"/>
+    <circle cx="848" cy="98" r="7"/>
+  </g>
+
+  <!-- wordmark + tagline -->
+  <text x="206" y="102" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="54" font-weight="700" fill="#ffffff">notionmemory</text>
+  <text x="208" y="142" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="22" fill="#a6a6a6">Turn Notion into a second brain for your coding agents</text>
+</svg>

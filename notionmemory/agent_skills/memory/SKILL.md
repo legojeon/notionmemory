@@ -67,10 +67,11 @@ and can be absent or imperfect.
 - **If it's not relevant, ignore it silently.** Don't mention an irrelevant hint to the
   user or force it into the conversation.
 - If session context instead says the memory index is empty (e.g. "local search index
-  is empty — run `notionmemory memory reindex` to fill it"), relay that to the user or
-  suggest running `notionmemory memory reindex` — this note only appears when memory is
-  bound. Real lookups still go through `recall`; the index is just what powers this
-  per-message hint.
+  is empty — run `notionmemory memory reindex` to fill it"), **just run `notionmemory
+  memory reindex` yourself** — it's a quick local rebuild from Notion, so do it rather
+  than handing the user a command to type (mention in one line that you refreshed the
+  memory index). This note only appears when memory is bound. Real lookups still go
+  through `recall`; the index is just what powers this per-message hint.
 
 ## recall conventions
 

@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 360" role="img"
+     aria-label="Memory lifecycle: capture as draft, consolidate with importance scoring, recall the important memories at the right time — all in your Notion">
+  <defs>
+    <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8b93a1"/>
+    </marker>
+    <style>
+      .t   { font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif; }
+      .st  { font-weight:700; font-size:18px; fill:#191919; }
+      .li  { font-size:13.5px; fill:#3f4650; }
+      .hk  { font-size:12px; fill:#8b93a1; font-style:italic; }
+      .ar  { stroke:#8b93a1; stroke-width:2.4; fill:none; }
+      .dn  { stroke:#c3c9d2; stroke-width:2; stroke-dasharray:4 4; fill:none; }
+    </style>
+  </defs>
+
+  <rect x="1" y="1" width="918" height="358" rx="16" fill="#ffffff" stroke="#e1e4e8"/>
+
+  <!-- Stage 1: Capture -->
+  <g>
+    <rect x="30" y="40" width="262" height="150" rx="13" fill="#fbfbfe" stroke="#e1e4e8"/>
+    <rect x="30" y="40" width="262" height="6" rx="3" fill="#2e75cc"/>
+    <text class="t st" x="52" y="80">1 · Capture</text>
+    <text class="t li" x="52" y="108">“Remember this” &#8594; <tspan font-weight="700">Active</tspan></text>
+    <text class="t li" x="52" y="130">Agent decides on its own &#8594; <tspan font-weight="700">Draft</tspan></text>
+    <text class="t hk" x="52" y="166">as you work · zero effort</text>
+  </g>
+
+  <!-- Stage 2: Consolidate -->
+  <g>
+    <rect x="329" y="40" width="262" height="150" rx="13" fill="#fbf9ff" stroke="#e1e4e8"/>
+    <rect x="329" y="40" width="262" height="6" rx="3" fill="#8b5cf6"/>
+    <text class="t st" x="351" y="80">2 · Consolidate</text>
+    <text class="t li" x="351" y="106">Summarize &amp; refine the drafts</text>
+    <text class="t li" x="351" y="128">Score importance — <tspan font-weight="700">Strength 1–10</tspan></text>
+    <text class="t li" x="351" y="150">Merge · supersede · project brief</text>
+    <text class="t hk" x="351" y="178">Stop hook queues it · you run the pass</text>
+  </g>
+
+  <!-- Stage 3: Recall -->
+  <g>
+    <rect x="628" y="40" width="262" height="150" rx="13" fill="#f7fdf9" stroke="#e1e4e8"/>
+    <rect x="628" y="40" width="262" height="6" rx="3" fill="#16a34a"/>
+    <text class="t st" x="650" y="80">3 · Recall</text>
+    <text class="t li" x="650" y="106">Session start: brief + <tspan font-weight="700">top</tspan> memories</text>
+    <text class="t li" x="650" y="128">Per message: relevant-memory hint</text>
+    <text class="t li" x="650" y="150">Search &#8594; live read (never stale)</text>
+    <text class="t hk" x="650" y="178">SessionStart · UserPromptSubmit</text>
+  </g>
+
+  <!-- stage-to-stage arrows -->
+  <path class="ar" d="M296,115 L325,115" marker-end="url(#a2)"/>
+  <path class="ar" d="M595,115 L624,115" marker-end="url(#a2)"/>
+
+  <!-- Notion store -->
+  <rect x="30" y="266" width="860" height="66" rx="13" fill="#191919"/>
+  <rect x="52" y="282" width="34" height="34" rx="8" fill="#ffffff"/>
+  <text x="69" y="307" font-family="Georgia,serif" font-size="24" font-weight="700" fill="#191919" text-anchor="middle">N</text>
+  <text class="t" x="104" y="299" font-size="16" font-weight="700" fill="#ffffff">Your Notion — Second Brain</text>
+  <text class="t" x="104" y="319" font-size="12.5" fill="#9b9b9b">one curated store · you own it · content read live</text>
+
+  <!-- connectors down to the store -->
+  <path class="dn" d="M161,190 L161,266"/>
+  <path class="dn" d="M460,190 L460,266"/>
+  <path class="dn" d="M759,190 L759,266"/>
+  <text class="t hk" x="170" y="230">write</text>
+  <text class="t hk" x="469" y="230">curate</text>
+  <text class="t hk" x="768" y="230">read</text>
+</svg>

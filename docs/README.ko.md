@@ -1,101 +1,275 @@
-# notionmemory
+<p align="center">
+  <img src="../assets/banner.svg" alt="notionmemory — Notion을 코딩 에이전트의 세컨드 브레인으로" width="100%">
+</p>
 
-Notion을 second-brain 허브로 삼아, 에이전트 장기기억·강의노트 등 여러 소스를 모으는 개인 플랫폼. superpowers처럼 **스킬을 계속 꽂는** 구조.
+<p align="center">
+  <a href="https://pypi.org/project/notionmemory/"><img src="https://img.shields.io/pypi/v/notionmemory.svg" alt="PyPI 버전"></a>
+  <img src="https://img.shields.io/pypi/pyversions/notionmemory.svg" alt="Python 버전">
+  <a href="../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/Notion-second%20brain-191919?logo=notion&logoColor=white" alt="Notion second brain">
+</p>
 
-## 🚀 새 세션(Claude 등)에서 시작하는 법 — 여기부터 읽으세요
+<p align="center"><a href="../README.md">English</a> | <b>한국어</b></p>
 
-**M1(플랫폼 골격)·M2(notes 이식)·M3(memory direct mode)·M4(보안+UI 마감)·§3 리팩터·git(커밋 자동 캡처)·calendar(일정 조회·등록)가 완료**되어 notes/memory/git/calendar 스킬을 실제로 사용할 수 있는 상태입니다(마일스톤 상세는 아래 "마일스톤" 절 참고).
+<p align="center">
+  <a href="#why-notionmemory">Why</a> ·
+  <a href="#install">Install</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#agents">Agents</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#uninstall">Uninstall</a>
+</p>
 
-1. **설계 이해**: `docs/superpowers/specs/2026-07-14-notionmemory-second-brain-design.md` 를 읽어 전체 그림·용어(capture/recall/action, 연동 모델)를 파악.
-2. **설치**: `uv tool install .` (또는 `pip install -e .`) 후
-   `notionmemory install --trust-codex-hooks` — Claude Code와 Codex 양쪽에 스킬과
-   세션 훅을 설치한다. 제거는 `notionmemory teardown` (Notion DB는 보존).
-   설치물 목록은 `notionmemory teardown --dry-run` 으로 확인한다.
+**notionmemory**는 여러분의 Notion을 코딩 에이전트(Claude Code, Codex)를 위한 장기 기억으로
+바꿔줍니다. 장기 기억, 캘린더, 템플릿, 내용 검색을 **설치형 스킬**로 제공하고, 세션 훅이 필요한
+맥락을 알아서 띄워줍니다. 모든 데이터는 **여러분의 Notion**에 그대로 쌓입니다 — 별도의 DB도,
+서버도 없습니다.
 
-   > **구 버전(`scripts/sync_skills.py`)에서 올라오는 경우**: 그때 심은 스킬 디렉터리에는
-   > 소유 표시(`.notionmemory-owned`)가 없다. install은 그런 디렉터리를 덮어쓰지 않고
-   > 건너뛰며 경로를 출력하고, teardown도 손대지 않고 알리기만 한다 — 사용자가 직접 만든
-   > 동명 스킬과 파일 시스템으로 구분할 수 없기 때문이다. 출력에 나온 경로를 직접 지운 뒤
-   > install을 다시 실행하면 된다.
-3. 완료 기준(현재): `python -m pytest` 전부 통과 + `notionmemory serve` 로 대시보드가 뜨고 notes/memory/git/calendar 스킬을 실행할 수 있음.
+명령어를 직접 입력할 필요는 없습니다. 에이전트에게 **평소처럼 말만 하세요** — "이거 기억해둬",
+"이거 어디에 정리했더라?", "캘린더에 넣어줘", "이 페이지 템플릿으로 등록해줘" — 그러면 에이전트가
+notionmemory를 알아서 실행합니다.
 
-## 실행
+<p align="center">
+  <img src="../assets/flow.svg" width="100%"
+       alt="Claude Code·Codex가 notionmemory에게 말을 걸면, notionmemory가 Notion·Notion Calendar에 저장하고 불러온다">
+</p>
 
-1. `cp config.example.yaml config.yaml` (필요한 옵션만 덮어써도 됨; 값 설명은 파일 안 주석 참고).
-2. `notionmemory serve` 로 대시보드 기동(기본 포트 8765) 후 브라우저에서 열기.
-3. 대시보드의 "연동" 패널에서 Notion PAT를 연결(토큰은 keyring에 저장, config.yaml엔 안 남음). agent 연동은 `claude` 또는 `codex` CLI가 PATH에 있으면 자동 감지된다.
-4. notion+agent가 모두 연결되면 notes 카드가 활성화된다. 카드를 열어 `input_dir`(정리할 노트/PDF 폴더)을 지정하고 실행 → 로그가 1초 간격으로 폴링되며, 완료 시 성공/실패/스킵 카운트가 표시된다.
-5. 노션에 실제로 내보내기 전에 `limit: 1` + `dry_run: true` 로 먼저 스모크 실행해 보는 것을 권장.
+## Why notionmemory
 
-## git (커밋 자동 캡처)
+제가 직접 쓰려고 만들었습니다. [**agentmemory**](https://github.com/rohitg00/agentmemory)나
+[claude-mem](https://github.com/thedotmack/claude-mem) 같은 도구는 메모리를 **로컬 벡터
+DB**에 저장합니다. 빠르고 프라이빗하지만, 저에게는 두 가지가 계속 아쉬웠습니다.
 
-리포에서 커밋할 때마다 순수 셸로 동작하는 post-commit 훅이 커밋 메타(해시·subject·body·변경
-파일 목록)를 로컬 큐(`~/.local/state/notionmemory/gitqueue`)에 적재한다 — 네트워크 호출 없이
-ms 단위로 끝나며 어떤 경우에도 exit 0(커밋을 절대 깨뜨리지 않음). 큐는 그 자리에서 Notion에
-쓰이지 않고, 이후 두 경로 중 하나로 플러시된다: 세션 Stop 훅 리마인더(에이전트가 `git show`로
-diff를 확인해 여러 커밋을 의미 단위로 묶어 요약·저장) 또는 `notionmemory git flush`
-(headless 배치 요약). **diff 원문은 Notion에 저장하지 않는다** — 해시·Files·GitHub Link만
-포인터로 남기고, 코드의 집은 항상 git 자체다.
+- **무엇이 저장됐는지 볼 수가 없습니다.** 벡터 DB는 사실상 블랙박스라, 열어서 에이전트가
+  "기억한" 내용을 확인하거나 틀린 항목을 고치기 어렵습니다. Notion이라면 그냥 페이지이니, 저장된
+  메모리를 제가 직접 읽고 고칠 수 있습니다.
+- **기기를 옮기면 기억이 끊깁니다.** 저는 서버와 노트북을 오가며 개발하는데, 한 기기에 저장된
+  메모리는 다른 기기와 공유되지 않습니다. Notion은 이미 **클라우드**라, 어디서 작업하든 같은
+  기억을 씁니다.
 
-| 서브커맨드 | 설명 |
-| --- | --- |
-| `install [path]` | 대상 리포에 post-commit 훅 설치 + 중앙 레지스트리 등록(기존 훅은 마커 블록으로 체이닝) |
-| `uninstall [path]` | 훅 제거 + 자동 설치 제외 목록에 등록 |
-| `status [--repair]` | 등록된 리포의 훅 상태 일람, `--repair`로 누락분 일괄 재설치 |
-| `list [--all]` | 큐 내용 출력(기본 현재 리포, `--all`로 전체) |
-| `ack <hash>...` | 저장 완료된 커밋을 큐에서 제거 |
-| `flush [--repo path]` | headless로 큐를 요약해 Notion에 저장하고 정리(기본 전체 리포) |
+여기에 더해, 에이전트가 코드뿐 아니라 제 **공부 노트와 일정**까지 다뤄주면 좋겠다고 생각했습니다.
+그 자료들은 이미 Notion에 있으니까요. 메모리까지 같은 곳에 두면, 숨겨진 별도 DB가 아니라 저와
+에이전트가 어디서든 닿는 하나의 공간이 됩니다. 그래서 notionmemory는 **Notion을 클라우드처럼**
+씁니다 — 눈에 보이고, 직접 고칠 수 있고, 공유되고, 이미 제 일상이 담긴 곳으로요.
 
-`config.yaml`의 `skills.git`에서 `install_policy`(`auto`\|`ask`\|`off`, 기본 `auto`) /
-`repos`(등록된 리포 목록, install이 관리) / `exclude`(자동 설치 제외 목록)를 설정한다.
-`install_policy: auto`일 때는 세션 시작 시 현재 리포에 훅이 없으면 자동으로 설치한다.
+## Install
 
-> **기존 설치 마이그레이션(config 키 rename)**: `notes-capture`→`notes`, `git-capture`→`git`
-> 이름 변경 이전에 만든 `config.yaml`이 있다면 `skills.notes-capture:` → `skills.notes:`,
-> `skills.git-capture:` → `skills.git:`로 **키 이름만** 바꿔야 한다(값은 그대로 둠). 바꾸지
-> 않으면 해당 섹션은 조용히 무시되고 기본값이 쓰인다 — 예: notes의 `parent_page_id`가
-> 사라져 엉뚱한 위치에 쓰이거나, git의 `exclude` 목록이 사라져 제외했던 리포에 훅이
-> 자동 재설치될 수 있다.
+### 1. 백엔드 설치 (사용자 범위)
 
-## calendar (일정 조회·등록)
+**사용자 범위(user scope)**로 설치하세요. `sudo`나 시스템 전역 설치는 피해야 합니다.
+notionmemory는 스킬, 세션 훅, 로컬 상태를 홈 디렉터리 아래(`~/.claude`, `~/.codex`,
+`~/.config/notionmemory`, `~/.local/state/notionmemory`)에 두기 때문에, 반드시 본인 계정으로
+실행돼야 합니다.
 
-전용 Notion `Calendar` DB를 부트스트랩해 에이전트가 일정을 읽고 쓴다. 일정 하나 = DB 행 하나 =
-Notion 페이지(속성 + 본문 메모)이며, 일정 원문은 Second Brain에 복사하지 않는다 — 일정에서
-태어난 결정만 memory로 저장하고 페이지 URL을 `--link`로 잇는다.
+```bash
+pipx install notionmemory        # 권장 — 격리 설치 + PATH 등록 + 사용자 범위
+# 또는: uv tool install notionmemory
+# 또는: pip install --user notionmemory
+```
 
-| 서브커맨드 | 설명 |
-| --- | --- |
-| `list [--from D] [--to D] [--days N]` | 기본 오늘부터 7일, 시작 오름차순(취소분 제외) |
-| `add "<title>" --start "YYYY-MM-DD HH:MM"` | 일정 등록(`--end/--location/--link/--notes/--source`). 시각 없이 날짜만 주면 종일 |
-| `update <event_id> [--start ...]` | 준 필드만 변경. 새 start와 기존 end가 안 맞으면 end 제거 + 경고 |
-| `cancel <event_id>` | Status=Canceled 기록 후 페이지를 휴지통으로(앱에서도 사라짐, 30일 내 복원 가능) |
-| `setup` | Notion Calendar 앱 연결 방법 안내 + DB 바로가기 출력 |
+### 2. 에이전트에 연결
 
-**Notion Calendar 앱 연결은 수동입니다** — 앱 설정에는 공개 API가 없어 자동화할 수 없다.
-`notionmemory calendar setup`(또는 대시보드의 calendar 카드)이 알려주는 3단계를 따르면 된다:
-① 앱에서 워크스페이스 연결 → ② `Calendar` DB 추가 → ③ **Make default calendar 지정**.
-③을 빼먹으면 앱에서 만든 일정이 Google 계정에 저장돼 에이전트가 읽지 못하므로 중요하다.
-시각이 있는 일정은 로컬 IANA 타임존으로 저장되고, 조회 구간 경계에도 로컬 오프셋이 붙는다.
+**여러 에이전트에 설치해도 됩니다** — 오히려 그게 핵심입니다. Claude Code와 Codex가 같은 기억을
+공유하니까요. 다만 **에이전트 하나당 설치 방법은 하나만** 쓰세요(플러그인 *또는*
+`notionmemory install`). 같은 에이전트에 두 방법을 다 쓰면 스킬이 중복 설치됩니다.
 
-## 핵심 설계 결정 (요약)
+**Claude Code (플러그인)**
 
-- **Notion = 허브이자 저장소**(사람·에이전트가 읽고 쓰는 창). memory 스킬은 Second Brain DB에 직접 저장·검색한다 — 별도 메모리 서버 없음.
-- **스킬 프리미티브 3종**: `capture`(백그라운드 소스→Notion 단방향) / `recall`(에이전트 호출 Notion 읽기) / `action`(에이전트 호출 1회성 Notion 쓰기). 스킬 하나가 여러 kind를 가질 수 있다(예: memory=capture+recall, calendar=recall+action). **양방향 sync 금지**.
-- **명명 규칙 — 이름=도메인, kinds=기능**: 스킬 이름은 "무엇에 대한 스킬인가"(도메인 명사: notes/git/memory/calendar)만 표현하고, "무엇을 하는가"는 `Skill.kinds`(`capture`/`recall`/`action`, 복수 가능)가 표현한다. 한 스킬 = 한 이름 = 패키지 폴더 = 스킬 id = config 키 = CLI 서브커맨드 = Notion `Source` 값. 이름에 기능을 박으면(예: `~-capture` 접미형 이름) 그 스킬에 읽기 verb가 추가되는 순간 이름이 거짓이 된다 — 실제로 두 스킬의 이름을 이 규칙에 맞게 도메인 명사만 남도록 정리한 적이 있다.
-- **LLM API 키 없음** — 추론은 구독형 agent 런타임(**claude/codex만**) 경유.
-- **Notion 단일 백엔드**(Obsidian 제외).
-- Python 3.13 + Flask + PyYAML + pytest.
+```bash
+/plugin marketplace add legojeon/notionmemory
+/plugin install notionmemory@notionmemory
+```
 
-## 마일스톤
+> ⚠️ 플러그인이 스킬과 세션 훅을 함께 설치합니다. `notionmemory install --claude`를 **따로
+> 실행하지 마세요** — 중복 설치됩니다.
 
-- **M1 — 플랫폼 골격** ✅ 완료: core(config·skill_base·integrations·registry) + 웹 대시보드(스킬 버튼 그리드, 미연결=비활성). 스킬 0개로도 동작.
-- **M2 — notes 이식** ✅ 완료: 기존 NoteSync 파이프라인을 이식(Obsidian 제거, LLM→agent 런타임 교체), 비동기 job + 로그 폴링으로 대시보드에서 실행 가능.
-- **M3 — memory direct mode** ✅ 완료: `notionmemory remember/recall/forget` CLI가 Notion Second Brain DB에 직접 저장·검색 + 사용자 레벨 훅(SessionStart 자동 주입, Stop/PreCompact 리마인더) + memory 에이전트 스킬(사용자 레벨 미러).
-- **M4 — 보안+UI 마감** ✅ 완료: app.js 자동 이스케이프 태그 템플릿(XSS 차단), config 원자적 쓰기(디스크=단일 소스), number 렌더링, 이월 minors 청소, agentmemory 흔적 제거 — `docs/superpowers/plans/2026-07-18-m4-security-ui-polish.md`.
-- **§3 리팩터 — NotionSession 통일** ✅ 완료: exporter→NotionSession 통일(byte-send 429 재시도 포함), VERSION 단일화, fingerprint 화이트리스트 재편 — `docs/superpowers/specs/2026-07-18-s3-refactor-notion-session-design.md`.
-- **git — 커밋 자동 캡처** ✅ 완료: post-commit 훅 + 로컬 큐 + 세션 Stop 리마인더/`git flush` 배치 요약으로 커밋을 Second Brain에 기록(위 "git" 절 참고, 설계 문서는 `docs/superpowers/specs/` 아래 해당 날짜 파일).
-- **calendar — 일정 조회·등록** ✅ 완료: 전용 Calendar DB에 recall+action(list/add/update/cancel/setup, 위 "calendar" 절 참고) — `docs/superpowers/specs/2026-07-20-calendar-design.md`.
+**Codex (플러그인 + 훅)**
 
-## 참고 위치
+```bash
+codex plugin marketplace add legojeon/notionmemory
+codex plugin add notionmemory@notionmemory
+notionmemory install --codex --skip-skills --trust-codex-hooks
+```
 
-- 원본 NoteSync 레포(이식 대상): `~/Documents/Projects/NoteSync`
+> ⚠️ `--trust-codex-hooks`는 필수입니다. 없으면 훅이 아무 표시 없이 동작하지 않습니다.
+
+**플러그인 없이 (한 번에 두 에이전트)**
+
+```bash
+pipx install notionmemory && notionmemory install
+```
+
+> Codex를 쓴다면 `notionmemory install --codex --trust-codex-hooks`도 실행해야 훅이
+> 동작합니다.
+
+### 3. 온보딩 실행
+
+설치가 끝나면 **에이전트에게 "온보딩해줘"라고 말해 보세요.** `notionmemory:onboard` 스킬이
+실행되고, 첫 세션에서는 에이전트가 먼저 제안합니다. Notion 연결(페이지를 integration에 공유하는
+것까지)부터
+memory, calendar, 검색 설정까지 선택지로 안내하고, 이미 끝난 단계는 건너뜁니다. 직접 하실 일은
+Notion 토큰을 붙여넣는 것 하나뿐입니다(비밀 값은 채팅으로 주고받으면 안 되니까요). 토큰은
+[app.notion.com/developers/tokens](https://app.notion.com/developers/tokens)에서 만들며,
+이때 아래를 확인하세요.
+
+- **워크스페이스 (가장 중요):** notionmemory가 사용할 페이지가 들어 있는 워크스페이스를
+  고르세요. 토큰은 그 워크스페이스 하나에만 접근합니다.
+- **기능(Capability):** **Notion API**는 체크된 상태로 두세요(콘텐츠 읽기/쓰기). "Workers"는
+  필요 없습니다.
+- **만료일:** **가장 긴 기간**을 고르세요. 만료되면 토큰이 멈추고, 새로 만들어 다시 연결해야
+  합니다.
+
+## Quick start
+
+온보딩 뒤에는 notionmemory 명령을 칠 일이 없습니다. 에이전트에게 말하면 알맞은 스킬을 알아서
+실행합니다. 예를 들어:
+
+**기억하고 불러오기**
+> *"인증을 JWT refresh-token 회전 방식으로 바꿨다고 기억해둬."*
+> *"레이트 리밋은 어떻게 처리하기로 했었지?"*
+> *"이 프로젝트에 대해 지금까지 뭘 알고 있어?"*
+
+**캘린더**
+> *"내일 오후 3시부터 4시까지 디자인 리뷰 잡아줘."*
+> *"이번 주 일정 뭐 있어?"*
+
+**Notion 검색**
+> *"배포 런북 어디에 적어놨더라?"*
+> *"Postgres 마이그레이션 노트 찾아줘."*
+
+**템플릿**
+> *"이 Notion 페이지를 주간 보고서 템플릿으로 등록해줘."* (URL 붙여넣기)
+> *"이번 주에 한 일로 보고서 초안 써줘."*
+
+CLI는 볼 일이 없습니다. 게다가 세션이 시작될 때 에이전트는 이미 이 프로젝트의 요약과 가장 중요한
+메모리를 갖고 있어서, 하던 곳에서 바로 이어갈 수 있습니다.
+
+## Agents
+
+notionmemory는 **에이전트가 주도**합니다. CLI는 에이전트가 호출하는 수단일 뿐이고, 여러분은
+자연어로 말하면 에이전트가 알맞은 스킬을 골라 실행합니다.
+
+| 에이전트 | 설치 방법 | 사용법 |
+| --- | --- | --- |
+| **Claude Code** | 플러그인(또는 `notionmemory install`) | *"이 결정 기억해둬", "예전에 X 얘기한 적 있나?", "이거 캘린더에 넣어줘"*처럼 말하기 |
+| **Codex** | 플러그인 + `install --codex --trust-codex-hooks` | 동일 — 말만 하면 에이전트가 notionmemory를 대신 실행 |
+
+에이전트가 쓸 수 있는 **스킬**:
+
+- **onboard** — 처음 설정 안내 (Notion + memory + calendar + 검색)
+- **memory** — Notion 세컨드 브레인에 장기적인 결정·패턴을 저장하고 불러오기
+- **calendar** — Notion 캘린더 DB의 일정 조회·생성·이동
+- **templates** — Notion 페이지·DB 등록 및 내용 작성
+- **library** — Notion 전체 내용 검색
+- **settings** — 연결·설정을 위한 로컬 웹 대시보드
+- **git** — (선택) 커밋을 memory에 자동으로 기록
+
+## How it works
+
+에이전트는 notionmemory **CLI**를 통해 Notion과 대화하고, CLI는 **Notion REST API**를
+호출합니다. 별도의 DB도, 상시 실행되는 서버도 없습니다. 이게 단순한 저장소가 아니라 *메모리*인
+이유는 흐름에 있습니다 — 가볍게 저장하고, **중요도를 매겨 정리(consolidate)**한 뒤, 알맞은
+순간에 *중요한* 것을 불러옵니다.
+
+<p align="center">
+  <img src="../assets/lifecycle.svg" width="100%"
+       alt="메모리 흐름: 초안으로 저장 → 중요도 점수(Strength 1–10)로 정리 → 알맞은 때 상위 메모리 회수 — 모두 Notion 안에서">
+</p>
+
+### 무엇이, 어떻게 저장되나
+
+- **메모리**는 Notion "세컨드 브레인" 데이터베이스입니다. 직접 *"기억해둬"*라고 하면 바로
+  **Active**로 저장되고, 에이전트가 스스로 판단해 저장하면 **Draft(초안)**로 들어갑니다. 초안도
+  불러올 수는 있지만 아직 정식으로 승격되지 않은 상태입니다.
+- 모든 메모리에는 **Strength(1–10)** 중요도 점수가 붙습니다. 이 점수로 회수 순위를 정하고, 세션
+  시작 때 무엇을 보여줄지 결정합니다.
+- 이후 **정리 패스**(`notionmemory memory consolidate`, 본인 터미널에서 실행)가 에이전트를 통해
+  초안을 검토합니다. 요약·정제하고, 실제 Strength를 매기고, 가치 없는 건 버리고(→ *Forgotten*),
+  중복은 병합하고(→ *Superseded*), 프로젝트별 **요약(brief)**을 갱신합니다. 그래서 DB가 아무거나
+  쌓인 더미가 아니라 잘 정리된 상태로 유지됩니다.
+
+### 언제 읽나
+
+- **세션 시작 때** 이 프로젝트의 요약과 **Strength가 높은** 메모리가 자동으로 주입됩니다. 최신순
+  나열이 아니라 중요도 기준입니다.
+- **메시지마다** 네트워크를 쓰지 않는 로컬 색인이 *"관련 메모리"* 한 줄 힌트를 덧붙일 수 있습니다.
+  에이전트는 실제로 관련 있을 때만 `recall`로 자세히 읽고, 아니면 무시합니다.
+- **필요할 때** `library search`가 제목·헤딩으로 Notion 전체에서 후보를 찾고, 에이전트가 상위
+  후보를 **실시간으로 읽습니다.** 내용은 캐싱하지 않고 항상 최신으로 읽습니다.
+
+### 임베딩 없이 검색하는 법
+
+벡터 DB도, 임베딩 모델도 없습니다. 매칭은 **어휘 기반**입니다 — 영어는 단어 경계, 한국어는 부분
+문자열로, 제목·헤딩·각 메모리의 concept 태그를 대상으로 하고 Strength로 가중합니다. BM25보다도
+일부러 단순합니다 — 코퍼스 통계도, 랭킹 모델도 없습니다. 이걸로 충분한 이유는, 검색의 역할이
+*후보*를 내는 것까지이기 때문입니다. **의미 판단은 에이전트가
+직접 합니다.** 상위 후보를 실시간으로 읽고 무엇이 진짜 관련 있는지 가려냅니다 — 벡터 유사도
+점수가 근사하려는 그 판단을 LLM은 그냥 해냅니다. 덕분에 임베딩을 만들고 동기화하고 낡지 않게
+관리할 것이 없고, 메시지마다 붙는 힌트도 작은 로컬 색인만으로 네트워크 없이 돕니다.
+
+### 메모리는 어떻게 갱신되나
+
+- 새 정보가 이전 것을 **대체(supersede)**합니다(`--supersedes`). 원본은 삭제되지 않고
+  *Superseded*로 남습니다. `forget`은 상태를 *Forgotten*으로 바꿀 뿐, 완전히 지우지 않습니다.
+- 정리 패스가 시간이 지나며 다시 점수를 매기고 병합해서, 중요도와 프로젝트 요약이 최신으로
+  유지됩니다.
+- Notion에서 삭제한 페이지는 읽는 순간 로컬 검색 색인에서 **저절로 정리됩니다**(404를 만나면
+  그 자리에서 낡은 포인터를 제거). 나머지는 가끔 전체 정리로 쓸어냅니다.
+
+### 왜 MCP 서버가 아니라 CLI + API인가
+
+- 세션 훅(SessionStart / Stop / UserPromptSubmit)은 **평범한 셸 명령**으로 돌아갑니다. 세션
+  안에서 상시 열어 두는 MCP 연결이 아니라 CLI가 필요합니다.
+- 같은 CLI가 **헤드리스 환경이나 cron**에서도 돌아갑니다(예: 정리 패스). MCP를 지원하는 채팅
+  안에서만 쓰는 게 아닙니다.
+- 스킬 묶음 + CLI 하나로 **Claude Code와 Codex에서 똑같이** 동작합니다. MCP는 에이전트마다 지원
+  범위와 동작이 다릅니다.
+- **구성 요소가 적습니다.** 상시 서버가 없고, 토큰은 OS 키링에 있고, 로컬에 남는 건 가벼운 검색
+  색인뿐입니다.
+
+**설정 대시보드**는 Notion 연결과 스킬 옵션을 저장합니다 — 에이전트에게 *"notionmemory 설정
+열어줘"*라고 하면 됩니다(`settings` 스킬). 직접 열고 싶으면 `notionmemory serve`를 실행하세요.
+토큰은 OS 키링에 보관되고 파일에는 절대 남지 않습니다.
+
+## Uninstall
+
+완전히 지우려면 몇 단계가 필요합니다. 조각마다 관리하는 주체가 다르기 때문입니다.
+`notionmemory teardown`을 **먼저**(CLI가 아직 남아 있을 때) 실행하고, 백엔드는 **마지막**에
+지우세요(실행 중인 `pipx uninstall`이 자기 자신을 지우는 건 불안정합니다). `teardown`은
+notionmemory가 설치한 것(스킬, 세션/git 훅, 로컬 상태)만 지우고 **Notion 페이지는 절대 건드리지
+않습니다.** `--purge-config --purge-secrets`를 붙이지 않으면 config와 키링 토큰은 남겨 둡니다.
+
+**Claude Code (플러그인):**
+
+```bash
+notionmemory teardown --purge-config --purge-secrets   # config, 키링 토큰, 로컬 상태
+claude plugin uninstall notionmemory@notionmemory      # 스킬 + 훅
+claude plugin marketplace remove notionmemory          # 마켓플레이스 소스
+pipx uninstall notionmemory                            # 백엔드 — 마지막에
+```
+
+**Codex (플러그인):**
+
+```bash
+notionmemory teardown --purge-config --purge-secrets
+codex plugin remove notionmemory@notionmemory          # 또는 `codex /plugins`에서 제거
+codex plugin marketplace remove notionmemory
+pipx uninstall notionmemory
+```
+
+**플러그인 없이 설치한 경우**(`notionmemory install`로 설정) — teardown이 스킬과 훅도 함께
+지웁니다:
+
+```bash
+notionmemory teardown --purge-config --purge-secrets
+pipx uninstall notionmemory
+```
+
+나중에 다시 설치하려고 config와 토큰을 남기고 싶으면 `--purge-config --purge-secrets`를 빼세요.
+백엔드를 `uv`나 `pip`으로 설치했다면 `uv tool uninstall notionmemory` /
+`pip uninstall notionmemory`로 지우세요. **Notion 데이터베이스와 페이지는 절대 삭제되지
+않습니다.**
+
+## License
+
+MIT — [LICENSE](../LICENSE) 참고.

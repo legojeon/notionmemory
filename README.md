@@ -1,115 +1,250 @@
-# notionmemory
+<p align="center">
+  <img src="assets/banner.svg" alt="notionmemory — Turn Notion into a second brain for your coding agents" width="100%">
+</p>
 
-Turn Notion into a second-brain hub for coding agents (Claude Code, Codex).
-notionmemory ships a set of installable **skills** — long-term memory, calendar,
-templates, and library recall — plus session hooks that surface the right context
-automatically.
+<p align="center">
+  <a href="https://pypi.org/project/notionmemory/"><img src="https://img.shields.io/pypi/v/notionmemory.svg" alt="PyPI version"></a>
+  <img src="https://img.shields.io/pypi/pyversions/notionmemory.svg" alt="Python versions">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/Notion-second%20brain-191919?logo=notion&logoColor=white" alt="Notion second brain">
+</p>
 
-> Skills and CLI onboarding output are available in English (default) and Korean
-> (`config language: en|ko`). A longer Korean guide is at [`docs/README.ko.md`](docs/README.ko.md).
+<p align="center"><b>English</b> | <a href="docs/README.ko.md">한국어</a></p>
+
+<p align="center">
+  <a href="#why-notionmemory">Why</a> ·
+  <a href="#install">Install</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#agents">Agents</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#uninstall">Uninstall</a>
+</p>
+
+**notionmemory** turns your own Notion workspace into a shared, long-term brain for coding
+agents (Claude Code, Codex). It ships a set of installable **skills** — long-term memory,
+calendar, templates, and content search — plus session hooks that surface the right context
+automatically. Everything lives in **your** Notion; there's no separate database or server.
+
+You don't run its commands by hand. **You talk to your agent in plain language** — "remember
+that", "where did I file this?", "add this to my calendar", "register this page as a template"
+— and the agent runs notionmemory for you under the hood.
+
+<p align="center">
+  <img src="assets/flow.svg" width="100%"
+       alt="Claude Code and Codex talk to notionmemory, which captures and recalls in your Notion and Notion Calendar">
+</p>
+
+## Why notionmemory
+
+I built this for myself. Tools like [**agentmemory**](https://github.com/rohitg00/agentmemory)
+and [claude-mem](https://github.com/thedotmack/claude-mem) keep memories in a **local vector
+database** — fast and private, but two things kept getting in my way:
+
+- **I couldn't see what was stored.** A vector DB is a black box — I couldn't open it, read what
+  the agent "remembered," or fix a wrong entry. In Notion it's just pages, so I read and edit the
+  memory myself.
+- **It didn't follow me.** I develop across a server and a laptop, and memory that lives on one
+  machine doesn't sync to the other. Notion is already **cloud** — the same brain everywhere.
+
+I also wanted my agent beyond code: my **study notes and schedule** already live in Notion.
+Keeping memory there too gives my agent (and me) one place to reach from anywhere, instead of a
+hidden sidecar database. So notionmemory uses **Notion as the cloud** — visible, editable,
+shared, and already where the rest of my life is.
 
 ## Install
 
-1) Backend (required, both harnesses):
+### 1. Install the backend (user scope)
+
+Install into your **user scope** — never `sudo` / system-wide. notionmemory places skills,
+session hooks, and local state under your home (`~/.claude`, `~/.codex`,
+`~/.config/notionmemory`, `~/.local/state/notionmemory`), so it must run as your own user.
 
 ```bash
-pipx install notionmemory      # or: uv tool install notionmemory / pip install --user notionmemory
+pipx install notionmemory        # recommended — isolated, on your PATH, user-scoped
+# or: uv tool install notionmemory
+# or: pip install --user notionmemory
 ```
 
-2a) Claude Code (plugin):
+### 2. Add it to your agent
+
+Installing for **both agents is supported** — that's the point: Claude Code and Codex share the
+same brain. Just use **one install method per agent** (plugin *or* `notionmemory install`);
+doing both on the same agent installs its skills twice.
+
+**Claude Code (plugin)**
 
 ```bash
 /plugin marketplace add legojeon/notionmemory
 /plugin install notionmemory@notionmemory
-# skills appear as notionmemory:calendar, notionmemory:memory, …
-# Do NOT also run `notionmemory install --claude` (the plugin already installs skills + hooks).
 ```
 
-2b) Codex (plugin + hooks):
+> ⚠️ The plugin installs the skills **and** the session hooks. Do **not** also run
+> `notionmemory install --claude` — that double-installs them.
+
+**Codex (plugin + hooks)**
 
 ```bash
 codex plugin marketplace add legojeon/notionmemory
 codex plugin add notionmemory@notionmemory
-notionmemory install --codex --skip-skills --trust-codex-hooks   # hooks + trust (plugin owns the skills)
-# --skip-skills: don't mirror skills, the plugin already provides them
-# --trust-codex-hooks: required or Codex will silently not fire the installed hooks
+notionmemory install --codex --skip-skills --trust-codex-hooks
 ```
 
-3) Get set up — run guided onboarding:
+> ⚠️ `--trust-codex-hooks` is required — without it Codex silently never fires the hooks.
 
-Once installed, just ask your agent to **onboard you** — it runs the
-**`notionmemory:onboard`** skill. On your first session the agent also offers this
-automatically. Onboarding walks you through connecting Notion and setting up memory,
-calendar, and library as guided choices, and skips anything already done.
-
-When it reaches the **Notion token** step it sends you to the settings dashboard to
-paste your integration token (`ntn_...`) — the token is entered there, never in chat.
-Create one at <https://app.notion.com/developers/tokens>, and share the Notion pages/DBs
-you want notionmemory to use with that integration. It's stored in your OS keyring,
-never in config.
-
-You can open that dashboard anytime — ask the agent for the **`notionmemory:settings`**
-skill, or run it from a terminal:
-
-```bash
-notionmemory serve      # opens the settings dashboard at http://localhost:8765
-```
-
-It shows your **Notion**, **Agent** (Claude Code / Codex), and **git** (gh) connections
-in one place so you can verify them. Until Notion is connected, the skills load but
-can't read or write Notion.
-
-Prefer no plugin? One uniform command sets up both harnesses (skills unnamespaced):
+**No plugin (one command, both agents)**
 
 ```bash
 pipx install notionmemory && notionmemory install
 ```
 
-Codex users: `notionmemory install` will tell you to also run `notionmemory install --codex --trust-codex-hooks` before Codex hooks fire.
+> Codex users still need `notionmemory install --codex --trust-codex-hooks` before Codex
+> hooks fire.
 
-The marketplace source is this repository. If you're working from a local clone
-before it's reachable as `legojeon/notionmemory`, add it by path instead:
-`codex plugin marketplace add "$(pwd)"` / `claude plugin marketplace add "$(pwd)"`.
+### 3. Run onboarding
 
-## Skills
+Once installed, **just ask your agent to onboard you** — it runs the `notionmemory:onboard`
+skill (and offers it automatically on your first session). It walks you through **connecting
+Notion** — including sharing your pages with the integration — and setting up memory, calendar,
+and search as guided choices, skipping anything already done. The only thing it hands to you is
+pasting the Notion token, because a secret must never go through chat — so mind these when you
+create it at [app.notion.com/developers/tokens](https://app.notion.com/developers/tokens):
 
-- **onboard** — first-time guided setup: connect Notion and set up memory, calendar & library
+- **Workspace (most important):** choose the workspace that holds your pages — the token is
+  locked to that one workspace.
+- **Capability:** keep **Notion API** checked (read/write content); "Workers" isn't needed.
+- **Expiration:** pick the **longest window offered** — when it lapses the token stops working
+  and you'll have to create a new one and reconnect.
+
+## Quick start
+
+After onboarding you never type notionmemory commands — you just talk to your agent and it runs
+the right skill. For example:
+
+**Remember & recall**
+> *"Remember that we moved auth to JWT refresh-token rotation."*
+> *"Did we ever decide how to handle rate limiting?"*
+> *"What do you already know about this project?"*
+
+**Calendar**
+> *"Add a design review tomorrow 3–4pm."*
+> *"What's on my calendar this week?"*
+
+**Search your Notion**
+> *"Where did I write the deployment runbook?"*
+> *"Find my notes on the Postgres migration."*
+
+**Templates**
+> *"Register this Notion page as my weekly-report template."* (paste the URL)
+> *"Draft this week's report from what we did."*
+
+You never see the CLI. And at session start the agent is already primed with this project's
+brief and your most important memories — so it can pick up where you left off.
+
+## Agents
+
+notionmemory is **agent-driven** — the CLI is only the mechanism the agent calls. You interact
+in natural language; the agent picks the right skill and runs it.
+
+| Agent | How it's installed | How you use it |
+| --- | --- | --- |
+| **Claude Code** | plugin (or `notionmemory install`) | Ask it: *"remember this decision", "did we discuss X before?", "put this on my calendar"* |
+| **Codex** | plugin + `install --codex --trust-codex-hooks` | Same — talk to it; it runs notionmemory for you |
+
+**Skills** the agent can reach:
+
+- **onboard** — first-time guided setup (Notion + memory + calendar + search)
 - **memory** — save/recall long-term decisions & patterns in a Notion Second Brain
-- **calendar** — read/create/move events in a Notion calendar DB
-- **templates** — CRUD over your registered Notion templates & databases
+- **calendar** — read/create/move events in a Notion calendar database
+- **templates** — register Notion pages/DBs and author content into them
 - **library** — content search across your Notion pages
-- **settings** — local web dashboard for connections & configuration
+- **settings** — a local web dashboard for connections & configuration
+- **git** — optional post-commit capture of your commits into memory
 
-## Upgrade
+## How it works
 
-notionmemory installs files on your system (skill mirrors, session/git hooks,
-state). To upgrade cleanly — including removing skills that a new version has
-retired — run `notionmemory teardown` then reinstall. `teardown` removes only what
-it installed; your Notion pages, config, and keyring token are preserved by
-default (see `notionmemory teardown --dry-run`).
+Your agent talks to your Notion through the notionmemory **CLI**, which calls the **Notion REST
+API**. There's no separate database and no long-running server. What makes it a *memory* rather
+than a dumb store is the lifecycle — capture cheaply, **consolidate with importance scoring**,
+then recall the *important* things at the right moment:
+
+<p align="center">
+  <img src="assets/lifecycle.svg" width="100%"
+       alt="Memory lifecycle: capture as draft, consolidate with importance scoring (Strength 1–10), recall the top memories at the right time — all in your Notion">
+</p>
+
+### What gets stored, and how
+
+- **Memory** is a Notion "Second Brain" database. When you explicitly say *"remember this"* it
+  lands **Active** right away. When the agent decides on its own to save something, it lands as
+  a **Draft** — recallable, but not yet promoted.
+- Every memory carries a **Strength (1–10)** — an importance score used to rank recall and to
+  decide what's worth surfacing at session start.
+- A later **consolidation** pass (`notionmemory memory consolidate`, which you run in your own
+  terminal) has an agent review the Drafts: summarize and refine them, assign a real Strength,
+  drop noise (→ *Forgotten*), merge duplicates (→ *Superseded*), and maintain a rolled-up
+  per-project **brief**. So the database stays curated instead of a raw dump.
+
+### When it reads
+
+- **At session start**, the agent is fed this project's brief plus its top **high-Strength**
+  memories — gated by importance, not a raw recency dump.
+- **Per message**, a zero-network local index may add a one-line *"relevant memory"* hint; the
+  agent deep-reads it with `recall` only if it's actually relevant, and ignores it otherwise.
+- **On demand**, `library search` finds pointers by title/heading across your whole Notion, and
+  the agent **live-reads** the winners — content is always read fresh, never cached.
+
+### Search without embeddings
+
+There is no vector database and no embedding model. Matching is **lexical** — word-boundary
+matching for English, substring for Korean — over titles, headings, and each memory's concept
+tags, weighted by Strength. Deliberately simpler than even BM25: no corpus statistics, no
+ranking model. That's enough because the search only has to produce *candidates*:
+**the agent itself supplies the semantics.** It reads the top hits live and judges what's
+actually relevant — the judgment a vector similarity score approximates, an LLM does directly.
+The upshot: nothing to embed, sync, or go stale, and the per-message hint runs with zero network
+from a tiny local index.
+
+### How memory updates
+
+- New information **supersedes** the old (`--supersedes`) — the original is kept as *Superseded*,
+  not deleted. `forget` sets Status=*Forgotten*; nothing is ever hard-deleted.
+- Consolidation re-scores and merges over time, so importance and the project brief stay current.
+- Pages you delete in Notion **self-heal** out of the local search index the moment they're read
+  (a live 404 prunes the stale pointer), with an occasional full prune to sweep the rest.
+
+### Why a CLI + API, not an MCP server
+
+- The session hooks (SessionStart / Stop / UserPromptSubmit) run as **plain shell commands** —
+  they need a CLI, not a live MCP connection held open inside an agent session.
+- The same CLI runs **headless and in cron** (e.g. consolidation), not only inside an
+  MCP-capable chat.
+- One skill set + CLI behaves **identically across Claude Code and Codex**; MCP support and
+  semantics vary by agent.
+- **Fewer moving parts:** no server process to run, your token stays in the OS keyring, and the
+  only local state is a thin search index.
+
+The **settings dashboard** stores your Notion connection and skill options — just ask your agent
+to *"open notionmemory settings"* (the `settings` skill), or run `notionmemory serve` yourself.
+The token lives in your OS keyring, never in a file.
 
 ## Uninstall
 
-Full removal is a few steps because different tools own different pieces: the plugin
-(skills + hooks) and its marketplace source belong to the harness, and the Python
-backend belongs to your package manager. Run `notionmemory teardown` **first** — while
-the CLI still exists — and remove the backend **last** (a running `pipx uninstall` of
-itself is unreliable).
+Full removal is a few steps because different tools own different pieces. Run
+`notionmemory teardown` **first** (while the CLI still exists) and remove the backend **last**
+(a running `pipx uninstall` of itself is unreliable). `teardown` removes only what notionmemory
+installed — skills, session/git hooks, local state — and **never touches your Notion pages**; it
+keeps your config and keyring token unless you add `--purge-config --purge-secrets`.
 
-`teardown` removes only what notionmemory installed (skill mirrors, session/git hooks,
-local state). It never touches your Notion databases/pages, and it keeps config + your
-keyring token unless you add `--purge-config --purge-secrets`.
-
-**Plugin install — Claude Code:**
+**Claude Code (plugin):**
 
 ```bash
 notionmemory teardown --purge-config --purge-secrets   # config, keyring token, local state
 claude plugin uninstall notionmemory@notionmemory      # skills + hooks
 claude plugin marketplace remove notionmemory          # marketplace source
-pipx uninstall notionmemory                            # Python backend — run last
+pipx uninstall notionmemory                            # backend — run last
 ```
 
-**Plugin install — Codex:**
+**Codex (plugin):**
 
 ```bash
 notionmemory teardown --purge-config --purge-secrets
@@ -118,18 +253,18 @@ codex plugin marketplace remove notionmemory
 pipx uninstall notionmemory
 ```
 
-**Non-plugin install** (you set it up with `notionmemory install`): teardown already
-removes the skills and hooks, so it's just:
+**No-plugin install** (you set it up with `notionmemory install`) — teardown already removes the
+skills and hooks:
 
 ```bash
 notionmemory teardown --purge-config --purge-secrets
 pipx uninstall notionmemory
 ```
 
-Keep `--purge-config --purge-secrets` off if you want to preserve your config and saved
-Notion token for a later reinstall. If you installed the backend with `uv`/`pip` instead
-of `pipx`, uninstall it with `uv tool uninstall notionmemory` / `pip uninstall
-notionmemory`. Notion databases and pages are never deleted.
+Drop `--purge-config --purge-secrets` to keep your config and saved token for a later reinstall.
+If you installed the backend with `uv`/`pip` instead of `pipx`, uninstall it with
+`uv tool uninstall notionmemory` / `pip uninstall notionmemory`. **Notion databases and pages are
+never deleted.**
 
 ## License
 

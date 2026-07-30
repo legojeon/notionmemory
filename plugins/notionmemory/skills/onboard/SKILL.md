@@ -51,7 +51,22 @@ The raw PAT/token is a secret and **must never be pasted into chat** — there i
 - Tell the user to open the settings dashboard and paste the token there: start it if
   needed (`notionmemory serve`, then open `http://localhost:8765`) — or they can invoke
   the `settings` skill. Point them at the Notion connection field. If you mention where to
-  create the token, use exactly `https://app.notion.com/developers/tokens`.
+  create the token, use exactly `https://app.notion.com/developers/tokens` (an internal
+  integration / "connection"; the token starts with `ntn_`).
+- Three settings matter when they create it — **the workspace is the critical one**:
+  - **Workspace (most important): make sure they pick the workspace that holds the pages
+    they want notionmemory to use.** The token is locked to that single workspace, and the
+    wrong choice is the hardest mistake to notice later.
+  - **Notion API** capability stays checked (read/write content); "Workers" is irrelevant.
+  - **Expiration**: warn them to set it deliberately — the token *expires* on the date they
+    choose, and once it lapses they must create a brand-new token and reconnect. Tell them to
+    pick the longest window offered rather than a short one. (When it does lapse, you'll
+    surface a clear 401 reconnect message.)
+- **Call out the step people miss**: the token alone can read/write nothing until the user
+  **shares the pages/DBs with that integration**. On each top-level page or database they
+  want notionmemory to use, they open the page's `•••` menu → **Connections** (or "Add
+  connections") and add the integration; sub-pages inherit, so sharing a parent covers its
+  children. Say this explicitly — otherwise memory/calendar/library connect but see nothing.
 - Wait for them to say they're done, then re-check:
 
 ```bash
@@ -97,9 +112,11 @@ Offer a scan — yes / no:
 
 ## 6. templates (usage note only — no setup)
 
-No connection needed. In one or two lines, tell the user templates let them register and
-author Notion pages (`notionmemory templates ...`, or the settings dashboard to manage
-per-template prompts) — then finish. Don't force any setup.
+No connection needed. In one or two lines, tell the user that — going forward — they can
+just **ask you in plain language** to register a Notion page/DB as a template or to author
+content into one ("register this page as a template", "fill in the weekly report"), and you
+run it for them; the settings dashboard is where per-template prompts are managed. Frame it
+as talking to you, not as commands to type. Then finish — don't force any setup.
 
 ## Done
 
