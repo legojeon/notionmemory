@@ -336,3 +336,32 @@ def test_handler_error_does_not_abort_the_whole_teardown(installed, monkeypatch)
         assert not (installed / ".local" / "state" / "notionmemory").exists()
     finally:
         skills.chmod(0o700)
+
+
+def test_purge_secrets_actually_removes_the_saved_pat(installed):
+    """회귀: purge-secrets 는 notion_auth 가 저장한 것과 같은 keyring (service,
+    account) 를 지워야 한다. 예전엔 account 를 'token' 으로 하드코딩했는데 실제
+    저장은 PAT_ACCOUNT='personal-access-token' 이라, purge 가 조용히 아무것도 못
+    지우고 'removed' 만 출력했다(라이브 e2e 가 잡음). round-trip 으로 강제한다."""
+    from notionmemory.core import notion_auth
+    notion_auth.save_pat("ntn_live_secret")
+    assert notion_auth.load_pat() == "ntn_live_secret"     # 전제
+    lines = teardown.run(["claude"], purge_secrets=True)
+    assert notion_auth.load_pat() == "", "purge-secrets 후 PAT 가 남아 있으면 안 된다"
+    assert "removed: keyring PAT" in lines
+
+
+def test_purge_secrets_reports_none_when_no_pat(installed):
+    """PAT 가 없으면 'removed' 로 거짓 보고하지 않는다(정확한 상태 보고)."""
+    from notionmemory.core import notion_auth
+    assert notion_auth.load_pat() == ""                    # 전제: 없음
+    lines = teardown.run(["claude"], purge_secrets=True)
+    assert "removed: keyring PAT" not in lines
+
+
+def test_purge_secrets_off_keeps_the_pat(installed):
+    """--purge-secrets 없으면 PAT 는 보존된다(기본 보존 계약)."""
+    from notionmemory.core import notion_auth
+    notion_auth.save_pat("ntn_keepme")
+    teardown.run(["claude"])
+    assert notion_auth.load_pat() == "ntn_keepme"

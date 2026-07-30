@@ -1,6 +1,6 @@
 {
   "name": "notionmemory",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Notion second-brain skills for coding agents: calendar, memory, templates, library, and settings. Backed by the notionmemory Python CLI (pipx install notionmemory).",
   "author": { "name": "Jaewoo Jeon", "email": "learnsteam.kr@gmail.com" },
   "license": "MIT",

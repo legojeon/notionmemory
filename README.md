@@ -90,12 +90,46 @@ default (see `notionmemory teardown --dry-run`).
 
 ## Uninstall
 
+Full removal is a few steps because different tools own different pieces: the plugin
+(skills + hooks) and its marketplace source belong to the harness, and the Python
+backend belongs to your package manager. Run `notionmemory teardown` **first** — while
+the CLI still exists — and remove the backend **last** (a running `pipx uninstall` of
+itself is unreliable).
+
+`teardown` removes only what notionmemory installed (skill mirrors, session/git hooks,
+local state). It never touches your Notion databases/pages, and it keeps config + your
+keyring token unless you add `--purge-config --purge-secrets`.
+
+**Plugin install — Claude Code:**
+
 ```bash
-notionmemory teardown              # removes skills, hooks, local state
-notionmemory teardown --purge-config --purge-secrets   # also config + token
+notionmemory teardown --purge-config --purge-secrets   # config, keyring token, local state
+claude plugin uninstall notionmemory@notionmemory      # skills + hooks
+claude plugin marketplace remove notionmemory          # marketplace source
+pipx uninstall notionmemory                            # Python backend — run last
 ```
 
-Notion databases and pages are never deleted.
+**Plugin install — Codex:**
+
+```bash
+notionmemory teardown --purge-config --purge-secrets
+codex plugin remove notionmemory@notionmemory          # or uninstall it from `codex /plugins`
+codex plugin marketplace remove notionmemory
+pipx uninstall notionmemory
+```
+
+**Non-plugin install** (you set it up with `notionmemory install`): teardown already
+removes the skills and hooks, so it's just:
+
+```bash
+notionmemory teardown --purge-config --purge-secrets
+pipx uninstall notionmemory
+```
+
+Keep `--purge-config --purge-secrets` off if you want to preserve your config and saved
+Notion token for a later reinstall. If you installed the backend with `uv`/`pip` instead
+of `pipx`, uninstall it with `uv tool uninstall notionmemory` / `pip uninstall
+notionmemory`. Notion databases and pages are never deleted.
 
 ## License
 

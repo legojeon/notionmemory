@@ -18,8 +18,6 @@ from notionmemory.skills.git import queue as gc_queue
 # 구 이름으로 설치된 스킬 디렉터리. 우리만 쓰던 이름이라 이름 매칭으로 안전하다.
 LEGACY_SKILL_NAMES = ("notes-capture", "git-capture", "memory-capture", "notes")
 
-KEYRING_SERVICE = "notionmemory.notion"
-
 
 def _from_receipt() -> list[ArtifactSpec]:
     """영수증은 JSON 파일 — 우리가 이번에 쓴 것이라는 보장이 없다.
@@ -232,12 +230,16 @@ def run(targets: list[str], *, purge_config: bool = False,
         if dry_run:
             lines.append(M("teardown.will_remove_secrets"))
         else:
-            try:
-                import keyring
-                keyring.delete_password(KEYRING_SERVICE, "token")
-                lines.append(M("teardown.removed_secrets"))
-            except Exception:
-                lines.append(M("teardown.remove_failed_secrets"))
+            # 단일 진실: notion_auth 가 저장한 것과 같은 (service, account) 로 지운다.
+            # 예전에 여기서 account 를 "token" 으로 하드코딩했는데 실제 저장은
+            # PAT_ACCOUNT="personal-access-token" 이라, purge 가 조용히 아무것도
+            # 못 지우고 "removed" 만 출력했다(라이브 e2e 가 잡음). 좌표를 재선언하지
+            # 말고 canonical delete_pat() 에 위임한다.
+            from notionmemory.core import notion_auth
+            had_pat = bool(notion_auth.load_pat())
+            notion_auth.delete_pat()
+            lines.append(M("teardown.removed_secrets" if had_pat
+                           else "teardown.remove_failed_secrets"))
     else:
         lines.append(M("teardown.keep_secrets"))
 
