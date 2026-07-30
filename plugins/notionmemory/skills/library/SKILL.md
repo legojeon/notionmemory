@@ -37,6 +37,12 @@ is out of date. **Tell the user you're scanning their Notion**, then run `librar
 before searching (this crawls the whole workspace and takes time, so don't do it silently). For
 queries where recency matters, like "what did I write today," also `refresh` first.
 
+If session start instead injects "deleted or unshared pages may be lingering … run `notionmemory
+library refresh --full`", that's a **periodic prune request** (a full crawl drops pages you
+deleted/unshared in Notion). Run it at a non-disruptive moment — it's routine cleanup, not urgent
+— and mention it's a ~1–2 min periodic tidy, not something the user asked for. (You don't need to
+ask permission; just say you're doing a quick library cleanup.)
+
 ## Limits
 
 - **The scan only knows titles and headings.** A page whose relevant content lives only in the
@@ -44,5 +50,9 @@ queries where recency matters, like "what did I write today," also `refresh` fir
   (e.g., "container orchestration" → "Kubernetes"), or ask the user which page they mean.
 - Search reflects the current scan, so **a page you just created may not show up until you
   refresh.**
+- **Deletions lag search, not read.** A page you deleted or unshared in Notion can linger as a
+  `search` pointer until a `refresh --full`; but `read` is always live, so reading a dead pointer
+  simply reports the page is gone (and self-heals that entry out of the scan). Never present a
+  stale `search` hit as if it still exists — the live `read` is the source of truth.
 - **Date/status filters** ("tomorrow's schedule", "incomplete todos") belong to calendar/templates'
   structured queries, not library. library only finds things by "what they're about" (text).

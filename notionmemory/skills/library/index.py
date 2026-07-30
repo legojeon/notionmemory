@@ -22,13 +22,17 @@ def index_path() -> Path:
 def load() -> dict:
     p = index_path()
     if not p.is_file():
-        return {"last_refreshed": "", "last_run": "", "pages": {}}
+        return {"last_refreshed": "", "last_run": "", "last_full_run": "",
+                "dirty_since_full": False, "pages": {}}
     try:
         data = json.loads(p.read_text(encoding="utf-8") or "{}")
     except (OSError, ValueError):
-        return {"last_refreshed": "", "last_run": "", "pages": {}}
+        return {"last_refreshed": "", "last_run": "", "last_full_run": "",
+                "dirty_since_full": False, "pages": {}}
     data.setdefault("last_refreshed", "")
     data.setdefault("last_run", "")
+    data.setdefault("last_full_run", "")     # 벽시계: 마지막 `--full`(prune) 시각
+    data.setdefault("dirty_since_full", False)  # 라이브 404 지연삭제가 관측한 드리프트
     data.setdefault("pages", {})
     return data
 
@@ -47,6 +51,13 @@ def upsert(idx: dict, page_id: str, *, title: str, headings: list,
 
 def remove(idx: dict, page_id: str) -> bool:
     return idx["pages"].pop(page_id, None) is not None
+
+
+def mark_dirty(idx: dict) -> None:
+    """라이브 404 지연삭제가 죽은 항목을 걷었을 때 부른다 — '마지막 full 이후 드리프트를
+    관측함' 플래그. SessionStart 가 이걸 보고 floor 를 넘겼으면 `--full` 을 넛지한다.
+    `--full` 이 돌면 crawl.refresh 가 도로 False 로 리셋한다."""
+    idx["dirty_since_full"] = True
 
 
 def tokenize(text: str) -> list[str]:

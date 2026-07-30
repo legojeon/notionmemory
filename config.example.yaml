@@ -53,3 +53,8 @@ skills:
   calendar:
     parent_page_id: ""          # Calendar DB를 만들 부모 페이지 ID(비우면 워크스페이스 최상위)
     # database_id/data_source_id 는 최초 사용 시 CLI가 자동 기록
+
+  library:
+    full_refresh_days: 7        # `library refresh --full`(삭제/공유해제 prune) 넛지 최소 간격(일).
+                                # 라이브 read-404로 드리프트를 관측한 뒤 이 간격이 지나면 SessionStart가
+                                # --full을 권한다(관측 없어도 30일 경과 시 백스톱으로 한 번). 크게 잡으면 덜 자주.

@@ -40,6 +40,9 @@ class TemplateStore:
         resp = self.session.request(method, path, **kwargs)
         if resp.status_code < 300:
             return resp
+        # 401 은 보통 NotionSession.request 가 NotionAuthError 로 먼저 잡는다(재연결
+        # 안내가 더 명확해서) — 여기 401 을 남기는 건 방어다. 어느 경로로 401 이 오든
+        # 프로필은 지우지 않는다(오직 404 만 지운다). 403(공유 해제)은 여기서만 잡힌다.
         if resp.status_code in (401, 403):
             raise self._auth_error(resp.status_code)
         if resp.status_code == 404 and page_scope:
@@ -261,6 +264,8 @@ class TemplateStore:
         missing: dict[int, bool] = {}
         for i, db in enumerate(p.databases):
             resp = self.session.request("GET", f"/data_sources/{db['data_source_id']}")
+            # 401 은 대개 NotionSession 이 상류에서 NotionAuthError 로 잡는다 — 여기
+            # 401 은 방어적 backstop(둘 다 프로필을 안 지운다). 403 은 여기서 처리.
             if resp.status_code in (401, 403):
                 raise self._auth_error(resp.status_code)
             if resp.status_code not in (200, 404):

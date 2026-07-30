@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 from notionmemory.core import paths
@@ -180,6 +181,57 @@ def onboarding_injection() -> str:
         return ""
 
 
+LIBRARY_FULL_FLOOR_DAYS = 7      # 드리프트 관측 시: 이 간격 지나야 --full 넛지(과빈도 바닥)
+LIBRARY_FULL_BACKSTOP_DAYS = 30  # 관측 없어도 이만큼 오래되면 한 번(안 건드린 유령 정리)
+
+
+def _days_since(iso: str, now) -> float | None:
+    """iso 시각으로부터 now 까지 일수. 파싱 불가/빈 값이면 None('해당 없음')."""
+    if not iso:
+        return None
+    try:
+        t = datetime.fromisoformat(iso)
+    except ValueError:
+        return None
+    if t.tzinfo is None:
+        t = t.replace(tzinfo=timezone.utc)
+    return (now - t).total_seconds() / 86400.0
+
+
+def library_full_refresh_injection(now=None) -> str:
+    """색인이 채워져 있고, 라이브 404 지연삭제가 드리프트를 관측했거나(dirty) 마지막
+    `--full`(prune) 이후 너무 오래됐으면 `library refresh --full` 을 넛지. 네트워크 0
+    (로컬 색인 + 벽시계만) — read-repair 의 anti-entropy 스윕 트리거이고, floor 로
+    과빈도를 막는다(관측해도 최소 간격 안엔 한 번, 관측 없으면 backstop 때만).
+
+    미갱신/빈 색인은 여기서 다루지 않는다 — 그건 `library_injection` 의 몫이라
+    return "" 로 양보한다(중복 넛지 금지)."""
+    try:
+        from notionmemory.core.config import Config
+        from notionmemory.skills.library import index as lib_index
+        now = now or datetime.now(timezone.utc)
+        idx = lib_index.load()
+        if not lib_index.was_refreshed(idx) or not lib_index.count(idx):
+            return ""
+        opts = Config.load(str(paths.config_path())).skill_options("library")
+        try:
+            floor = int(opts.get("full_refresh_days") or LIBRARY_FULL_FLOOR_DAYS)
+        except (TypeError, ValueError):
+            floor = LIBRARY_FULL_FLOOR_DAYS
+        backstop = max(LIBRARY_FULL_BACKSTOP_DAYS, floor)
+        days = _days_since(idx.get("last_full_run", ""), now)
+        dirty = bool(idx.get("dirty_since_full"))
+        # 드리프트 관측 + (한 번도 full 없었음 or floor 경과) → 넛지.
+        if dirty and (days is None or days >= floor):
+            return _m("hook.library_full_refresh")
+        # 관측 없어도 full 기준선이 있고 아주 오래됐으면 한 번(안 건드린 유령 정리).
+        if days is not None and days >= backstop:
+            return _m("hook.library_full_refresh")
+        return ""
+    except Exception:
+        return ""
+
+
 def memory_index_injection() -> str:
     """memory 로컬 색인(`mem_index`, Task 1/2)이 비어 있으면(파일 없음/0건) reindex
     안내. 로컬 파일만 본다(네트워크 0) — 색인이 비어 있으면 UserPromptSubmit 훅
@@ -297,9 +349,14 @@ def main(harness: str = "claude") -> int:
             # 다음 세션(else 분기)에 그 넛지가 다시 뜨므로 유실되지 않는다.
             print(onboarding)
         else:
-            lib = library_injection()
-            if lib:
-                print(lib)
+            # 색인이 낡아 --full 이 필요하면 그 넛지가 우선(정보성 카운트 줄은 생략).
+            lib_full = library_full_refresh_injection()
+            if lib_full:
+                print(lib_full)
+            else:
+                lib = library_injection()
+                if lib:
+                    print(lib)
             mem_idx_note = memory_index_injection()
             if mem_idx_note:
                 print(mem_idx_note)

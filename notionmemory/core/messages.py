@@ -82,6 +82,9 @@ CATALOG = {
             "library: not scanned yet — run `notionmemory library refresh --full` "
             "before your first search"),
         "hook.library_count": "library: {n} pages scanned, last refreshed {watermark}",
+        "hook.library_full_refresh": (
+            "library: deleted or unshared pages may be lingering in the search index — "
+            "run `notionmemory library refresh --full` to prune them (periodic cleanup, ~1-2 min)."),
         "hook.watermark_unknown": "(unknown)",
         "hook.onboarding_offer": (
             "notionmemory isn't fully set up yet ({missing}). Offer the user guided "
@@ -99,6 +102,10 @@ CATALOG = {
         "hook.memory_index_empty": (
             "memory: local search index is empty — run `notionmemory memory reindex` "
             "to fill it (needed for per-message recall hints)"),
+        "notion.auth_invalid": (
+            "Notion rejected the token (HTTP 401) — it may be expired, rotated, or "
+            "revoked. Reconnect Notion in the settings dashboard (`notionmemory serve`, "
+            "or the `settings` / `onboard` skill), then re-check with `notionmemory status`."),
     },
     "ko": {
         # --- install ---
@@ -170,6 +177,9 @@ CATALOG = {
         "hook.library_empty": (
             "library: 아직 안 훑어봄 — 첫 검색 전 `notionmemory library refresh --full` 필요"),
         "hook.library_count": "library: {n}건 훑어봄, 마지막 갱신 {watermark}",
+        "hook.library_full_refresh": (
+            "library: 삭제·공유해제된 페이지가 검색 색인에 남아 있을 수 있습니다 — "
+            "`notionmemory library refresh --full` 로 정리하세요(주기적 정리, ~1–2분)."),
         "hook.watermark_unknown": "(미상)",
         "hook.onboarding_offer": (
             "notionmemory 설정이 아직 완료되지 않았습니다({missing}). 사용자에게 안내 "
@@ -186,6 +196,10 @@ CATALOG = {
         "hook.memory_index_empty": (
             "memory 색인 없음 — `notionmemory memory reindex` 로 채우세요"
             "(메시지당 회수 힌트에 필요)"),
+        "notion.auth_invalid": (
+            "Notion 이 토큰을 거부했습니다(HTTP 401) — 만료·회전·폐기됐을 수 있습니다. "
+            "settings 대시보드(`notionmemory serve`, 또는 `settings`/`onboard` 스킬)에서 "
+            "Notion 을 재연결한 뒤 `notionmemory status` 로 확인하세요."),
     },
 }
 

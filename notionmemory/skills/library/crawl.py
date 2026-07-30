@@ -105,6 +105,10 @@ def refresh(session, *, full: bool = False, log=lambda *_: None) -> dict:
     # 벽시계 마커 — refresh 가 여기까지 왔으면 '한 번은 돌았다'. watermark(last_refreshed)
     # 는 빈 워크스페이스에선 "" 라 '미갱신'과 구분이 안 되므로 별도로 찍는다(스펙 §6 넛지).
     idx["last_run"] = datetime.now(timezone.utc).isoformat()
+    if full:
+        # `--full` 만이 prune 을 하므로 '마지막 전체 정리' 시각·드리프트 리셋도 여기서만.
+        idx["last_full_run"] = idx["last_run"]
+        idx["dirty_since_full"] = False
     index.save(idx)
     log(f"  · library 색인 갱신 — {indexed}건 색인, {pruned}건 정리, 총 {index.count(idx)}건")
     return {"indexed": indexed, "pruned": pruned, "total": index.count(idx)}

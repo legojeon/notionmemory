@@ -32,7 +32,7 @@ from notionmemory.skills.templates import filters as templates_filters
 from notionmemory.skills.templates import introspect as templates_introspect
 from notionmemory.skills.templates import profile as templates_profile
 from notionmemory.skills.templates import render as templates_render
-from notionmemory.skills.templates.document import DocumentStore, block_markdown
+from notionmemory.skills.templates.document import DocumentStore, PageNotFound, block_markdown
 from notionmemory.skills.templates.store import ProfileGone, TemplateStore
 
 DEFAULT_CONFIG = str(paths.config_path())
@@ -795,7 +795,20 @@ def _cmd_library(args) -> int:
     if args.action == "read":
         # 등록 무관 — 전역 유일 page-id 만으로 본문을 라이브로 읽는다.
         store = DocumentStore(NotionSession(), log=print)
-        print(store.read(args.page_id))
+        try:
+            print(store.read(args.page_id))
+        except PageNotFound:
+            # 라이브 404 = 그 페이지가 삭제/공유해제됨(read-repair). 색인에 있으면
+            # 지연삭제(자가치유)하고 드리프트를 표시 → SessionStart 가 floor 를 넘겼을
+            # 때 `--full` 을 넛지한다. 나머지 안 건드린 유령 항목은 그 스윕이 정리.
+            idx = library_index.load()
+            pruned = library_index.remove(idx, args.page_id)
+            if pruned:
+                library_index.mark_dirty(idx)
+                library_index.save(idx)
+            print(f"library: {args.page_id} 는 더 이상 없습니다(삭제/공유해제) — "
+                  + ("색인에서 정리했습니다. " if pruned else "")
+                  + "다른 죽은 항목은 `notionmemory library refresh --full` 로 정리하세요")
         return 0
     if args.action == "refresh":
         summary = library_crawl.refresh(NotionSession(), full=args.full, log=print)

@@ -18,7 +18,8 @@ def test_path_is_under_state_dir(state_home):
 
 def test_load_empty_when_absent():
     idx = I.load()
-    assert idx == {"last_refreshed": "", "last_run": "", "pages": {}}
+    assert idx == {"last_refreshed": "", "last_run": "", "last_full_run": "",
+                   "dirty_since_full": False, "pages": {}}
 
 
 def test_upsert_save_load_round_trip():

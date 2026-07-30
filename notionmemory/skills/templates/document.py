@@ -87,6 +87,12 @@ DOC_PAGE_SIZE = 100
 DOC_NODE_CAP = 500     # read 한 번이 읽는 블록 총량 상한 — 거대한 페이지 방어
 
 
+class PageNotFound(RuntimeError):
+    """대상 페이지/블록이 404 — 삭제됐거나 통합에 공유되지 않음. 일반 실패와 구분해
+    호출부(library read)가 색인 지연삭제로 자가치유할 수 있게 한다. RuntimeError
+    하위라 이를 따로 잡지 않는 호출부(templates)는 기존처럼 메시지를 출력한다."""
+
+
 class DocumentStore:
     """등록된 페이지의 본문 블록 I/O. 게이트(미리보기·확인)는 CLI 책임 — 여기선 원시 동작만.
 
@@ -100,6 +106,8 @@ class DocumentStore:
 
     def _req(self, method: str, path: str, **kwargs):
         resp = self.session.request(method, path, **kwargs)
+        if resp.status_code == 404:
+            raise PageNotFound(f"Notion {method} {path} 실패: 404 (페이지가 없거나 공유 안 됨)")
         if resp.status_code >= 300:
             raise RuntimeError(
                 f"Notion {method} {path} 실패: {resp.status_code} {resp.text[:200]}")
