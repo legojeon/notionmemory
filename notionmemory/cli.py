@@ -848,6 +848,18 @@ def _cmd_status(args) -> int:
         return 1
 
 
+def _cmd_language(args) -> int:
+    """`language <en|ko>` 로 config 언어를 저장(대시보드·CLI·훅 문구가 이걸 따른다),
+    인자 없으면 현재값 출력. 온보딩 첫 스텝이 사용자의 선택을 이걸로 기록한다."""
+    from notionmemory.core.config import Config, save_language
+    if getattr(args, "lang", None):
+        save_language(args.config, args.lang)
+        print(f"language set to {args.lang}")
+        return 0
+    print(f"language: {i18n.language(Config.load(args.config))}")
+    return 0
+
+
 def _resolve_install_language(args) -> None:
     """install 언어 우선순위: 플래그 > 기존 config > TTY 프롬프트 > 없음.
     헤드리스(비-TTY)는 절대 프롬프트로 막지 않는다 — 리졸버가 en 을 기본으로 한다."""
@@ -1093,6 +1105,10 @@ def main(argv=None) -> int:
     stc = sub.add_parser("status")
     stc.add_argument("--config", default=DEFAULT_CONFIG)
 
+    lang_p = sub.add_parser("language")
+    lang_p.add_argument("lang", nargs="?", choices=["en", "ko"])
+    lang_p.add_argument("--config", default=DEFAULT_CONFIG)
+
     hook = sub.add_parser("hook")
     hook.add_argument("name", choices=["session-start", "save-reminder", "session-stop",
                                        "user-prompt"])
@@ -1206,6 +1222,8 @@ def main(argv=None) -> int:
             return 1
     if args.cmd == "status":
         return _cmd_status(args)
+    if args.cmd == "language":
+        return _cmd_language(args)
     if args.cmd == "hook":
         from notionmemory.hooks import save_reminder, session_start, session_stop, user_prompt
         return {"session-start": session_start.main,

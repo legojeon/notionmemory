@@ -27,8 +27,25 @@ def test_probes_state_first():
 
 def test_states_the_full_sequence():
     text = _text().lower()
-    for step in ("pat", "memory", "calendar", "library", "templates"):
+    for step in ("language", "pat", "memory", "calendar", "library", "templates"):
         assert step in text, step
+
+
+def test_language_step_sets_config_via_cli():
+    """언어를 온보딩 첫 스텝으로 물어 `notionmemory language` 로 기록한다."""
+    text = _text()
+    assert "notionmemory language" in text
+    low = text.lower()
+    assert "한국어" in text or "korean" in low
+    assert "english" in low
+
+
+def test_pat_url_is_current_not_legacy():
+    """토큰 생성 URL 은 현행 app.notion.com/developers/tokens — 에이전트가 자기
+    기억의 옛 notion.so/my-integrations 를 쓰지 않도록 명시한다."""
+    text = _text()
+    assert "app.notion.com/developers/tokens" in text
+    assert "my-integrations" not in text
 
 
 def test_uses_structured_choices_with_fallback():

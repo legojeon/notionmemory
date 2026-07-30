@@ -44,7 +44,7 @@ calendar, and library as guided choices, and skips anything already done.
 
 When it reaches the **Notion token** step it sends you to the settings dashboard to
 paste your integration token (`ntn_...`) — the token is entered there, never in chat.
-Create one at <https://www.notion.so/my-integrations>, and share the Notion pages/DBs
+Create one at <https://app.notion.com/developers/tokens>, and share the Notion pages/DBs
 you want notionmemory to use with that integration. It's stored in your OS keyring,
 never in config.
 

@@ -1,6 +1,6 @@
 ---
 name: onboard
-description: First-time (and resumable) setup for notionmemory. Use when the user asks to set up / onboard / get started with notionmemory, when a SessionStart note offers guided onboarding, or when a core connection (Notion PAT, memory, or calendar) is missing. Walks Notion → memory → calendar → library → templates as structured choices, skipping whatever is already configured.
+description: First-time (and resumable) setup for notionmemory. Use when the user asks to set up / onboard / get started with notionmemory, when a SessionStart note offers guided onboarding, or when a core connection (Notion PAT, memory, or calendar) is missing. Walks language → Notion → memory → calendar → library → templates as structured choices, skipping whatever is already configured.
 ---
 
 # onboard — guided setup
@@ -33,13 +33,25 @@ question**, not free-form chat:
 
 The PAT step is an instruction, not a choice — no menu there.
 
-## 1. Notion PAT (if `status` shows not connected)
+## 1. Language (ask first)
+
+Ask which language notionmemory's dashboard, CLI output, and setup nudges should use —
+present it as a structured choice (skip if the user has clearly set one already):
+
+1. **English**
+2. **한국어 (Korean)**
+
+Then record it: `notionmemory language en` (or `notionmemory language ko`). This sets only
+the shipped-string language; you keep replying to the user in whatever language they write.
+
+## 2. Notion PAT (if `status` shows not connected)
 
 The raw PAT/token is a secret and **must never be pasted into chat** — there is no PAT-entry CLI.
 
 - Tell the user to open the settings dashboard and paste the token there: start it if
   needed (`notionmemory serve`, then open `http://localhost:8765`) — or they can invoke
-  the `settings` skill. Point them at the Notion connection field.
+  the `settings` skill. Point them at the Notion connection field. If you mention where to
+  create the token, use exactly `https://app.notion.com/developers/tokens`.
 - Wait for them to say they're done, then re-check:
 
 ```bash
@@ -50,7 +62,7 @@ notionmemory status
   attempt any DB setup before this passes. If it still shows not connected, relay that and
   let them retry in the dashboard.
 
-## 2. memory (if `status` shows not bound)
+## 3. memory (if `status` shows not bound)
 
 Present a choice — create / connect / skip:
 
@@ -63,7 +75,7 @@ Present a choice — create / connect / skip:
 resulting DB link on success. If it refuses, relay the reason verbatim and re-offer the
 choice — don't guess a fix. On skip, move on without setting anything.
 
-## 3. calendar (if `status` shows not bound)
+## 4. calendar (if `status` shows not bound)
 
 Same create / connect / skip choice:
 
@@ -75,7 +87,7 @@ Same create / connect / skip choice:
 schema needs, but **refuses on a hard type conflict** rather than guessing. Report the DB
 link and any added columns. If it refuses, relay the reason and re-offer.
 
-## 4. library (if `status` shows not scanned)
+## 5. library (if `status` shows not scanned)
 
 Offer a scan — yes / no:
 
@@ -83,7 +95,7 @@ Offer a scan — yes / no:
   `library search` works).
 - **No**: skip — they can run it later.
 
-## 5. templates (usage note only — no setup)
+## 6. templates (usage note only — no setup)
 
 No connection needed. In one or two lines, tell the user templates let them register and
 author Notion pages (`notionmemory templates ...`, or the settings dashboard to manage
