@@ -61,6 +61,11 @@ it gives and use the `templates` commands instead. Always confirm property names
 Before a calendar operation (especially the first one in a session), check the connection:
 `notionmemory status` (whole-picture) or `notionmemory calendar connection` (this skill only).
 
+If several things are unset at once, the `onboard` skill runs the full guided sequence
+(PAT → memory → calendar → library → templates) as structured choices — invoke it
+instead of walking each skill by hand. This section is the per-skill connect detail
+`onboard` (and you) rely on.
+
 - **No PAT (Notion not connected)**: don't try to fix this yourself. Guide the user to the
   settings dashboard (the `settings` skill, or `notionmemory serve` → `http://localhost:8765`)
   to connect Notion there. **The raw PAT/token must never be pasted into chat** — there is no
@@ -76,9 +81,6 @@ Before a calendar operation (especially the first one in a session), check the c
   name but an incompatible type) rather than guessing. Report the resulting DB link and any
   columns that were added. If it refuses, relay the reason verbatim and re-offer the menu —
   don't guess a fix.
-- **Setup sequence** when several things are unconfigured at once, do them in this order:
-  PAT (settings dashboard) → memory → calendar → library (ask "want me to scan it for
-  search?" → `notionmemory library refresh`) → templates (usage note only, no setup needed).
 
 ## Find content with library
 

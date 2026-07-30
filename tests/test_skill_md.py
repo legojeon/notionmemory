@@ -15,7 +15,7 @@ def test_skills_root_is_inside_package():
 
 def test_skill_names_are_the_final_set():
     assert skill_assets.skill_names() == [
-        "calendar", "library", "memory", "settings", "templates"]   # notes 제거
+        "calendar", "library", "memory", "onboard", "settings", "templates"]
 
 
 def test_skill_names_include_library():

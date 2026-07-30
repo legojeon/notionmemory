@@ -83,14 +83,14 @@ CATALOG = {
             "before your first search"),
         "hook.library_count": "library: {n} pages scanned, last refreshed {watermark}",
         "hook.watermark_unknown": "(unknown)",
-        "hook.onboarding_pat": (
-            "notionmemory: Notion isn't connected yet. Offer the user guided setup — "
-            "open the settings dashboard (the `settings` skill, or `{cli} serve`) to "
-            "connect Notion, then set up memory, calendar, library, and templates."),
-        "hook.onboarding_setup": (
-            "notionmemory: Notion is connected, but {skills} not set up yet. Offer the "
-            "user guided setup for {skills} via the settings dashboard (the `settings` "
-            "skill, or `{cli} serve`)."),
+        "hook.onboarding_offer": (
+            "notionmemory isn't fully set up yet ({missing}). Offer the user guided "
+            "onboarding: invoke the `onboard` skill — it walks Notion (PAT), memory, and "
+            "calendar setup as structured choices (and offers a library scan), skipping "
+            "whatever is already done. Not the dashboard — `onboard` drives it."),
+        "hook.onboard_item.notion": "Notion not connected",
+        "hook.onboard_item.memory": "memory not set up",
+        "hook.onboard_item.calendar": "calendar not set up",
         "hook.memory_brief": "project brief ({project}):\n{brief}",
         "hook.memory_top": "high-strength memories ({project}): {items}",
         "hook.memory_pending_consolidation": (
@@ -171,14 +171,14 @@ CATALOG = {
             "library: 아직 안 훑어봄 — 첫 검색 전 `notionmemory library refresh --full` 필요"),
         "hook.library_count": "library: {n}건 훑어봄, 마지막 갱신 {watermark}",
         "hook.watermark_unknown": "(미상)",
-        "hook.onboarding_pat": (
-            "notionmemory: Notion 이 아직 연결되지 않았습니다. 사용자에게 안내 설정을 "
-            "제안하세요 — settings 대시보드(`settings` 스킬 또는 `{cli} serve`)를 열어 "
-            "Notion 을 연결한 뒤 memory·calendar·library·templates 순으로 설정하세요."),
-        "hook.onboarding_setup": (
-            "notionmemory: Notion 은 연결됐지만 {skills} 가 아직 설정되지 않았습니다. "
-            "settings 대시보드(`settings` 스킬 또는 `{cli} serve`)로 {skills} 안내 설정을 "
-            "제안하세요."),
+        "hook.onboarding_offer": (
+            "notionmemory 설정이 아직 완료되지 않았습니다({missing}). 사용자에게 안내 "
+            "온보딩을 제안하세요: `onboard` 스킬을 호출하면 Notion(PAT)·memory·calendar "
+            "설정을 구조화 선택지로 안내하고(라이브러리 스캔도 제안) 이미 된 단계는 "
+            "건너뜁니다. settings 대시보드가 아니라 `onboard` 가 진행합니다."),
+        "hook.onboard_item.notion": "Notion 미연결",
+        "hook.onboard_item.memory": "memory 미설정",
+        "hook.onboard_item.calendar": "calendar 미설정",
         "hook.memory_brief": "프로젝트 브리프({project}):\n{brief}",
         "hook.memory_top": "고Strength 메모리({project}): {items}",
         "hook.memory_pending_consolidation": (

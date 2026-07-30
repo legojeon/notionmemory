@@ -149,24 +149,33 @@ def library_injection() -> str:
 
 
 def onboarding_injection() -> str:
-    """PAT 미연결 / calendar·memory 미바인딩이면 온보딩 넛지 한 블록(settings 대시보드로
-    안내). 전부 설정돼 있으면 "" — 매 세션 닦달하지 않는다.
+    """코어 설정(PAT/memory/calendar)이 하나라도 비어 있고 아직 온보딩을 제안하지
+    않았으면(config `onboarding.offered`) `onboard` 스킬을 **한 번** 제안하고 마커를
+    set 한다. 이미 제안했거나 코어가 다 되어 있으면 "". library 미색인만으로는 제안하지
+    않는다 — 그건 library_injection 의 steady-state 넛지 몫이다(돌아온 사용자에게 전체
+    온보딩을 다시 들이밀지 않기 위해).
 
-    `status.probe(config, verify=False)`를 쓴다 — `verify=True`는 live HTTP 왕복이라
-    세션마다 도는 이 훅에는 못 쓴다(task-3 계약, `test_injection_makes_no_network_call`).
-    PAT 미연결이 최우선 조건이다 — DB 바인딩보다 먼저 풀어야 하는 게이팅 전제이기 때문에,
-    PAT 안내와 DB 설정 안내를 동시에 찍지 않고 PAT 쪽을 먼저 반환한다."""
+    `status.probe(config, verify=False)`(네트워크 0)만 쓴다 — 세션마다 도는 훅이라
+    live HTTP 왕복 금지(task-3 계약, test_injection_makes_no_network_call)."""
     try:
-        from notionmemory.core import status as status_mod
+        from notionmemory.core import config as cfg, status as status_mod
         from notionmemory.core.config import Config
-        config = Config.load(str(paths.config_path()))
+        path = str(paths.config_path())
+        config = Config.load(path)
+        if config.onboarding_offered():
+            return ""
         st = status_mod.probe(config, verify=False)
+        missing = []
         if not st["notion"]["connected"]:
-            return _m("hook.onboarding_pat", cli=CLI)
-        missing = [name for name in ("calendar", "memory") if not st[name]["bound"]]
-        if missing:
-            return _m("hook.onboarding_setup", skills=", ".join(missing), cli=CLI)
-        return ""
+            missing.append(_m("hook.onboard_item.notion"))
+        if not st["memory"]["bound"]:
+            missing.append(_m("hook.onboard_item.memory"))
+        if not st["calendar"]["bound"]:
+            missing.append(_m("hook.onboard_item.calendar"))
+        if not missing:
+            return ""
+        cfg.save_onboarding_offered(path)
+        return _m("hook.onboarding_offer", missing=", ".join(missing), cli=CLI)
     except Exception:
         return ""
 
@@ -280,15 +289,20 @@ def main(harness: str = "claude") -> int:
         line = templates_injection()
         if line:
             print(line)
-        lib = library_injection()
-        if lib:
-            print(lib)
         onboarding = onboarding_injection()
         if onboarding:
+            # onboard 제안이 나가는 세션에는 library/memory-index 빈-색인 넛지를 억제한다
+            # — onboard 흐름이 library 스캔을 이미 안내하므로 중복 닦달이 된다. memory
+            # reindex 는 onboard 가 직접 안내하진 않지만, 제안이 한 번 나가면 마커가 서고
+            # 다음 세션(else 분기)에 그 넛지가 다시 뜨므로 유실되지 않는다.
             print(onboarding)
-        mem_idx_note = memory_index_injection()
-        if mem_idx_note:
-            print(mem_idx_note)
+        else:
+            lib = library_injection()
+            if lib:
+                print(lib)
+            mem_idx_note = memory_index_injection()
+            if mem_idx_note:
+                print(mem_idx_note)
     except Exception:
         pass
     try:

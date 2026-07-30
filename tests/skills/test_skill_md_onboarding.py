@@ -48,11 +48,13 @@ def test_onboarding_section_never_puts_raw_pat_in_chat():
         assert "raw" in low and ("token" in low or "pat" in low)
 
 
-def test_onboarding_section_states_the_setup_sequence():
+def test_onboarding_section_points_to_onboard_not_duplicate_sequence():
     for name in ("memory", "calendar"):
         section = _onboarding_section(name)
-        # PAT → memory → calendar → library → templates 순서 규약
-        assert "library" in section and "templates" in section
+        # 전체 시퀀스는 onboard 스킬이 소유 — per-skill 은 onboard 를 참조만 한다
+        assert "onboard" in section
+        # 중복 standalone "Setup sequence" 불릿은 사라진다(포인터 문단의 화살표 요약은 허용)
+        assert "Setup sequence" not in section
 
 
 def test_memory_connect_is_documented_as_strict():

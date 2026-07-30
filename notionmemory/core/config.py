@@ -32,6 +32,10 @@ class Config:
     def skill_options(self, skill_id: str) -> dict:
         return (self.data.get("skills") or {}).get(skill_id) or {}
 
+    def onboarding_offered(self) -> bool:
+        ob = self.data.get("onboarding")
+        return bool(ob.get("offered")) if isinstance(ob, dict) else False
+
 
 def _load_raw(config_path: str) -> dict:
     if os.path.exists(config_path):
@@ -60,6 +64,17 @@ def save_language(config_path: str, lang: str) -> None:
     """최상위 language 키 기록. 다른 키 보존(원자 교체)."""
     raw = _load_raw(config_path)
     raw["language"] = lang
+    _write_raw(config_path, raw)
+
+
+def save_onboarding_offered(config_path: str) -> None:
+    """온보딩을 능동 제안했다는 일회성 마커 기록(onboarding.offered=true).
+    다른 키 보존(원자 교체). teardown --purge-config 로만 리셋된다(config 삭제)."""
+    raw = _load_raw(config_path)
+    ob = raw.get("onboarding")
+    ob = ob if isinstance(ob, dict) else {}
+    ob["offered"] = True
+    raw["onboarding"] = ob
     _write_raw(config_path, raw)
 
 

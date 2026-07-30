@@ -10,12 +10,18 @@ from notionmemory.skills.library import index as I
 
 @pytest.fixture(autouse=True)
 def isolated(tmp_path, monkeypatch):
+    from notionmemory.core import config as cfg, paths
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / ".config"))
     monkeypatch.setattr(session_start, "resolve_toplevel", lambda cwd: "")
     monkeypatch.setattr(session_start, "maybe_install_git_hook", lambda top: "")
     monkeypatch.setattr(session_start.subprocess, "run",
                         lambda *a, **k: type("R", (), {"returncode": 1, "stdout": ""})())
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"cwd": str(tmp_path)})))
+    # 이 파일은 library_injection 만 시험한다 — 코어(PAT/memory/calendar)가 이 tmp
+    # HOME 에서는 미설정이라 onboarding_injection 이 먼저 발화해 library 넛지를
+    # 억제한다(task-2 계약). 이미 온보딩을 제안했다고 마킹해 그 게이트를 우회한다.
+    cfg.save_onboarding_offered(str(paths.config_path()))
     return tmp_path
 
 
