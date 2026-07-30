@@ -9,6 +9,8 @@
 from __future__ import annotations
 
 import difflib
+import os
+import unicodedata
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -59,7 +61,12 @@ def save(p: Profile) -> Path:
     target = path_for(p.slug)
     target.parent.mkdir(parents=True, exist_ok=True)
     head = yaml.safe_dump(data, allow_unicode=True, sort_keys=False).rstrip("\n")
-    target.write_text(f"{_SEP}\n{head}\n{_SEP}\n{body}", encoding="utf-8")
+    # 원자 교체(config.py 와 같은 규율) — write_text 도중 끊기면 잘린 프로필이 남고,
+    # load_all 은 파싱 실패를 삼켜 템플릿이 목록에서 **조용히 사라진다**. prompt 는
+    # 사용자가 손으로 쓴 콘텐츠(강의노트 규칙 등)라 다른 사본이 없다(opus 스윕).
+    tmp = target.with_suffix(target.suffix + ".tmp")
+    tmp.write_text(f"{_SEP}\n{head}\n{_SEP}\n{body}", encoding="utf-8")
+    os.replace(tmp, target)
     return target
 
 
@@ -130,6 +137,20 @@ def find_prop(db: dict, name: str) -> dict:
     for prop in props:
         if prop.get("name") == name:
             return prop
+    # 공백 무시 폴백 — Notion 스키마엔 `마감일 ` 처럼 끝공백 붙은 이름이 흔한데(공유
+    # 템플릿 복제 등) CLI 파싱(parse_set/--fields/--where)은 이름을 strip 하므로 정확
+    # 일치로는 영원히 도달 불가다(실사용 버그). strip 비교로 **유일**할 때만 그 속성을
+    # 돌려준다 — 둘 이상이면 추측하지 않고 아래 기존 오류로 떨어진다. 호출부는 사용자가
+    # 친 이름이 아니라 여기서 받은 캐노니컬 `prop["name"]` 을 페이로드 키로 써야 한다.
+    # NFC 정규화도 함께 접는다 — macOS 파일명/일부 입력기는 한글을 NFD 로 내보내
+    # `마감일`(NFD) vs `마감일`(NFC) 이 **화면엔 똑같이 보이면서** 불일치한다(오류
+    # 메시지가 자기모순처럼 읽히는, 공백과 같은 부류의 함정). slugify 는 이미 NFC 로
+    # 정규화한다 — 같은 규율을 조회 이음매에도 적용한다.
+    def _norm(s: str) -> str:
+        return unicodedata.normalize("NFC", (s or "").strip())
+    stripped = [p for p in props if _norm(p.get("name")) == _norm(name)]
+    if len(stripped) == 1:
+        return stripped[0]
     names = [prop.get("name", "") for prop in props]
     close = difflib.get_close_matches(name, names, n=1, cutoff=0.6)
     hint = f" 혹시 `{close[0]}`인가요?" if close else f" 사용 가능: {', '.join(names)}"

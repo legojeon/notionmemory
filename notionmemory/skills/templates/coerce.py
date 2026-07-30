@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import math
 import re
+import unicodedata
 from datetime import datetime
 from typing import Callable
 
@@ -136,7 +137,20 @@ def _choice(prop: dict, value: str, *, allow_new: bool, hint: str | None = None)
     # Notion 원본 옵션 배열을 그대로 복사해오면 문자열이 아니라 {"name": ...} dict 가
     # 섞여 들어온다 — 둘 다 받아 TypeError 대신 정상적인 ValueError 로 이어지게 한다.
     choices = [c["name"] if isinstance(c, dict) else c for c in (prop.get("choices") or [])]
-    if value in choices or (allow_new and choices):
+    if value in choices:
+        return value
+    # 공백 무시 폴백 — 속성 이름(find_prop)과 같은 부류인데 여기가 더 위험하다: 옵션
+    # 이름에 끝공백이 있으면(`완료 `) 사용자의 `완료` 는 select 에서 400 이 아니라
+    # **조용히 새 옵션을 만들어** 보드를 쪼갠다(이 모듈 docstring 의 그 사고). 조회
+    # (validate_choice) 쪽은 equals 가 아무것도 못 찾아 조용히 0건이 된다. strip 비교로
+    # **유일**할 때만 캐노니컬 옵션명으로 치환한다 — allow_new 보다 먼저 시도해야
+    # `--allow-new-option` 이 기존 옵션 매칭을 건너뛰고 중복 옵션을 만들지 않는다.
+    def _norm(s: str) -> str:       # NFC 도 접는다 — find_prop 폴백과 같은 규율(NFD 입력)
+        return unicodedata.normalize("NFC", (s or "").strip())
+    stripped = [c for c in choices if _norm(c) == _norm(value)]
+    if len(stripped) == 1:
+        return stripped[0]
+    if allow_new and choices:
         return value
     if not choices:
         # 등록 시 choices 를 못 읽은 DB — 막을 근거가 없으니 통과시키되 판단은 Notion 에.
@@ -224,12 +238,17 @@ def build_properties(db: dict, pairs: list[tuple[str, str]], *,
     """검증된 Notion `properties` 페이로드. 실패는 전부 쓰기 전에 ValueError."""
     out: dict = {}
     for name, value in pairs:
-        if name in out:
-            raise ValueError(f"같은 속성을 두 번 지정했습니다: {name}")
         prop = find_prop(db, name)          # 오타면 유사 이름 제안 + refresh 안내
+        # 페이로드 키는 캐노니컬 이름 — find_prop 의 공백 무시 폴백으로 `마감일 `(끝공백)
+        # 이 매칭됐을 때 사용자가 친 `마감일` 을 키로 쓰면 로컬 검증만 통과하고 Notion
+        # 이 "없는 속성" 400 을 낸다. 중복 검사도 캐노니컬 기준이어야 `마감일`+`마감일 `
+        # 이중 지정이 걸린다.
+        canonical = prop["name"]
+        if canonical in out:
+            raise ValueError(f"같은 속성을 두 번 지정했습니다: {canonical}")
         if not types.flags(prop.get("type", "")).writable or not prop.get("writable"):
             raise ValueError(
                 f"`{name}`은 {prop.get('type')} 이라 쓸 수 없습니다 (읽기 전용 속성)")
-        out[name] = _value_json(prop, value, resolve_relation=resolve_relation,
-                                allow_new_option=allow_new_option)
+        out[canonical] = _value_json(prop, value, resolve_relation=resolve_relation,
+                                     allow_new_option=allow_new_option)
     return out

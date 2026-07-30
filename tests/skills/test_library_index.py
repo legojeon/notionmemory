@@ -125,3 +125,12 @@ def test_count_and_watermark():
     idx["last_refreshed"] = "2026-07-24T10:00:00.000Z"
     assert I.count(idx) == 1
     assert I.watermark(idx) == "2026-07-24T10:00:00.000Z"
+
+
+def test_save_is_atomic_no_tmp_left(tmp_path, monkeypatch):
+    monkeypatch.setattr(I.paths, "state_dir", lambda: tmp_path)
+    idx = I.load()
+    I.upsert(idx, "p1", title="t", headings=[], url="", last_edited_time="")
+    I.save(idx)
+    assert I.load()["pages"]["p1"]["title"] == "t"
+    assert not list(tmp_path.rglob("*.tmp")), "임시 파일이 남으면 안 된다"

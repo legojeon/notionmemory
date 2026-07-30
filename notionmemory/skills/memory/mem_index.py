@@ -15,6 +15,7 @@ Type=="brief" 는 build() 에서부터 걸러 색인에 절대 들어오지 않�
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from notionmemory.core import paths
@@ -62,7 +63,10 @@ def load() -> dict:
 def save(idx: dict) -> None:
     p = index_path()
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(idx, ensure_ascii=False, indent=2), encoding="utf-8")
+    # 원자 교체 — library index.save 와 같은 규율(잘린 JSON 은 조용히 빈 색인이 된다).
+    tmp = p.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(idx, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, p)
 
 
 def search(idx: dict, query: str, *, project: str = "", limit: int = 3,

@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
@@ -40,7 +41,11 @@ def load() -> dict:
 def save(idx: dict) -> None:
     p = index_path()
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(idx, ensure_ascii=False, indent=2), encoding="utf-8")
+    # 원자 교체 — 도중 끊기면 load() 가 파싱 실패를 삼켜 빈 색인으로 시작하고,
+    # 사용자는 통째로 재스캔해야 한다(재구축 가능하지만 110초짜리 낭비).
+    tmp = p.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(idx, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, p)
 
 
 def upsert(idx: dict, page_id: str, *, title: str, headings: list,

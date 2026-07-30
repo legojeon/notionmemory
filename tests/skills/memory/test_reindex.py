@@ -53,7 +53,7 @@ class FakeStoreFactory:
 
 
 class _FakeStore:
-    def _data_source(self):
+    def _data_source(self, *, create=True):
         return self._ds
 
 

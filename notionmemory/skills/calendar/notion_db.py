@@ -127,11 +127,16 @@ class CalendarDB:
         resp = self._req("POST", f"/data_sources/{data_source_id}/query", json={
             "filter": {"property": "Event ID", "rich_text": {"equals": event_id}},
             "page_size": 1})
-        results = resp.json().get("results", [])
+        results = resp.json().get("results") or []      # 명시적 null 도 빈 목록으로
         return results[0] if results else None
 
     def query(self, data_source_id: str, filter_json: dict) -> list[dict]:
-        """서버측 필터로 걸러진 페이지 전량 페치 (속성만 — 본문 블록은 별도)."""
+        """서버측 필터로 걸러진 페이지 전량 페치 (속성만 — 본문 블록은 별도).
+
+        진행 불변식 가드 — templates `store._fetch` 가 실기에서 두 번 재현한
+        `has_more:true` + `next_cursor:null`(또는 빈 results) 정체 응답에서 이 루프는
+        무한 요청 폭주가 된다(opus 스윕 실측). 서버가 진행을 못 시켜주면 지금까지
+        모은 것을 돌려주고 멈춘다."""
         pages: list[dict] = []
         cursor = None
         while True:
@@ -139,10 +144,13 @@ class CalendarDB:
             if cursor:
                 payload["start_cursor"] = cursor
             data = self._req("POST", f"/data_sources/{data_source_id}/query", json=payload).json()
-            pages += data.get("results", [])
+            rows = data.get("results") or []
+            pages += rows
             if not data.get("has_more"):
                 return pages
             cursor = data.get("next_cursor")
+            if not cursor or not rows:
+                return pages
 
     def create_page(self, data_source_id: str, props: dict, notes: str = "") -> dict:
         blocks = markdown_to_blocks(notes) if notes else []

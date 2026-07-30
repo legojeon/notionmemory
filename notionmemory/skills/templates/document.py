@@ -168,7 +168,7 @@ class DocumentStore:
         if after:
             body["after"] = after
         data = self._req("PATCH", f"/blocks/{page_id}/children", json=body).json()
-        return [b.get("id", "") for b in data.get("results", [])]
+        return [b.get("id", "") for b in (data.get("results") or [])]
 
     def set_block(self, block_id: str, markdown: str) -> None:
         """블록 내용 교체. Notion 은 블록 타입 제자리 변경을 지원하지 않으므로,

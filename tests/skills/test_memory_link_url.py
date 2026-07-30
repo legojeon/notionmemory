@@ -108,7 +108,7 @@ class FakeDB:
     def __init__(self):
         self.created = []
 
-    def ensure(self, parent, meta):
+    def ensure(self, parent, meta, *, create=True):
         meta.set_meta("data_source_id", "ds_1")
         return "ds_1"
 

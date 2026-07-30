@@ -81,7 +81,7 @@ class _RecordingDB:
     def __init__(self):
         self.created: dict | None = None
 
-    def ensure(self, parent_page_id, meta):
+    def ensure(self, parent_page_id, meta, *, create=True):
         return "DS"
 
     def create_page(self, data_source_id, memory):

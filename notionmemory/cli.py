@@ -608,7 +608,12 @@ def _text_or_file(inline, file_path):
     if file_path:
         if file_path == "-":
             return sys.stdin.read()
-        return Path(file_path).read_text(encoding="utf-8")
+        try:
+            return Path(file_path).read_text(encoding="utf-8")
+        except OSError as e:
+            # 이 플래그의 주 사용자는 본문을 임시 파일로 쓰는 에이전트다 — 지워진/오타
+            # 경로는 예상된 실패이므로 traceback 이 아니라 되물음(exit 2)이어야 한다.
+            raise ValueError(f"파일을 읽을 수 없습니다: {file_path} ({e.strerror or e})")
     return inline
 
 

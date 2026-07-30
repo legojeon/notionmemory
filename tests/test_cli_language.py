@@ -39,3 +39,13 @@ def test_language_rejects_invalid_choice(tmp_path):
     p = str(tmp_path / "config.yaml")
     with pytest.raises(SystemExit):        # argparse choices guard
         main(["language", "fr", "--config", p])
+
+
+def test_text_or_file_missing_file_is_valueerror_not_traceback(tmp_path):
+    """--*-file 의 주 사용자는 임시 파일을 쓰는 에이전트 — 지워진 경로는 예상된
+    실패라 exit 2(ValueError)여야지 FileNotFoundError traceback 이면 안 된다."""
+    import pytest
+    from notionmemory.cli import _text_or_file
+    with pytest.raises(ValueError):
+        _text_or_file(None, str(tmp_path / "gone.md"))
+    assert _text_or_file("inline", None) == "inline"

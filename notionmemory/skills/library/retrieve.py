@@ -25,7 +25,7 @@ def search(session, config, query: str, *, limit: int = 25,
     if "memory" in sources:
         res = MemoryStore(session, config).recall(query, top=limit)
         if not res.get("fallback"):        # 폴백(최근 N개)은 매칭이 아니다 — content 처럼 무매칭=무결과
-            for s in res.get("results", []):
+            for s in (res.get("results") or []):
                 out.append({"source": "memory", "id": s.get("mem_id", ""),
                             "title": s.get("title", ""),
                             "section": s.get("type", ""), "score": 0})

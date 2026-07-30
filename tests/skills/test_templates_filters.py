@@ -600,3 +600,30 @@ def test_valid_ops_matches_clause_dispatch_for_every_type(ptype):
         else:
             assert op in allowed, (
                 f"{ptype} {op}: _clause 는 받아들였는데 _valid_ops 는 없다고 한다")
+
+
+# --- opus 사냥(릴리스 전 스윕): 값 속 단어-연산자 오파싱 + sort 내부 공백 붕괴 ---
+
+def test_parse_where_value_containing_word_operator_token():
+    """`=` 가 단어 연산자보다 먼저 나오면 `=` 가 이긴다 — 예전엔 값 속 ` in `/`ends` 가
+    연산자로 잡혀 속성 이름이 `Title = Life` 처럼 오염되고 도달 불가였다."""
+    assert filters.parse_where("Title = Life in Korea") == ("Title", "=", "Life in Korea")
+    assert filters.parse_where("Title=Life in Korea") == ("Title", "=", "Life in Korea")
+    assert filters.parse_where("Status = in progress") == ("Status", "=", "in progress")
+    assert filters.parse_where("Title = How it ends") == ("Title", "=", "How it ends")
+    assert filters.parse_where("Title = the empty set") == ("Title", "=", "the empty set")
+
+
+def test_parse_where_word_operator_still_wins_when_first():
+    assert filters.parse_where("Tags contains remote") == ("Tags", "contains", "remote")
+    assert filters.parse_where("Stage in Applied,Offer") == ("Stage", "in", "Applied,Offer")
+    assert filters.parse_where("Notes empty") == ("Notes", "empty", "")
+    # 이름에 연산자 단어가 든 속성도 여전히 동작(기존 보장 유지)
+    assert filters.parse_where("Contains Notes contains x") == ("Contains Notes", "contains", "x")
+
+
+def test_parse_sort_preserves_internal_whitespace_in_name():
+    # 예전엔 " ".join 이 내부 연속 공백을 붕괴시켜 find_prop 을 못 찾았다
+    out = filters.parse_sort("Date of  Application desc")
+    assert out["property"] == "Date of  Application"
+    assert out["direction"] == "descending"

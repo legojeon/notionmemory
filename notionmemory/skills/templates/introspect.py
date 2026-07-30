@@ -126,7 +126,7 @@ def resolve_target(session, target: str) -> str:
     data = _req(session, "POST", "/search", json={
         "query": target, "filter": {"property": "object", "value": "page"},
         "page_size": 10}).json()
-    hits = [r for r in data.get("results", []) if r.get("object") == "page"]
+    hits = [r for r in (data.get("results") or []) if r.get("object") == "page"]
     candidates = [{"id": r["id"], "title": _page_title(r), "url": r.get("url", "")}
                   for r in hits]
     if len(candidates) == 1:
@@ -425,7 +425,7 @@ def sample_rows(session, data_source_id: str, names: list, n: int = SAMPLE_ROWS)
                            json={"page_size": n})
     if resp.status_code != 200:
         return []
-    return [render.flatten(pg, names) for pg in resp.json().get("results", [])[:n]]
+    return [render.flatten(pg, names) for pg in (resp.json().get("results") or [])[:n]]
 
 
 def _generate_body(runtime, p: profile.Profile, samples: dict,

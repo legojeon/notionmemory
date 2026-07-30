@@ -42,7 +42,13 @@ def run(config: Config, log) -> int:
     색인된 건수, 실패 시 -1(생 traceback 없이)."""
     try:
         store = MemoryStore(NotionSession(), config, log=log)
-        pages = store.db.query(store._data_source(), build_filter())
+        # 조회 경로 — 미바인딩이면 DB 를 만들지 말고(고아 DB 기전) 안내하고 끝낸다.
+        ds = store._data_source(create=False)
+        if not ds:
+            log("memory reindex 실패 — memory 가 아직 연결되지 않았습니다: "
+                "`notionmemory memory connect --new`(또는 --url) 먼저 (기존 색인 유지)")
+            return -1
+        pages = store.db.query(ds, build_filter())
     except (RuntimeError, requests.RequestException) as e:
         log(f"memory reindex 실패 — Notion 조회 불가: {e} (기존 색인 유지)")
         return -1

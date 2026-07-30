@@ -59,17 +59,23 @@ _ORDER_DATE = {">": "after", "<": "before", ">=": "on_or_after", "<=": "on_or_be
 def parse_where(raw: str) -> tuple[str, str, str]:
     """`"Days Open>30"` → `("Days Open", ">", "30")`.
 
-    단어 연산자를 먼저 본다 — 공백으로 구분된 토큰만 연산자로 인정하므로
-    `Contains Notes contains x` 같은 이름도 갈라지지 않는다.
+    단어·기호 연산자를 둘 다 매치해 **더 앞에서 시작하는 쪽**을 연산자로 삼는다.
+    단어 연산자만 먼저 보면 `Title = Life in Korea` 의 값 속 ` in ` 이 연산자로
+    잡혀 속성 이름이 `Title = Life` 로 오염되고, 그 필터는 영원히 도달 불가가 된다
+    (이스케이프 표면이 없다 — opus 스윕이 재현). 같은 위치면 단어 쪽 우선(기존
+    보장 유지: `Contains Notes contains x` 는 여전히 이름으로 안 갈라진다).
     """
     text = (raw or "").strip()
-    m = _WORD_RE.match(text)
-    if m:
+    mw, ms = _WORD_RE.match(text), _SYM_RE.match(text)
+    if mw and ms:
+        m = mw if mw.start("op") <= ms.start("op") else ms
+    else:
+        m = mw or ms
+    if m is mw and m:
         op, value = m.group("op"), (m.group("v") or "").strip()
         if op in NO_VALUE_OPS and value:
             raise ValueError(f"`{op}`는 값을 받지 않습니다: {raw!r}")
         return m.group("p").strip(), op, value
-    m = _SYM_RE.match(text)
     if m:
         return m.group("p").strip(), m.group("op"), m.group("v").strip()
     raise ValueError(
@@ -91,7 +97,9 @@ def parse_sort(raw: str) -> dict:
     if not words:
         raise ValueError(f"--sort 형식이 아닙니다: {raw!r} (\"속성 asc|desc\")")
     if len(words) >= 2 and words[-1].lower() in ("asc", "desc"):
-        name, direction = " ".join(words[:-1]), words[-1].lower()
+        # `" ".join(words[:-1])` 은 이름 내부의 연속 공백을 붕괴시켜(`Date of  App`)
+        # find_prop 을 못 찾게 한다 — 끝의 방향 토큰만 잘라내 원문 그대로 보존한다.
+        name, direction = text[: len(text) - len(words[-1])].rstrip(), words[-1].lower()
     elif len(words) <= 2:
         name, direction = text, "asc"
     else:
@@ -228,7 +236,7 @@ def _clause(db: dict, name: str, op: str, value: str, *,
         # 만드는 걸 막는다(coerce.py 의 쓰기 경로와 같은 검증·같은 메시지 재사용).
         items = [coerce.validate_choice(prop, v) for v in items]
         key = "contains" if ptype == "multi_select" else "equals"
-        return {"or": [{"property": name, ptype: {key: item}} for item in items]}
+        return {"or": [{"property": prop["name"], ptype: {key: item}} for item in items]}
 
     # 타입×연산자 유효성을 값 유무보다 먼저 가린다(리뷰 지적) — `Salary starts` 처럼 값도
     # 없고 연산자도 안 맞는 입력에서 "값이 없습니다" 먼저 던지면, 에이전트가 값을 채워
@@ -246,14 +254,14 @@ def _clause(db: dict, name: str, op: str, value: str, *,
         elif ptype == "multi_select":
             needle = coerce.validate_choice(prop, value)
         key = "contains" if op == "contains" else "does_not_contain"
-        return {"property": name, ptype: {key: needle}}
+        return {"property": prop["name"], ptype: {key: needle}}
 
     if op in ("starts", "ends"):
         if ptype not in TEXT_TYPES:
             _reject(name, ptype, op)
         _need_value(name, op, value)
         key = "starts_with" if op == "starts" else "ends_with"
-        return {"property": name, ptype: {key: value}}
+        return {"property": prop["name"], ptype: {key: value}}
 
     if op in _ORDER_NUM:
         if ptype not in ORDERED_TYPES:
@@ -357,7 +365,8 @@ def compile_query(db: dict, *, wheres, search: str, sorts,
                 flat.append(p)
         out["filter"] = {"and": flat}
     if sorts:
-        for s in sorts:
-            _checked(db, s["property"])
-        out["sorts"] = list(sorts)
+        # 검증 겸 캐노니컬화 — find_prop 의 공백 무시 폴백이 `마감일 `(끝공백) 를
+        # 매칭해줘도 페이로드에 사용자가 친 이름을 실으면 Notion 만 400 을 낸다.
+        out["sorts"] = [{**s, "property": _checked(db, s["property"])["name"]}
+                        for s in sorts]
     return out

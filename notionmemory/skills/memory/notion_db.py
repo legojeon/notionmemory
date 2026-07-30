@@ -126,7 +126,14 @@ class SecondBrainDB:
         return out
 
     # ---- 부트스트랩 ----
-    def ensure(self, parent_page_id: str, meta) -> str:
+    def ensure(self, parent_page_id: str, meta, *, create: bool = True) -> str:
+        """data source id. `create=False`면 살아있는 캐시가 있을 때만 주고 없으면 "".
+
+        calendar 와 같은 규율 — 조회 경로(recall/library search/SessionStart 훅)가
+        DB 를 만드는 것은 그 자체로 잘못이다: PAT 만 연결한 사용자가 검색 한 번에
+        원치 않은 Second Brain 을 떠안고(고아 DB 의 실제 기전), 훅 경로는 예외를
+        삼켜 아무 말도 없이 만든 뒤 온보딩 넛지까지 선점해 버린다(opus 스윕 재현).
+        """
         cached = meta.get_meta("data_source_id")
         if cached:
             r = self.session.request("GET", f"/data_sources/{cached}")
@@ -152,6 +159,8 @@ class SecondBrainDB:
                 self.log(f"  ! 저장된 data source({cached}) 접근 불가({r.status_code}) → 재부트스트랩")
             else:
                 raise RuntimeError(f"Notion GET /data_sources/{cached} 실패: {r.status_code} {r.text[:200]}")
+        if not create:
+            return ""       # 조회 경로 — 없는 DB 를 만들지 않는다
         # parent_page_id 미지정 시 워크스페이스 최상위에 직접 생성 — 사이드바에서
         # 바로 DB가 열린다 (2025-09 API가 database의 workspace parent 지원).
         parent = ({"type": "page_id", "page_id": parent_page_id} if parent_page_id
@@ -192,11 +201,15 @@ class SecondBrainDB:
         resp = self._req("POST", f"/data_sources/{data_source_id}/query", json={
             "filter": {"property": "Mem ID", "rich_text": {"equals": mem_id}},
             "page_size": 1})
-        results = resp.json().get("results", [])
+        results = resp.json().get("results") or []      # 명시적 null 도 빈 목록으로
         return results[0] if results else None
 
     def query(self, data_source_id: str, filter_json: dict) -> list[dict]:
-        """서버측 필터로 걸러진 페이지 전량 페치 (속성만 — 본문 블록은 별도)."""
+        """서버측 필터로 걸러진 페이지 전량 페치 (속성만 — 본문 블록은 별도).
+
+        진행 불변식 가드 — `has_more:true` + `next_cursor:null`(또는 빈 results) 정체
+        응답에서 무한 요청 폭주를 막는다(templates `store._fetch`·library crawl 과
+        같은 방어, calendar 와 동일 수정)."""
         pages: list[dict] = []
         cursor = None
         while True:
@@ -204,10 +217,13 @@ class SecondBrainDB:
             if cursor:
                 payload["start_cursor"] = cursor
             data = self._req("POST", f"/data_sources/{data_source_id}/query", json=payload).json()
-            pages += data.get("results", [])
+            rows = data.get("results") or []
+            pages += rows
             if not data.get("has_more"):
                 return pages
             cursor = data.get("next_cursor")
+            if not cursor or not rows:
+                return pages
 
     def query_drafts(self, data_source_id: str, project: str) -> list[dict]:
         """Status=Draft 전량을 서버측으로 걸러온 뒤 Project 는 클라이언트에서 매치한다
@@ -240,7 +256,8 @@ class SecondBrainDB:
             if cursor:
                 params["start_cursor"] = cursor
             data = self._req("GET", f"/blocks/{page_id}/children", params=params).json()
-            for block in data.get("results", []):
+            rows = data.get("results") or []
+            for block in rows:
                 payload = block.get(block.get("type"), {}) or {}
                 if "rich_text" not in payload:
                     continue  # divider/이미지 등 텍스트 없는 블록 — 빈 줄 내지 않음
@@ -249,6 +266,8 @@ class SecondBrainDB:
             if not data.get("has_more"):
                 return "\n".join(lines)
             cursor = data.get("next_cursor")
+            if not cursor or not rows:      # 진행 불변식 — 정체 응답에서 무한 루프 금지
+                return "\n".join(lines)
 
     # ---- 쓰기 ----
     def _props(self, memory: dict) -> dict:
@@ -319,10 +338,13 @@ class SecondBrainDB:
             if cursor:
                 params["start_cursor"] = cursor
             data = self._req("GET", f"/blocks/{page_id}/children", params=params).json()
-            block_ids += [b["id"] for b in data.get("results", []) if b.get("id")]
+            rows = data.get("results") or []
+            block_ids += [b["id"] for b in rows if b.get("id")]
             if not data.get("has_more"):
                 break
             cursor = data.get("next_cursor")
+            if not cursor or not rows:      # 진행 불변식 — 정체 응답에서 무한 루프 금지
+                break
         for bid in block_ids:
             self._req("DELETE", f"/blocks/{bid}")
         blocks = self._blocks(content)

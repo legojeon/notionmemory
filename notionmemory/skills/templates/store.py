@@ -155,9 +155,10 @@ class TemplateStore:
         db = self._live_db(p, db_key)
         names = self._prop_names(db)
         if fields:
-            for name in fields:
-                profile.find_prop(db, name)     # 오타면 제안 + refresh 안내
-            names = list(fields)
+            # 검증 겸 캐노니컬화(오타면 제안 + refresh 안내) — 공백 무시 폴백으로
+            # `마감일 `(끝공백) 이 매칭됐을 때 render.flatten 이 페이지 속성을 사용자가
+            # 친 이름으로 찾으면 그 열만 조용히 빈 값이 된다.
+            names = [profile.find_prop(db, name)["name"] for name in fields]
         payload = filters.compile_query(db, wheres=list(wheres), search=search,
                                         sorts=list(sorts),
                                         resolve_relation=self.relation_resolver(p))
