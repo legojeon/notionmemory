@@ -18,6 +18,7 @@ from typing import Callable
 
 from notionmemory.skills.templates import types
 from notionmemory.skills.templates.profile import find_prop
+from notionmemory.core.notion_text import utf16_cap
 
 MAX_RICH_TEXT = 2000
 _TRUE = {"1", "true", "on", "yes", "y"}
@@ -37,7 +38,7 @@ def rt(text: str) -> list[dict]:
     calendar 에도 같은 두 줄이 있지만 import 하지 않는다. 스킬 간 결합을 늘리지 않는
     것이 이 설계의 전제이고(스펙 §0), 두 줄을 공유하려고 의존을 만들 이유가 없다.
     """
-    return [{"text": {"content": (text or "")[:MAX_RICH_TEXT]}}]
+    return [{"text": {"content": utf16_cap(text or "", MAX_RICH_TEXT)}}]
 
 
 def parse_set(raw: str) -> tuple[str, str]:

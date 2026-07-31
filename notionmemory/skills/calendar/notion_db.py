@@ -6,6 +6,7 @@ skills/memory/notion_db.py(SecondBrainDB)와 동형: ensure() 캐시 검증→40
 from __future__ import annotations
 
 from notionmemory.core.notion_markdown import markdown_to_blocks
+from notionmemory.core.notion_text import utf16_cap
 
 DB_TITLE = "Calendar"
 STATUSES = ("Scheduled", "Done", "Canceled")
@@ -47,7 +48,7 @@ def db_url(database_id: str) -> str:
 
 def rt(text: str) -> list[dict]:
     """rich_text 프로퍼티 값 — Notion 항목당 2000자 한계 방어."""
-    return [{"text": {"content": (text or "")[:2000]}}]
+    return [{"text": {"content": utf16_cap(text or "")}}]
 
 
 class CalendarDB:

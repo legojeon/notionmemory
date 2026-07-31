@@ -50,6 +50,12 @@ updates that project's rollup brief.
 - SessionStart also injects this project's brief (a rolled-up summary consolidation
   maintains) and its top high-Strength Active memories, when available — treat those as
   free background context, not something you need to `recall` again.
+- **Long raw content boundary**: the Excerpt field that search matches against only
+  shows roughly the first 6000 characters of a memory's content — anything past that is
+  invisible to search. Don't dump a long raw transcript or file into a single `remember`
+  call expecting it to stay searchable; consolidation's job is to distill that kind of
+  Draft down into a dense, verbatim-preserving summary with real concepts, which is the
+  designed path for making long input searchable.
 
 ## Per-message hints (local index)
 
@@ -70,8 +76,13 @@ and can be absent or imperfect.
   is empty — run `notionmemory memory reindex` to fill it"), **just run `notionmemory
   memory reindex` yourself** — it's a quick local rebuild from Notion, so do it rather
   than handing the user a command to type (mention in one line that you refreshed the
-  memory index). This note only appears when memory is bound. Real lookups still go
-  through `recall`; the index is just what powers this per-message hint.
+  memory index). This note only appears when memory is bound. `recall` itself now ranks
+  candidates from this same local index first and live-verifies the top matches in at most
+  two batched round-trips before ever falling back to a full live query; `remember` writes
+  through to the index right after a successful save, so a memory you just saved is
+  visible to `recall` immediately. `memory reindex` (run manually, or automatically at
+  the end of `memory consolidate`) is the full rebuild that keeps the index's aggregate
+  stats correct over time — not the only thing keeping it usable.
 
 ## recall conventions
 

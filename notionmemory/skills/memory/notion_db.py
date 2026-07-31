@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 
 from notionmemory.core.notion_markdown import markdown_to_blocks
+from notionmemory.core.notion_text import utf16_cap, utf16_chunks
 
 DB_TITLE = "Second Brain"
 # "brief" = Second Brain v2 consolidation 이 소유하는 예약 Type(프로젝트 롤업 1행,
@@ -59,8 +60,19 @@ def page_id_from_url(url: str) -> str:
 
 
 def _rt(text: str) -> list[dict]:
-    """rich_text 프로퍼티 값 — Notion 항목당 2000자 한계 방어."""
-    return [{"text": {"content": (text or "")[:2000]}}]
+    """rich_text 프로퍼티 값 — Notion 한도는 UTF-16 코드유닛 기준(core.notion_text)."""
+    return [{"text": {"content": utf16_cap(text or "")}}]
+
+
+EXCERPT_CHUNKS = 3   # Excerpt 가시 창 = 3 × 2000 UTF-16 유닛 (스펙 §①)
+
+
+def excerpt_rt(content: str) -> list[dict]:
+    """Excerpt 속성 값 — rich_text 여러 항목으로 가시 창을 넓힌다(항목당 2000유닛
+    한도는 UTF-16 기준). 이 창을 넘는 원시 덤프의 꼬리는 잘린다 — 그런 입력은
+    consolidation 이 증류하는 것이 설계다(스펙 §① 경계)."""
+    return [{"text": {"content": c}}
+            for c in utf16_chunks(content or "", 2000)[:EXCERPT_CHUNKS]]
 
 
 def _ms_name(name: str) -> str:
@@ -85,7 +97,7 @@ def _related_rt(related_ids: list[str], link_page_ids: list[str]) -> list[dict]:
     rt: list[dict] = []
     text = ", ".join(related_ids)
     if text:
-        rt.append({"text": {"content": text[:2000]}})
+        rt.append({"text": {"content": utf16_cap(text)}})
     for pid in link_page_ids:
         if rt:
             rt.append({"text": {"content": " "}})
@@ -284,7 +296,7 @@ class SecondBrainDB:
             "Related": {"rich_text": _related_rt(memory.get("relatedIds") or [],
                                                  memory.get("linkPageIds") or [])},
             "Status": {"select": {"name": memory.get("status", "Active")}},
-            "Excerpt": {"rich_text": _rt(memory.get("content", ""))},
+            "Excerpt": {"rich_text": excerpt_rt(memory.get("content", ""))},
         }
         if memory.get("url"):
             props["Link"] = {"url": memory["url"]}
@@ -301,10 +313,8 @@ class SecondBrainDB:
         # rich_text 항목 2000자 한계 — 아주 긴 단일 행은 사전 분할
         lines = []
         for line in (content or "").splitlines():
-            while len(line) > 1800:
-                lines.append(line[:1800])
-                line = line[1800:]
-            lines.append(line)
+            # 1800 은 코드포인트가 아니라 UTF-16 유닛으로 센다 — 이모지 밀집 행 방어
+            lines.extend(utf16_chunks(line, 1800) or [""])
         return markdown_to_blocks("\n".join(lines))
 
     def create_page(self, data_source_id: str, memory: dict) -> str:

@@ -6,8 +6,11 @@
 자체의 성공 판정을 무르지 않는다, consolidate.py 참고).
 
 Notion/네트워크 실패는 여기서 흡수해 생 traceback 을 호출자에 새지 않게 한다 — 실패 시
--1 을 반환하고 log 로만 알린다. 색인은 recall 의 오프라인 폴백 경로일 뿐 정합성
-크리티컬은 아니므로, 실패하면 이전 색인을 그대로 둔 채 다음 회차 재시도로 충분하다."""
+-1 을 반환하고 log 로만 알린다. 색인은 이제 recall 의 1차 로컬 랭킹 경로를 떠받친다
+(라이브로 검증한 top-K 를 돌려준다) — 그래도 정합성 크리티컬은 아니다: `remember`
+가 저장마다 색인을 write-through 하고, recall 의 라이브 검증이 사라진 항목을
+read-repair 로 지연삭제하므로, 여기 이 전체 재계산은 그 위에 얹는 주기적 재계산일
+뿐이다. 실패하면 이전 색인을 그대로 둔 채 다음 회차 재시도로 충분하다."""
 from __future__ import annotations
 
 import requests
@@ -33,7 +36,7 @@ def _to_memory(page: dict) -> dict:
     return {
         "id": s["mem_id"], "title": s["title"], "concepts": s["concepts"],
         "strength": strength, "type": s["type"], "project": s["project"],
-        "status": status, "content": s["excerpt"],
+        "status": status, "content": s["excerpt"], "last_edited": s["last_edited"],
     }
 
 
@@ -55,5 +58,6 @@ def run(config: Config, log) -> int:
     memories = [_to_memory(p) for p in pages]
     idx = mem_index.build(memories)
     mem_index.save(idx)
-    log(f"memory reindex 완료 — {len(idx)}건 색인")
-    return len(idx)
+    n = mem_index.count(idx)
+    log(f"memory reindex 완료 — {n}건 색인")
+    return n

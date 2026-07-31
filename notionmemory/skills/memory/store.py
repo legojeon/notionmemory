@@ -165,6 +165,19 @@ class MemoryStore:
             "createdAt": now, "updatedAt": now,
         }
         page_id = self.db.create_page(ds, memory)
+        # write-through — 방금 저장한 메모리를 로컬 색인에도 바로 반영한다. best-effort:
+        # 색인이 손상돼 있거나 쓰기가 실패해도 이미 성공한 Notion 저장 자체는 절대
+        # 무르지 않는다(circular import 주의는 recall 과 동일 — 함수 내 지역 import).
+        try:
+            from notionmemory.skills.memory import mem_index
+
+            mem_index.add_memory({
+                "id": mem_id, "title": title, "content": content, "type": mem_type,
+                "concepts": list(concepts), "strength": strength, "status": status,
+                "project": project, "last_edited": now,
+            })
+        except Exception:
+            pass
         result = {"mem_id": mem_id, "page_id": page_id, "concepts": list(concepts)}
         if old is not None:
             try:
@@ -179,6 +192,30 @@ class MemoryStore:
         ds = self._data_source(create=False)    # 조회가 DB 를 만들면 안 된다(고아 DB 기전)
         if not ds:
             return {"results": [], "fallback": False}
+        # 로컬 랭킹 경로(스펙 §③) — 색인이 채워져 있고 쿼리가 있으면 BM25 후보를
+        # Mem ID or-필터 1왕복으로 검증한다. 실패/빈 색인은 아래 기존 전량 경로.
+        # 순환 import 주의: mem_index 가 store 의 tokenize/score_page 를 import 하므로
+        # 함수 내 지역 import 로만 들여온다(모듈 상단 import 는 순환을 만든다).
+        if query:
+            from notionmemory.skills.memory import mem_index
+
+            try:
+                # load/count/search/verify 전체를 통짜로 감싼다 — 손상된 색인(비-dict
+                # JSON)이나 미래 버전(version>2, docs()가 v1 평면으로 오인하지 않도록
+                # 이미 {} 로 방어하지만, 완전히 다른 JSON 형태까지는 못 막는다)이 와도
+                # 트레이스백이 아니라 조용한 성능 저하(기존 라이브 경로)로 떨어져야 한다.
+                # SecondBrainDB._req 는 검증 왕복의 4xx/5xx 도 RuntimeError 로 감싸 올리므로
+                # (notion_db.py:_req) 이 포괄 catch 하나로 그것까지 함께 흡수된다.
+                idx = mem_index.load()
+                if mem_index.count(idx):
+                    cands = mem_index.search(idx, query, project=project, mem_type=mem_type,
+                                             limit=top * 2, min_score=0.0001)
+                    if cands:
+                        verified = self._verify_candidates(ds, cands, top, mem_type, idx)
+                        if verified:
+                            return {"results": verified[:top], "fallback": False}
+            except Exception:
+                pass    # 색인/검증 실패 → 기존 라이브 경로로
         pages = self.db.query(ds, build_filter(mem_type=mem_type))
         summaries = [page_summary(p) for p in pages]
         if project:
@@ -192,6 +229,55 @@ class MemoryStore:
             return {"results": [s for _, s in hits[:top]], "fallback": False}
         recent = sorted(summaries, key=lambda s: s["last_edited"], reverse=True)
         return {"results": recent[:top], "fallback": True}
+
+    def _verify_candidates(self, ds, cands, top, mem_type, idx):
+        """상위 top 후보를 Mem ID or-필터 하나로 라이브 검증. 사라진 항목은 색인에서
+        지연 삭제(read-repair — library 와 같은 규율)하고 다음 후보로 1회 재채움.
+
+        검증 필터는 mem_type 절을 걸지 않는다(build_filter() — mem_type 없이). 후보는
+        이미 mem_index.search 단계에서 색인의 type 으로 선필터됐으므로(FIX I2), 여기서
+        또 type 절을 걸면 색인과 라이브가 어긋난 경우(예: consolidation 이 그 사이 이
+        페이지의 Type 을 바꿨다) 실제로는 살아있는 페이지가 "검증 실패"로 오인돼
+        read-repair 로 지연삭제(prune)당한다. 대신 mem_type 이 있으면 돌아온 라이브
+        요약만 사후 필터하고, prune 은 (타입 무관) 라이브 결과에 아예 없는 id 에만
+        적용한다 — 살아있는데 타입만 다른 항목은 색인에 그대로 남는다."""
+        from notionmemory.skills.memory import mem_index
+
+        results, remaining, pruned = [], list(cands), False
+        for _round in range(2):
+            # 1왕복당 or-필터 팔(arm) 수를 100으로 캡 — top 이 크더라도 컴파운드 필터가
+            # 무한정 커지지 않게 한다.
+            batch = remaining[:min(top - len(results), 100)]
+            if not batch:
+                break
+            remaining = remaining[len(batch):]
+            or_filter = {"or": [{"property": "Mem ID",
+                                 "rich_text": {"equals": c["mem_id"]}} for c in batch]}
+            # Notion 컴파운드 필터는 2단계(and/or)까지만 허용한다(templates/filters.py
+            # compile_query 의 splice 규율과 동일). build_filter() 는 이미 {"and": [...]}
+            # 이므로 그대로 한 겹 더 감싸면 and→and→or 3단계가 되어 라이브에서 400 —
+            # 그 팔(arm)들을 바깥 and 리스트에 그대로 풀어 넣어(splice) 2단계로 유지한다.
+            payload = {"and": [*build_filter()["and"], or_filter]}
+            pages = self.db.query(ds, payload)
+            live = {}
+            for p in pages:
+                s = page_summary(p)
+                live[s["mem_id"]] = s
+            for c in batch:
+                if c["mem_id"] in live:
+                    if not mem_type or live[c["mem_id"]]["type"] == mem_type:
+                        results.append(live[c["mem_id"]])
+                    # 타입만 어긋나고 실제로는 살아있는 항목 — prune 하지 않는다.
+                elif mem_index.docs(idx).pop(c["mem_id"], None) is not None:
+                    pruned = True
+            if len(results) >= top:
+                break
+        if pruned:
+            # read-repair — 배치 전체에 1회만 저장. meta(n/avgdl/df)는 여기서 의도적으로
+            # 갱신하지 않는다(prune 된 문서 수만큼 drift 한다) — 통계가 살짝 부정확해질
+            # 뿐 정합성 크리티컬은 아니고, 다음 reindex 가 통째로 다시 맞춰 자가치유한다.
+            mem_index.save(idx)
+        return results
 
     def project_brief(self, project: str) -> str:
         """프로젝트 롤업 브리프 본문(mem_id=f"brief-{project}") — 없으면 "".

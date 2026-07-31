@@ -402,6 +402,64 @@ def test_consolidate_skips_malformed_items_without_crashing(qroot, monkeypatch):
     assert q.list_jobs() == []
 
 
+# ── fix round: I4 프롬프트 창을 저장된 Excerpt 창(6000)에 맞춘다 ──
+
+def test_build_prompt_widens_excerpt_cap_to_6000():
+    """Draft 는 저장된 Excerpt 창(excerpt_rt 의 3×2000 유닛 청크, ≈6000)에서 읽힌다 —
+    프롬프트 구축이 그보다 좁은 상한(옛 1500)으로 자르면 저장 창을 다시 좁히는
+    꼴이 된다."""
+    from notionmemory.skills.memory.consolidate import _build_prompt
+    long_content = "x" * 7000
+    prompt = _build_prompt("proj", [{"mem_id": "m1", "type": "fact", "concepts": [],
+                                     "content": long_content}])
+    assert "content: " + "x" * 6000 in prompt
+    assert "x" * 6001 not in prompt
+
+
+# ── 검색지향 프롬프트 + concepts (Task 5) ─────────────────
+
+def test_system_prompt_demands_searchable_distillation():
+    from notionmemory.skills.memory.consolidate import SYSTEM
+    for marker in ("고유명사", "수치", "그대로 보존", "concepts", "3~6"):
+        assert marker in SYSTEM, marker
+
+
+def test_apply_updates_concepts_when_present(qroot, monkeypatch):
+    q.enqueue("proj", "/cwd", "2026-07-29T00:00:00Z")
+    fake_json = json.dumps({
+        "items": [
+            {"mem_id": "m1", "action": "keep", "strength": 8,
+             "concepts": ["jwt-refresh", "만료,정책"]},
+            {"mem_id": "m2", "action": "keep", "strength": 6},
+        ],
+        "merges": [], "brief": ""})
+    db, _ = _wire(monkeypatch, fake_json, [_draft("m1"), _draft("m2")])
+
+    res = consolidate.run(CFG, print, project="proj")
+
+    assert "error" not in res
+    assert db.props["m1_page"]["Concepts"] == {
+        "multi_select": [{"name": "jwt-refresh"}, {"name": "만료·정책"}]}
+    assert "Concepts" not in db.props["m2_page"]
+
+
+def test_apply_skips_concepts_when_all_invalid(qroot, monkeypatch):
+    """M9a — concepts 가 전부 비-문자열(예: dict)이면 정제 결과가 빈 리스트가 된다.
+    그걸 그대로 Concepts:[] 로 써버리면 기존 Concepts 옵션을 지워버리는 사고가 나므로
+    정제 결과가 비면 Concepts 키 자체를 안 보내야 한다(no-op, 기존 값 보존)."""
+    q.enqueue("proj", "/cwd", "2026-07-29T00:00:00Z")
+    fake_json = json.dumps({
+        "items": [{"mem_id": "m1", "action": "keep", "strength": 7,
+                   "concepts": [{"x": 1}]}],
+        "merges": [], "brief": ""})
+    db, _ = _wire(monkeypatch, fake_json, [_draft("m1")])
+
+    res = consolidate.run(CFG, print, project="proj")
+
+    assert "error" not in res
+    assert "Concepts" not in db.props["m1_page"]
+
+
 # ── reindex 자동 트리거 (Task 2) ──────────────────────────
 
 def test_consolidate_triggers_reindex_after_success(qroot, monkeypatch):

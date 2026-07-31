@@ -252,7 +252,7 @@ def memory_index_injection() -> str:
         st = status_mod.probe(config, verify=False)
         if not st["memory"]["bound"]:
             return ""
-        if not mem_index.load():
+        if mem_index.count(mem_index.load()) == 0:
             return _m("hook.memory_index_empty")
         return ""
     except Exception:

@@ -84,6 +84,19 @@ def test_bound_empty_but_present_index_file_still_nudges(capsys):
     assert "reindex" in out
 
 
+def test_bound_v2_index_with_zero_docs_still_nudges(capsys):
+    """v2 인덱스는 항상 최상위 dict(version/meta/docs)라 `not idx` 로는 "비어 있음"을
+    못 잡는다(docs 가 0건이어도 dict 자체는 truthy) — `mem_index.count(idx) == 0` 으로
+    판정해야 한다(회귀 가드, Task 3)."""
+    _bind_memory()
+    mem_index.save(mem_index.build([]))
+    assert mem_index.index_path().is_file()
+    assert mem_index.count(mem_index.load()) == 0
+    session_start.main()
+    out = capsys.readouterr().out
+    assert "reindex" in out
+
+
 def test_injection_makes_no_network_call(monkeypatch, capsys):
     import requests
 

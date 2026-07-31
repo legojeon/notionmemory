@@ -15,6 +15,7 @@
   <a href="#why-notionmemory">Why</a> ·
   <a href="#install">Install</a> ·
   <a href="#quick-start">Quick start</a> ·
+  <a href="#benchmarks">Benchmarks</a> ·
   <a href="#agents">Agents</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#uninstall">Uninstall</a>
@@ -139,6 +140,24 @@ the right skill. For example:
 
 You never see the CLI. And at session start the agent is already primed with this project's
 brief and your most important memories — so it can pick up where you left off.
+
+## Benchmarks
+
+Retrieval quality measured with [agentmemory's open eval harness](https://github.com/rohitg00/agentmemory/tree/main/eval)
+(hand-labeled P@K/R@K, no LLM judge) against a **live, sandboxed Notion database** — real
+`remember` ingests, real `recall` queries. Reproduce with [`bench/`](bench/README.md).
+
+| Corpus | grep (full-text baseline) | **notionmemory** |
+| --- | --- | --- |
+| coding-agent-life-v1 — 15 dev sessions, 15 queries | R@5 0.967 · MRR 0.824 | **R@5 1.000 · MRR 0.889** |
+| LongMemEval-S (ICLR 2025), stratified sample — 6 questions, raw ~9KB chat sessions | R@5 1.000 · MRR 0.917 | **R@5 1.000 · MRR 0.833** |
+
+No embeddings and no vector database behind those numbers: a lexical **BM25** ranking over a
+tiny local index (titles, concepts, content), live-verified against Notion, with the agent
+doing the semantic judging on top. Honest caveats: both corpora are small (15 + 6 hand-graded
+questions — the LongMemEval sample is 1 question per type, not the full 500), latency per
+recall is a live Notion round-trip (~1s), and the raw-transcript corpus is an off-label
+stress test — notionmemory's designed diet is distilled memories, which score at least as well.
 
 ## Agents
 

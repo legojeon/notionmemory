@@ -19,6 +19,7 @@ from notionmemory.core.config import Config
 from notionmemory.core.notion_client import NotionSession
 from notionmemory.skills.memory import consolidation_queue as queue
 from notionmemory.skills.memory import reindex
+from notionmemory.skills.memory.notion_db import _ms_name, excerpt_rt
 from notionmemory.skills.memory.store import MemoryStore
 
 SYSTEM = (
@@ -27,10 +28,17 @@ SYSTEM = (
     "판정하라: keep(요약·정제한 뒤 Strength 1~10 부여 — architecture/preference/durable "
     "패턴=8~10, workflow/재사용 가능한 bug=5~7, 스쳐가는 fact=1~4) 또는 drop(기록 가치 "
     "없음). 중복 초안은 merge 로 대표 하나만 keep 대상에 남기고 나머지 mem_id 를 "
-    "drop 목록에 넣어라. 그리고 이 프로젝트의 핵심 개념·결정·선호를 롤업한 짧은 "
+    "drop 목록에 넣어라. "
+    "keep 정제는 검색을 염두에 두고 써라: 고유명사·수치·날짜·제품명은 원문 표기 "
+    "그대로 보존하고(일반화·바꿔쓰기 금지 — 나중에 이 값을 검색할 사람이 있다), "
+    "요약은 3~8문장의 밀도 높은 사실 서술로 써서 나중에 물어볼 세부를 버리지 말 것. "
+    "각 keep 항목에는 검색어로 쓸 concepts 도 함께 내라: 소문자·구체적인 개념 3~6개 "
+    "(예: \"jwt-refresh-rotation\", 금지: \"auth\" 처럼 너무 넓은 단어). "
+    "그리고 이 프로젝트의 핵심 개념·결정·선호를 롤업한 짧은 "
     "브리프(마크다운 8~15줄)를 작성하라. 설명·코드펜스 없이 JSON 객체 하나만 출력하라: "
     '{"items": [{"mem_id": "<mem_id>", "action": "keep|drop", "strength": 1-10, '
-    '"content": "정제된 본문(선택, keep 일 때만 의미 있음)"}], '
+    '"content": "정제된 본문(선택, keep 일 때만 의미 있음)", '
+    '"concepts": ["소문자-구체적", "..."] (선택, keep 일 때 3~6개 권장)}], '
     '"merges": [{"keep": "<mem_id>", "drop": ["<mem_id>", ...]}], '
     '"brief": "<마크다운 롤업>"}')
 
@@ -51,7 +59,10 @@ def _build_prompt(project: str, drafts: list[dict]) -> str:
         concepts = ", ".join(d.get("concepts") or [])
         parts.append(f"- mem_id={d.get('mem_id', '')} type={d.get('type', '')} "
                      f"concepts=[{concepts}]")
-        parts.append(f"  content: {(d.get('content') or '')[:1500]}")
+        # 6000 — Draft 는 저장된 Excerpt 창(excerpt_rt 의 3×2000 유닛 청크, ≈6000)에서
+        # 읽힌다. 그보다 좁은 상한으로 잘라 프롬프트에 넣으면 consolidation 이 distill
+        # 해야 할 내용을 그 전에 이미 좁혀버리는 꼴이 된다(I4) — 저장 창과 맞춘다.
+        parts.append(f"  content: {(d.get('content') or '')[:6000]}")
     return "\n".join(parts)
 
 
@@ -73,7 +84,7 @@ def _upsert_brief(db, ds: str, project: str, content: str) -> None:
         db.set_properties(existing["id"], {
             "Status": {"select": {"name": "Active"}},
             "Strength": {"number": 10},
-            "Excerpt": {"rich_text": [{"text": {"content": content[:2000]}}]},
+            "Excerpt": {"rich_text": excerpt_rt(content)},
         })
         db.replace_content(existing["id"], content)
     else:
@@ -125,7 +136,17 @@ def _apply(db, ds: str, project: str, drafts: list[dict], result: dict, totals: 
                      "Strength": {"number": _clamp_strength(item.get("strength"))}}
             content = item.get("content")
             if isinstance(content, str) and content.strip():
-                props["Excerpt"] = {"rich_text": [{"text": {"content": content[:2000]}}]}
+                props["Excerpt"] = {"rich_text": excerpt_rt(content)}
+            concepts = item.get("concepts")
+            if isinstance(concepts, list):
+                # 정제된 결과를 먼저 계산하고, 그게 비어있지 않을 때만 Concepts 를
+                # 보낸다(M9a) — concepts 가 전부 비-문자열(예: dict)이라 정제 결과가
+                # []이 되면, 그걸 그대로 multi_select:[] 로 보내 기존 옵션을 지워버리는
+                # 사고를 막는다(all-invalid ≠ 의도적으로 비운 것).
+                cleaned = [{"name": _ms_name(c)} for c in concepts[:6]
+                          if isinstance(c, str) and c]
+                if cleaned:
+                    props["Concepts"] = {"multi_select": cleaned}
             db.set_properties(page_id, props)
             totals["promoted"] += 1
         elif action == "drop":
@@ -186,8 +207,11 @@ def run(config: Config, log, project: str = "") -> dict:
     if errors:
         totals["error"] = "; ".join(errors)
     # Notion 을 방금 갱신했으니 로컬 색인도 최신으로 맞춘다 — best-effort: 이미 확정된
-    # consolidate 의 성공/실패 판정(totals)을 reindex 실패가 무르면 안 된다(색인은
-    # recall 의 오프라인 폴백일 뿐, 다음 회차에 다시 시도하면 된다).
+    # consolidate 의 성공/실패 판정(totals)을 reindex 실패가 무르면 안 된다. 색인은
+    # 이제 recall 의 1차 로컬 랭킹 경로를 떠받치지만(remember 가 매 저장마다
+    # write-through 하고, 라이브 검증이 사라진 항목을 read-repair 한다) 여전히 정합성
+    # 크리티컬은 아니다 — 여기 이 전체 재계산이 실패해도 이전 색인이 그대로 남을
+    # 뿐이고, 다음 회차에 다시 시도하면 된다.
     try:
         reindex.run(config, log)
     except Exception as e:  # noqa: BLE001 — 의도적으로 광범위: reindex 실패를 절대 전파 안 함

@@ -78,8 +78,10 @@ def test_reindex_excludes_brief_and_writes_index(tmp_path, monkeypatch):
 
     assert count == 3
     idx = mem_index.load()
-    assert set(idx) == {"m1", "m2", "d1"}
-    assert idx["m1"]["status"] == "Active" and idx["d1"]["status"] == "Draft"
+    assert mem_index.count(idx) == 3
+    docs = mem_index.docs(idx)
+    assert set(docs) == {"m1", "m2", "d1"}
+    assert docs["m1"]["status"] == "Active" and docs["d1"]["status"] == "Draft"
     assert db.queries and db.queries[0] == ("ds_1", build_filter())
 
 
@@ -88,11 +90,12 @@ def test_reindex_maps_strength_concepts_and_content_fields(tmp_path, monkeypatch
 
     reindex.run(CFG, print)
 
-    idx = mem_index.load()
+    idx = mem_index.docs(mem_index.load())
     assert idx["m1"]["strength"] == 9
     assert idx["m1"]["concepts"] == ["a"]
-    assert idx["m1"]["excerpt"] == "ex"
+    assert idx["m1"]["content"] == "ex"
     assert idx["m1"]["title"] == "T"
+    assert idx["m1"]["last_edited"] == "2026-07-29T00:00:00.000Z"
 
 
 def test_reindex_returns_sentinel_and_logs_on_notion_error(tmp_path, monkeypatch):
@@ -117,4 +120,5 @@ def test_reindex_empty_workspace_writes_empty_index(tmp_path, monkeypatch):
     count = reindex.run(CFG, print)
 
     assert count == 0
-    assert mem_index.load() == {}
+    assert mem_index.count(mem_index.load()) == 0
+    assert mem_index.docs(mem_index.load()) == {}

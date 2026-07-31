@@ -15,6 +15,7 @@
   <a href="#why-notionmemory">Why</a> ·
   <a href="#install">Install</a> ·
   <a href="#quick-start">Quick start</a> ·
+  <a href="#benchmarks">Benchmarks</a> ·
   <a href="#agents">Agents</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#uninstall">Uninstall</a>
@@ -143,6 +144,24 @@ Notion 토큰을 붙여넣는 것 하나뿐입니다(비밀 값은 채팅으로 
 
 CLI는 볼 일이 없습니다. 게다가 세션이 시작될 때 에이전트는 이미 이 프로젝트의 요약과 가장 중요한
 메모리를 갖고 있어서, 하던 곳에서 바로 이어갈 수 있습니다.
+
+## Benchmarks
+
+검색 품질을 [agentmemory의 공개 평가 하네스](https://github.com/rohitg00/agentmemory/tree/main/eval)
+(사람이 라벨한 P@K/R@K, LLM 심판 없음)로 **실제 Notion 샌드박스 DB에 대해** 측정했습니다 —
+진짜 `remember` 주입, 진짜 `recall` 질의. [`bench/`](../bench/README.md)로 재현할 수 있습니다.
+
+| 코퍼스 | grep (전문 검색 베이스라인) | **notionmemory** |
+| --- | --- | --- |
+| coding-agent-life-v1 — 개발 세션 15개, 질의 15개 | R@5 0.967 · MRR 0.824 | **R@5 1.000 · MRR 0.889** |
+| LongMemEval-S (ICLR 2025) 층화 표본 — 6문항, 원시 ~9KB 챗 세션 | R@5 1.000 · MRR 0.917 | **R@5 1.000 · MRR 0.833** |
+
+이 숫자 뒤에 임베딩도 벡터 DB도 없습니다: 작은 로컬 색인(제목·concepts·본문) 위의 어휘
+**BM25** 랭킹을 Notion에 라이브 검증하고, 그 위에서 에이전트가 의미 판단을 합니다. 정직한
+캐비앗: 두 코퍼스 모두 소규모(수작업 채점 15+6문항 — LongMemEval은 타입별 1문항 표본이지
+전체 500문항이 아님)이고, recall 1회 지연은 라이브 Notion 왕복(~1초)이며, 원시 트랜스크립트
+코퍼스는 off-label 스트레스 테스트입니다 — notionmemory의 설계된 식단은 증류된 메모리이고,
+그쪽 점수는 최소한 같거나 더 좋습니다.
 
 ## Agents
 
