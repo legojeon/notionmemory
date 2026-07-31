@@ -147,10 +147,15 @@ Retrieval quality measured with [agentmemory's open eval harness](https://github
 (hand-labeled P@K/R@K, no LLM judge) against a **live, sandboxed Notion database** — real
 `remember` ingests, real `recall` queries. Reproduce with [`bench/`](bench/README.md).
 
-| Corpus | grep (full-text baseline) | **notionmemory** |
-| --- | --- | --- |
-| coding-agent-life-v1 — 15 dev sessions, 15 queries | R@5 0.967 · MRR 0.824 | **R@5 1.000 · MRR 0.889** |
-| LongMemEval-S (ICLR 2025), stratified sample — 6 questions, raw ~9KB chat sessions | R@5 1.000 · MRR 0.917 | **R@5 1.000 · MRR 0.833** |
+| Corpus | Adapter | R@5 | R@10 | P@5 | MRR |
+| --- | --- | --- | --- | --- | --- |
+| coding-agent-life-v1 — 15 dev sessions, 15 queries | grep (full-text baseline) | 0.967 | 0.967 | 0.227 | 0.824 |
+| | **notionmemory** | **1.000** | **1.000** | **0.240** | **0.889** |
+| LongMemEval-S (ICLR 2025), stratified sample — 6 questions, raw ~9KB chat sessions | grep (full-text baseline) | 1.000 | 1.000 | 0.333 | 0.917 |
+| | **notionmemory** | **1.000** | **1.000** | **0.333** | **0.833** |
+
+P@5 looks low by construction: most questions have 1–2 gold documents, so the ceiling is
+0.2–0.4 — read it against that ceiling, not against 1.0.
 
 No embeddings and no vector database behind those numbers: a lexical **BM25** ranking over a
 tiny local index (titles, concepts, content), live-verified against Notion, with the agent
@@ -158,6 +163,28 @@ doing the semantic judging on top. Honest caveats: both corpora are small (15 + 
 questions — the LongMemEval sample is 1 question per type, not the full 500), latency per
 recall is a live Notion round-trip (~1s), and the raw-transcript corpus is an off-label
 stress test — notionmemory's designed diet is distilled memories, which score at least as well.
+(The live table samples LongMemEval; the full 500 questions are covered offline below.)
+
+On the **full 500-question** LongMemEval-S (offline, over the shipped index code — the
+component that determines `recall`'s ordering; same `recall_any@K` per-question-index
+protocol as [agentmemory's run](https://github.com/rohitg00/agentmemory/blob/main/benchmark/LONGMEMEVAL.md),
+reproduce with `bench/lme_full500.py`), compared with results other systems report:
+
+| | **notionmemory**<br>(BM25, no embeddings) | agentmemory<br>(BM25 + vector) | agentmemory<br>(BM25 only) | MemPalace<br>(vector-only) | oracleagentmemory | Letta / MemGPT | Mem0 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **Benchmark** | LongMemEval-S | LongMemEval-S | LongMemEval-S | LongMemEval-S | LongMemEval | *LoCoMo (different)* | *LoCoMo (different)* |
+| **Sample** | full 500 | full 500 | full 500 | full run | full run | — | — |
+| **R@5** | **0.946** | 0.952 | 0.862 | ~0.966 | 0.944 | 0.832 | 0.685 |
+| **R@10** | **0.976** | 0.986 | 0.946 | ~0.976 | — | — | — |
+| **MRR** | **0.893** | 0.882 | 0.715 | — | — | — | — |
+| **Measured by** | us, offline index run | agentmemory | agentmemory | vendor (self-reported) | vendor (self-reported) | vendor (self-reported) | vendor (self-reported) |
+
+Zero embeddings lands 8pp above agentmemory's BM25-only and within 0.6pp of their
+BM25+vector hybrid (with a higher MRR) — the gap embeddings buy them is mostly closed by
+field-weighted BM25 plus the agent doing semantic judging at read time. Honest caveats:
+our row is an offline run of the shipped ranking code, not the live end-to-end path (that's
+the 6-question table above); non-agentmemory rows are vendor claims on their own harnesses,
+and the LoCoMo rows aren't even the same benchmark. Ballpark, not a leaderboard.
 
 ## Agents
 
@@ -214,14 +241,22 @@ then recall the *important* things at the right moment:
 
 ### Search without embeddings
 
-There is no vector database and no embedding model. Matching is **lexical** — word-boundary
-matching for English, substring for Korean — over titles, headings, and each memory's concept
-tags, weighted by Strength. Deliberately simpler than even BM25: no corpus statistics, no
-ranking model. That's enough because the search only has to produce *candidates*:
-**the agent itself supplies the semantics.** It reads the top hits live and judges what's
-actually relevant — the judgment a vector similarity score approximates, an LLM does directly.
-The upshot: nothing to embed, sync, or go stale, and the per-message hint runs with zero network
-from a tiny local index.
+There is still no vector database and no embedding model. Memory search runs on **BM25** —
+the classic lexical ranking (rare terms weigh more, long entries don't dominate) — over a
+tiny local index of titles, concepts, and content, with the statistics precomputed at
+reindex time so per-message lookups stay in milliseconds. On top of that:
+
+- `recall` **ranks locally, then live-verifies** the winners against Notion in one batched
+  query — you get index speed with live truth (vanished pages self-heal out of the index).
+- `remember` **writes through** to the index, so a memory you just saved is instantly
+  searchable — no waiting for a reindex.
+- Content search across your Notion pages (`library`) keeps an even simpler word-boundary
+  match over titles and headings — that index never stores your page bodies.
+
+Either way, the ranking only has to produce *candidates*: **the agent itself supplies the
+semantics.** It reads the top hits live and judges what's actually relevant — the judgment a
+vector similarity score approximates, an LLM does directly. Nothing to embed, sync, or go
+stale.
 
 ### How memory updates
 
