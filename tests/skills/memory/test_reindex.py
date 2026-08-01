@@ -93,7 +93,7 @@ def test_reindex_maps_strength_concepts_and_content_fields(tmp_path, monkeypatch
     idx = mem_index.docs(mem_index.load())
     assert idx["m1"]["strength"] == 9
     assert idx["m1"]["concepts"] == ["a"]
-    assert idx["m1"]["content"] == "ex"
+    assert idx["m1"]["excerpt"] == "ex"
     assert idx["m1"]["title"] == "T"
     assert idx["m1"]["last_edited"] == "2026-07-29T00:00:00.000Z"
 

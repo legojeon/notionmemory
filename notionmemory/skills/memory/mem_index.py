@@ -3,10 +3,14 @@
 library.index 와 같은 패턴(state_dir() 아래 index.json, load/save)이지만 내용은
 memory 전용이다.
 
-v2 포맷은 페이지 포인터가 아니라 전체 content(문서당 8000자 상한)와 필드 가중
-BM25 통계(문서별 tf, 전역 df, avgdl)를 미리 계산해 저장한다 — 매 검색마다
-lexical 스코어를 다시 훑던 v1 과 달리 `search`는 저장된 tf/df/avgdl 로 BM25 를
-계산만 한다. 랭킹은 BM25 × Strength 부스트.
+v2 포맷은 필드 가중 BM25 통계(문서별 tf, 전역 df, avgdl)를 미리 계산해 저장한다
+— 매 검색마다 lexical 스코어를 다시 훑던 v1 과 달리 `search`는 저장된 tf/df/avgdl
+로 BM25 를 계산만 한다. 랭킹은 BM25 × Strength 부스트. tf 는 content 8000자 창에서
+계산하되 **본문 자체는 저장하지 않는다** — 표시용 발췌 200자(`excerpt`)만 남긴다
+(점수는 tf 로만 내므로 검색 품질 손실 0, 색인 파일은 수 배 작아져 메시지당 로드가
+가벼워진다). 재빌드 경로(중복-id 재-add·변환)는 저장된 tf/dl 을 재계산 없이
+승계한다 — 200자 발췌에서 tf 를 재계산하면 발췌 밖 토큰이 조용히 사라진다.
+content 필드를 가진 구(뚱뚱한) v2 doc 도 그대로 읽히고 다음 재빌드 때 슬림해진다.
 
 한글 토큰(조사·어미가 공백 없이 붙는 언어 특성)은 정확 tf 키 매칭이 실패할 수
 있어 부분문자열 매칭 폴백(`_match_tf`)을 둔다 — ASCII 는 오탐(ray→array) 방지를
@@ -31,7 +35,8 @@ from pathlib import Path
 from notionmemory.core import paths
 from notionmemory.skills.memory.store import score_page, tokenize
 
-_CONTENT_MAX = 8000        # 문서당 저장 상한(가드레일) — Excerpt 창(≈6000)보다 넉넉히
+_CONTENT_MAX = 8000        # tf 계산 창(가드레일) — Excerpt 창(≈6000)보다 넉넉히
+_EXCERPT_MAX = 200         # doc 에 저장하는 표시용 발췌 — search 결과의 excerpt 와 동일 폭
 _TITLE_W, _CONCEPT_W = 3, 2
 K1, B = 1.5, 0.75
 
@@ -50,17 +55,25 @@ def _doc_tf(title: str, concepts: list, content: str) -> tuple[dict, int]:
 
 
 def build(memories: list) -> dict:
-    """메모리 목록 → v2 색인(전체 content + BM25 통계). Type=="brief" 는 제외."""
+    """메모리 목록 → v2 색인(발췌 200자 + BM25 통계). Type=="brief" 는 제외.
+
+    메모리가 사전계산 tf/dl 을 들고 오면(재빌드 경로 — _v1_entry_to_memory 가 v2
+    doc 에서 승계) 재계산하지 않는다: 이때 content 는 200자 발췌뿐이라 재계산하면
+    발췌 밖 토큰이 사라진다."""
     docs: dict = {}
     df: dict = {}
     for m in memories:
         if m.get("type") == "brief" or not m.get("id"):
             continue
         content = (m.get("content") or "")[:_CONTENT_MAX]
-        tf, dl = _doc_tf(m.get("title", ""), list(m.get("concepts") or []), content)
+        if m.get("tf") is not None and m.get("dl") is not None:
+            tf, dl = dict(m["tf"]), m["dl"]
+        else:
+            tf, dl = _doc_tf(m.get("title", ""), list(m.get("concepts") or []), content)
         docs[m["id"]] = {"title": m.get("title", ""),
                          "concepts": list(m.get("concepts") or []),
-                         "content": content, "strength": m.get("strength", 0),
+                         "excerpt": content[:_EXCERPT_MAX],
+                         "strength": m.get("strength", 0),
                          "type": m.get("type", ""), "project": m.get("project", ""),
                          "status": m.get("status", ""),
                          "last_edited": m.get("last_edited", ""),
@@ -105,15 +118,20 @@ def save(idx: dict) -> None:
 
 
 def _v1_entry_to_memory(mem_id: str, entry: dict) -> dict:
-    """색인 엔트리 → build() 가 기대하는 메모리 dict. 레거시 v1 평면 엔트리(content
-    대신 excerpt 필드)와 v2 doc(content 필드 — 중복-id 재빌드 경로가 넘긴다) 둘 다
-    받는다: content 우선, 없으면 excerpt. last_edited 는 v1 에 없었으니 빈 문자열."""
-    return {"id": mem_id, "title": entry.get("title", ""),
-            "concepts": list(entry.get("concepts") or []),
-            "content": entry.get("content") or entry.get("excerpt", ""),
-            "strength": entry.get("strength", 0), "type": entry.get("type", ""),
-            "project": entry.get("project", ""), "status": entry.get("status", ""),
-            "last_edited": entry.get("last_edited", "")}
+    """색인 엔트리 → build() 가 기대하는 메모리 dict. 레거시 v1 평면 엔트리(excerpt
+    필드, tf 없음 — 그 텍스트에서 재계산), 구 v2 doc(전문 content), 슬림 v2 doc
+    (발췌 excerpt) 전부 받는다: content 우선, 없으면 excerpt. doc 이 tf/dl 을 갖고
+    있으면 승계해 build() 의 재계산을 막는다 — 슬림 doc 의 200자 발췌로 재계산하면
+    발췌 밖 토큰이 사라진다. last_edited 는 v1 에 없었으니 빈 문자열."""
+    mem = {"id": mem_id, "title": entry.get("title", ""),
+           "concepts": list(entry.get("concepts") or []),
+           "content": entry.get("content") or entry.get("excerpt", ""),
+           "strength": entry.get("strength", 0), "type": entry.get("type", ""),
+           "project": entry.get("project", ""), "status": entry.get("status", ""),
+           "last_edited": entry.get("last_edited", "")}
+    if entry.get("tf") is not None and entry.get("dl") is not None:
+        mem["tf"], mem["dl"] = entry["tf"], entry["dl"]
+    return mem
 
 
 def add_memory(memory: dict) -> None:
@@ -156,7 +174,8 @@ def add_memory(memory: dict) -> None:
         content = (memory.get("content") or "")[:_CONTENT_MAX]
         tf, dl = _doc_tf(title, concepts, content)
         idx.setdefault("docs", {})[memory["id"]] = {
-            "title": title, "concepts": concepts, "content": content,
+            "title": title, "concepts": concepts,
+            "excerpt": content[:_EXCERPT_MAX],
             "strength": memory.get("strength", 0), "type": memory.get("type", ""),
             "project": memory.get("project", ""), "status": memory.get("status", ""),
             "last_edited": memory.get("last_edited", ""), "tf": tf, "dl": dl}

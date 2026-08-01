@@ -59,7 +59,7 @@ def test_build_v2_shape_and_stats():
     assert idx["version"] == 2
     assert mem_index.count(idx) == 2                    # brief 제외
     d = mem_index.docs(idx)["m1"]
-    assert d["content"].startswith("인증을")
+    assert d["excerpt"].startswith("인증을")
     assert d["tf"] and d["dl"] > 0
     assert idx["meta"]["n"] == 2 and idx["meta"]["avgdl"] > 0
     assert idx["meta"]["df"].get("jwt", 0) >= 1
@@ -192,7 +192,7 @@ def test_add_memory_converts_populated_legacy_v1_instead_of_replacing_it(tmp_pat
     assert idx["meta"]["n"] == 3
     docs = mi.docs(idx)
     assert set(docs) == {"v1a", "v1b", "new"}
-    assert docs["v1a"]["content"] == "refresh 회전 정책"      # v1 의 excerpt → v2 의 content
+    assert docs["v1a"]["excerpt"] == "refresh 회전 정책"      # v1 의 excerpt → v2 의 발췌
     # 변환된 옛 항목이 BM25 경로로 계속 검색 가능해야 한다(read-only 로 죽지 않는다).
     assert mi.search(idx, "jwt 회전", min_score=0.001)[0]["mem_id"] == "v1a"
     assert mi.search(idx, "쿠버네티스", min_score=0.001)[0]["mem_id"] == "v1b"
@@ -245,9 +245,40 @@ def test_docs_treats_unknown_version_as_empty_not_flat_v1():
     assert mem_index.count(idx) == 0
 
 
+# ── 색인 슬림화: 전문 대신 발췌 200자 저장, tf 는 8000자 창에서 ──────
+
+def test_build_stores_excerpt_only_tf_from_full_window():
+    """v2 doc 은 전문(≤8000자)을 저장하지 않는다 — 표시용 발췌 200자만. 점수는
+    사전계산 tf 로만 내므로 발췌 밖(>200자) 토큰도 계속 검색돼야 한다."""
+    deep = "본문 시작. " + ("filler " * 100) + "deepwatermarkzz 끝."
+    idx = mi.build([{"id": "m1", "title": "제목", "concepts": [], "content": deep,
+                     "strength": 5, "type": "fact", "project": "p",
+                     "status": "Active", "last_edited": ""}])
+    d = mi.docs(idx)["m1"]
+    assert "content" not in d
+    assert d["excerpt"] == deep[:200]
+    hits = mi.search(idx, "deepwatermarkzz", project="p", limit=3, min_score=0.001)
+    assert [h["mem_id"] for h in hits] == ["m1"]
+    assert hits[0]["excerpt"] == deep[:200]
+
+
+def test_dup_id_rebuild_preserves_deep_tf(tmp_path, monkeypatch):
+    """중복-id 재-add 의 전체 재빌드가 다른 doc 의 tf 를 200자 발췌에서 재계산하면
+    발췌 밖 토큰이 조용히 사라진다 — 저장된 tf/dl 을 그대로 승계해야 한다."""
+    monkeypatch.setattr(mi.paths, "state_dir", lambda: tmp_path)
+    deep = "본문 시작. " + ("filler " * 100) + "deepwatermarkzz 끝."
+    base = {"concepts": [], "strength": 5, "type": "fact", "project": "p",
+            "status": "Active", "last_edited": ""}
+    mi.save(mi.build([dict(base, id="a", title="깊은 문서", content=deep),
+                      dict(base, id="b", title="다른 문서", content="짧은 본문")]))
+    mi.add_memory(dict(base, id="b", title="다른 문서 v2", content="갱신 본문"))
+    hits = mi.search(mi.load(), "deepwatermarkzz", project="p", limit=3, min_score=0.001)
+    assert [h["mem_id"] for h in hits] == ["a"]
+
+
 def test_add_memory_same_id_does_not_double_count_meta():
     """재리뷰 N1 — 같은 mem_id 재-add 는 증분 meta 이중계산 대신 전체 재빌드로
-    처리한다(미래의 제자리-갱신 호출자 대비). content 필드도 보존돼야 한다."""
+    처리한다(미래의 제자리-갱신 호출자 대비). 발췌 필드도 보존돼야 한다."""
     m1 = {"id": "m1", "title": "jwt 회전", "concepts": ["jwt"],
           "content": "refresh 회전 본문", "strength": 5, "type": "fact",
           "project": "p", "status": "Active", "last_edited": "t"}
@@ -260,5 +291,5 @@ def test_add_memory_same_id_does_not_double_count_meta():
     fresh = mem_index.build([dict(m1, strength=9), m2])
     assert idx["meta"]["df"] == fresh["meta"]["df"]
     assert abs(idx["meta"]["avgdl"] - fresh["meta"]["avgdl"]) < 1e-9
-    assert mem_index.docs(idx)["m1"]["content"] == "refresh 회전 본문"   # content 보존
+    assert mem_index.docs(idx)["m1"]["excerpt"] == "refresh 회전 본문"   # 발췌 보존
     assert mem_index.docs(idx)["m1"]["strength"] == 9
