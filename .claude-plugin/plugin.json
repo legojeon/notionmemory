@@ -1,6 +1,6 @@
 {
   "name": "notionmemory",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "Notion second-brain skills for coding agents: calendar, memory, templates, library, and settings. Backed by the notionmemory Python CLI (pipx install notionmemory).",
   "author": { "name": "Jaewoo Jeon", "email": "learnsteam.kr@gmail.com" },
   "license": "MIT",
@@ -10,6 +10,7 @@
     "SessionStart": [ { "hooks": [ { "type": "command", "command": "command -v notionmemory >/dev/null 2>&1 && notionmemory hook session-start || true", "timeout": 20 } ] } ],
     "PreCompact": [ { "hooks": [ { "type": "command", "command": "command -v notionmemory >/dev/null 2>&1 && notionmemory hook save-reminder || true", "timeout": 20 } ] } ],
     "Stop": [ { "hooks": [ { "type": "command", "command": "command -v notionmemory >/dev/null 2>&1 && notionmemory hook session-stop || true", "timeout": 20 } ] } ],
-    "UserPromptSubmit": [ { "hooks": [ { "type": "command", "command": "command -v notionmemory >/dev/null 2>&1 && notionmemory hook user-prompt || true", "timeout": 20 } ] } ]
+    "UserPromptSubmit": [ { "hooks": [ { "type": "command", "command": "command -v notionmemory >/dev/null 2>&1 && notionmemory hook user-prompt || true", "timeout": 20 } ] } ],
+    "SessionEnd": [ { "hooks": [ { "type": "command", "command": "command -v notionmemory >/dev/null 2>&1 && notionmemory hook session-end || true", "timeout": 20 } ] } ]
   }
 }

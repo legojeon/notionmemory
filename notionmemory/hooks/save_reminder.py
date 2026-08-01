@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import sys
 
-from notionmemory.hooks.common import capture_mode
+from notionmemory.hooks.common import capture_mode, consolidate_guard
 
 CLI = "notionmemory"
 
@@ -39,6 +39,8 @@ def main(harness: str = "claude") -> int:
     """
     try:
         sys.stdin.read()
+        if consolidate_guard():
+            return 0
         if capture_mode() == "auto":
             if harness == "codex":
                 print(json.dumps({"systemMessage": REMINDER}, ensure_ascii=False))

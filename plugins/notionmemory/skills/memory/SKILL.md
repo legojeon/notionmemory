@@ -44,9 +44,23 @@ updates that project's rollup brief.
   from inside an agent session (it needs its own agent-runtime call, and nesting one
   agent session inside another isn't supported). If the user wants it run now, tell them
   to run it themselves in a plain terminal rather than running it via a tool call.
-- You don't need to run this proactively. When a SessionStart context note says drafts
-  are pending (`N draft memory(ies) pending — run notionmemory memory consolidate to
-  refine them`), just relay that to the user — let them decide when to run it.
+- **Consolidation now runs automatically.** SessionEnd and SessionStart hooks spawn it as
+  a detached background process (default `skills.memory.consolidate_mode: auto`), so you
+  no longer need to relay a "drafts pending" nudge to the user — it's already being
+  handled outside the conversation. Don't manually run it via a tool call either way (see
+  the non-nested rule above). If the user asks about consolidation status, check the log
+  at the state dir's `memory/consolidate.log`, or point them to `notionmemory memory
+  consolidate` for a manual run (useful if they've switched to
+  `skills.memory.consolidate_mode: nudge`, or for troubleshooting).
+- Consolidation also **mines memories directly from session transcripts** — it reviews
+  recent session content (not just Drafts) and, when it finds something durable, saves it
+  straight as an **Active** memory with a real **Strength**, no Draft stage. These show up
+  with `Source` set to the harness whose sessions were mined (per pass, `claude`/`codex`) —
+  not necessarily the harness that ran *this* session. The transcript is re-read locally;
+  the excerpt is sent to the **configured agent runtime**
+  (`integrations.agent.backend`, claude preferred over codex by default — pin it if the
+  user wants a specific CLI/account) to do the mining, which can differ from the harness
+  that actually ran the session. Only the distilled memory content reaches Notion.
 - SessionStart also injects this project's brief (a rolled-up summary consolidation
   maintains) and its top high-Strength Active memories, when available — treat those as
   free background context, not something you need to `recall` again.

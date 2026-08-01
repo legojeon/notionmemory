@@ -265,6 +265,12 @@ def test_query_drafts_empty_project_returns_all_projects():
     assert {d["mem_id"] for d in drafts} == {"m1", "m2"}
 
 
+# query_active_summaries 는 I3(review wave)에서 은퇴했다 — dedup 컨텍스트는 이제
+# consolidate._dedup_context() 가 로컬 mem_index 에서만 뽑는다(network 0). 이 Notion
+# 왕복 메서드는 consolidate.py 밖에 다른 호출자가 없어(YAGNI) 메서드와 이 테스트들을
+# 함께 지운다 — tests/skills/memory/test_consolidate.py 의 dedup 관련 테스트가
+# _dedup_context 를 커버한다.
+
 def test_replace_content_deletes_existing_children_then_appends():
     fs = FakeSession([
         (200, {"results": [{"id": "b1"}, {"id": "b2"}], "has_more": False}),  # GET children

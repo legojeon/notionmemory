@@ -60,23 +60,28 @@ def HOOK_EVENTS(cli_path: str, harness: str = "claude") -> dict:
     Stop/PreCompact 에서 평문 stdout 을 실패 처리하므로(실측) 훅이 자신을 부른
     하네스를 알아야 한다. Claude 는 기본값(claude)이라 플래그를 아예 안 붙인다 —
     지금까지의 명령 문자열을 그대로 유지해 기존 신뢰/영수증에 영향이 없다."""
-    def entry(hook_name: str) -> dict:
+    def entry(hook_name: str, timeout: int = 20) -> dict:
         cmd = f"{cli_path} hook {hook_name}"
         if harness != "claude":
             cmd += f" --harness {harness}"
-        return {"hooks": [{"type": "command", "command": cmd, "timeout": 20}]}
+        return {"hooks": [{"type": "command", "command": cmd, "timeout": timeout}]}
     # Stop 은 컨텍스트 주입용으로는 등록하지 않는다 — 매 턴 발화하는데 그 시점엔
     # 에이전트가 이미 턴을 끝냈고 Codex 스키마상 hookSpecificOutput 이 없다(위와 같은
     # 이유로 SessionStart 로 안내를 옮긴 내력은 그대로다). 하지만 Second Brain v2 는
     # Stop 을 **큐잉 전용**(session-stop, 무출력·비블로킹)으로 쓴다 — 컨텍스트를
     # 주입하지 않으므로 위 제약과 충돌하지 않는다.
+    # SessionEnd 는 **스폰 전용**(무출력)이다 — Stop 을 컨텍스트 주입에 못 쓰게 만든
+    # "additionalContext 채널 없음" 제약 자체가 여기선 적용되지 않는다(애초에 아무것도
+    # 주입하지 않으므로). Codex 공식 문서상 SessionEnd 타임아웃은 기본 1초/최대 3초라
+    # 여기서는 그 상한(3)을 쓴다 — Claude 는 기존 훅들과 같은 20초 그대로.
     return {"SessionStart": [entry("session-start")],
             "PreCompact": [entry("save-reminder")],
             "Stop": [entry("session-stop")],
             # UserPromptSubmit 은 메시지마다 로컬 memory 색인만 훑어 관련성 게이트를
             # 넘을 때만 힌트를 주입한다(네트워크 0, task-3 계약) — Stop 과 달리
             # additionalContext 채널이 있어 컨텍스트 주입에 써도 된다.
-            "UserPromptSubmit": [entry("user-prompt")]}
+            "UserPromptSubmit": [entry("user-prompt")],
+            "SessionEnd": [entry("session-end", timeout=3 if harness == "codex" else 20)]}
 
 
 def codex_trust_spec() -> ArtifactSpec:

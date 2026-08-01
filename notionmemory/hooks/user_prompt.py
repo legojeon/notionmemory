@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import sys
 
+from notionmemory.hooks.common import consolidate_guard
 from notionmemory.hooks.session_start import resolve_project
 from notionmemory.skills.memory import mem_index
 
@@ -40,8 +41,16 @@ def main(harness: str = "claude") -> int:
     """`harness` 는 CLI 의 `hook --harness` 값 그대로 받는다(다른 훅과 같은
     시그니처) — 이 훅은 하네스별로 출력 형태를 바꾸지 않는다(SessionStart 와 같은
     평문-stdout 방식, 하네스가 additionalContext 로 주입)."""
+    # M6 — stdin 소비가 consolidate_guard 의 no-op return 보다 먼저다(모든 훅이
+    # 항상 stdin 을 먼저 비운다는 단일 규율, session_start/session_stop 과 동일).
     try:
-        payload = json.loads(sys.stdin.read() or "{}")
+        raw = sys.stdin.read()
+    except Exception:
+        raw = ""
+    if consolidate_guard():
+        return 0
+    try:
+        payload = json.loads(raw or "{}")
         prompt = str(payload.get("prompt") or "")
         cwd = str(payload.get("cwd") or "")
         project = resolve_project(cwd)

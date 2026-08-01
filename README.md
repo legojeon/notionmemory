@@ -235,6 +235,14 @@ then recall the *important* things at the right moment:
   terminal) has an agent review the Drafts: summarize and refine them, assign a real Strength,
   drop noise (→ *Forgotten*), merge duplicates (→ *Superseded*), and maintain a rolled-up
   per-project **brief**. So the database stays curated instead of a raw dump.
+- That pass also runs **on its own** — a session-end/session-start hook spawns it in the
+  background — and mines new memories straight out of your session transcripts, landing
+  them as Active with a real Strength. The transcript is re-read locally, and the excerpt
+  is sent to your **configured agent runtime** (`integrations.agent.backend` — claude
+  preferred over codex by default; pin that key if you want a specific CLI/account, since
+  it can differ from the harness that actually ran the session). Notion only ever receives
+  the distilled memory. Set `skills.memory.consolidate_mode: nudge` in config to turn the
+  automatic pass off and go back to manual/cron-only runs.
 
 ### When it reads
 

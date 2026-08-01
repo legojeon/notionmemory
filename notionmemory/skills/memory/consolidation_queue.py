@@ -42,13 +42,27 @@ def queue_root_writable() -> bool:
         return False
 
 
-def enqueue(project: str, cwd: str, ts: str) -> None:
-    """프로젝트당 잡 1개로 dedup — 같은 project 로 반복 호출하면 기존 잡을 최신
-    cwd/ts 로 덮어쓸 뿐, 파일이 늘지 않는다(파일명 = project 의 결정적 해시)."""
+MAX_SESSIONS = 10
+
+
+def enqueue(project: str, cwd: str, ts: str, session: dict | None = None) -> None:
+    """프로젝트당 잡 1개 dedup(기존) + `sessions` 병합-upsert.
+
+    같은 session_id 는 최신 항목으로 갱신(세션당 1항목 — Stop 은 매 턴 발화한다),
+    ts 오름차순 최대 MAX_SESSIONS 개만 보존해 consolidate 를 오래 못 돌려도 큐가
+    무한히 자라지 않는다. 구버전 잡 파일(sessions 없음)은 빈 목록으로 읽힌다."""
     root = queue_root()
     root.mkdir(parents=True, exist_ok=True)
     job_id = _job_filename(project)
-    payload = {"id": job_id, "project": project, "cwd": cwd, "ts": ts}
+    existing = _parse_job(root / job_id) or {}
+    sessions = [s for s in existing.get("sessions") or [] if isinstance(s, dict)]
+    if session and session.get("session_id") and session.get("transcript_path"):
+        sessions = [s for s in sessions if s.get("session_id") != session["session_id"]]
+        sessions.append(dict(session))
+        sessions.sort(key=lambda s: str(s.get("ts", "")))
+        sessions = sessions[-MAX_SESSIONS:]
+    payload = {"id": job_id, "project": project, "cwd": cwd, "ts": ts,
+               "sessions": sessions}
     (root / job_id).write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
 
@@ -87,3 +101,45 @@ def ack(ids: list[str]) -> int:
             except OSError:
                 pass
     return removed
+
+
+def ack_sessions(job_id: str, mined_session_ids, seen_ts: str) -> None:
+    """compare-and-delete ack(M1) — `ack()`처럼 무조건 파일을 지우지 않는다.
+
+    consolidate 가 이 잡의 세션 목록을 스냅샷해 LLM 패스(최대 600초)를 도는 동안,
+    같은 프로젝트에서 새 Stop 이 발화해 `enqueue()`가 이 파일을 다시 쓸 수 있다
+    (`ts`가 갱신되고 새 세션이 `sessions`에 추가된다). 그 시점에 `ack()`로 파일을
+    통째로 unlink 하면 그 사이 끼어든 새 세션 엔트리까지 함께 사라진다 — 그래서
+    여기서 ack 시점에 파일을 다시 읽어 `ts`를 스냅샷 때 값(`seen_ts`)과 비교한다:
+
+    - 안 바뀌었으면(아무도 안 건드림) 기존과 동일하게 통째로 지운다.
+    - 바뀌었으면 이번에 실제로 처리한 `mined_session_ids`만 `sessions`에서 제거하고
+      나머지(레이스로 새로 들어온 것)는 남긴 채 다시 쓴다 — 남는 게 없으면 그때는
+      지운다.
+    """
+    root = queue_root()
+    path = root / job_id
+    current = _parse_job(path)
+    if current is None:
+        return
+    if current.get("ts") == seen_ts:
+        try:
+            path.unlink()
+        except OSError:
+            pass
+        return
+    mined = set(mined_session_ids)
+    remaining = [s for s in (current.get("sessions") or [])
+                if isinstance(s, dict) and s.get("session_id") not in mined]
+    if not remaining:
+        try:
+            path.unlink()
+        except OSError:
+            pass
+        return
+    payload = dict(current)
+    payload["sessions"] = remaining
+    try:
+        path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass

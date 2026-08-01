@@ -33,3 +33,13 @@ def test_stop_hook_is_teardown_covered_by_hook_markers():
     hooks_spec = next(s for s in specs if s.id == "claude.hooks")
     assert "Stop" in hooks_spec.payload["events"]
     assert hooks_spec.markers == manifest.HOOK_MARKERS
+
+
+def test_hook_events_include_session_end_with_codex_timeout():
+    ev_claude = manifest.HOOK_EVENTS("/cli", harness="claude")
+    ev_codex = manifest.HOOK_EVENTS("/cli", harness="codex")
+    assert "SessionEnd" in ev_claude and "SessionEnd" in ev_codex
+    assert ev_claude["SessionEnd"][0]["hooks"][0]["timeout"] == 20
+    assert ev_codex["SessionEnd"][0]["hooks"][0]["timeout"] == 3  # 공식문서: 최대 3초
+    assert ev_codex["SessionEnd"][0]["hooks"][0]["command"].endswith(
+        "hook session-end --harness codex")

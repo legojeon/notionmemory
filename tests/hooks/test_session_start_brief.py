@@ -7,6 +7,7 @@ top_memories 조회), 실패/오프라인이면 무조건 조용히 무시한다
 않는다는 훅 전역 계약)."""
 import io
 import json
+import sys
 
 import pytest
 
@@ -126,3 +127,76 @@ def test_catalog_has_memory_pending_consolidation_key_en_and_ko():
     from notionmemory.core import messages
     assert "hook.memory_pending_consolidation" in messages.CATALOG["en"]
     assert "hook.memory_pending_consolidation" in messages.CATALOG["ko"]
+
+
+def test_hook_noop_under_consolidate_guard(monkeypatch, capsys):
+    monkeypatch.setenv("NOTIONMEMORY_CONSOLIDATE", "1")
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
+    assert session_start.main() == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_hook_reads_stdin_before_consolidate_guard_noop(monkeypatch):
+    """M6 — 재귀 가드로 no-op 하더라도 stdin 은 이미 소비돼 있어야 한다."""
+    monkeypatch.setenv("NOTIONMEMORY_CONSOLIDATE", "1")
+
+    class _TrackedStdin(io.StringIO):
+        def __init__(self, *a, **k):
+            super().__init__(*a, **k)
+            self.read_called = False
+
+        def read(self, *a, **k):
+            self.read_called = True
+            return super().read(*a, **k)
+
+    stdin = _TrackedStdin("{}")
+    monkeypatch.setattr("sys.stdin", stdin)
+    assert session_start.main() == 0
+    assert stdin.read_called is True
+
+
+# ── SessionStart 폴백 스폰 — autorun.maybe_spawn(sys.argv[0]), 모든 주입 뒤 별도 try ──
+
+def test_fallback_spawn_calls_autorun_with_cli_path(monkeypatch):
+    from notionmemory.skills.memory import autorun
+    calls = []
+    monkeypatch.setattr(autorun, "maybe_spawn", lambda cli: calls.append(cli) or True)
+    assert session_start.main() == 0
+    assert calls == [sys.argv[0]]
+
+
+def test_fallback_spawn_skipped_under_consolidate_guard(monkeypatch):
+    from notionmemory.skills.memory import autorun
+    monkeypatch.setenv("NOTIONMEMORY_CONSOLIDATE", "1")
+    monkeypatch.setattr(autorun, "maybe_spawn",
+                        lambda cli: pytest.fail("guarded — must not spawn"))
+    assert session_start.main() == 0
+
+
+def test_fallback_spawn_failure_does_not_break_injection(monkeypatch, capsys):
+    """스폰이 던져도 그 앞 섹션들의 주입은 이미 출력된 채로 살아남는다(격리된 try)."""
+    from notionmemory.skills.memory import autorun
+
+    def boom(cli):
+        raise RuntimeError("spawn boom")
+
+    monkeypatch.setattr(autorun, "maybe_spawn", boom)
+    monkeypatch.setattr(session_start, "_memory_store",
+                        lambda config: _FakeStore(brief="브리프 생존"))
+    assert session_start.main() == 0
+    assert "브리프 생존" in capsys.readouterr().out
+
+
+def test_injection_failure_does_not_break_fallback_spawn(monkeypatch):
+    """주입 섹션이 던져도(예: templates_injection 실패) 폴백 스폰은 별도 try 라
+    영향받지 않고 여전히 호출된다."""
+    from notionmemory.skills.memory import autorun
+    calls = []
+    monkeypatch.setattr(autorun, "maybe_spawn", lambda cli: calls.append(cli) or True)
+
+    def boom():
+        raise RuntimeError("injection boom")
+
+    monkeypatch.setattr(session_start, "templates_injection", boom)
+    assert session_start.main() == 0
+    assert calls == [sys.argv[0]]

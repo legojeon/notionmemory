@@ -12,13 +12,17 @@ Second Brain v2 Phase 2a Task 5 — 옛 `recall --project`(최근 5건, 서브�
 from __future__ import annotations
 
 import json
-import subprocess
+import subprocess  # noqa: F401 — 실제 로직은 core.projects 로 옮겼지만(I2), 기존
+                    # 테스트가 `session_start.subprocess.run` 을 monkeypatch 한다(같은
+                    # sys.modules 싱글턴이라 core.projects 쪽에서도 그대로 반영된다) —
+                    # 이 임포트를 지우면 그 monkeypatch 경로가 AttributeError로 깨진다.
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 from notionmemory.core import paths
-from notionmemory.hooks.common import capture_mode
+from notionmemory.core.projects import resolve_project, resolve_toplevel
+from notionmemory.hooks.common import capture_mode, consolidate_guard
 from notionmemory.skills.memory import consolidation_queue as cq
 
 # 훅이 안내 문구에 넣는 명령 이름 — 사용자가 그대로 따라 칠 수 있어야 하므로 맨 이름을 쓴다.
@@ -43,22 +47,10 @@ def _m(key: str, **fmt) -> str:
     return i18n.t(messages.CATALOG, key, _lang(), **fmt)
 
 
-def resolve_toplevel(cwd: str) -> str:
-    """git toplevel 절대경로, git 리포가 아니거나 실패하면 ""."""
-    try:
-        return subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"], cwd=cwd or None,
-            capture_output=True, text=True, timeout=2).stdout.strip()
-    except Exception:
-        return ""
-
-
-def resolve_project(cwd: str) -> str:
-    """git toplevel basename, 실패 시 cwd basename."""
-    top = resolve_toplevel(cwd)
-    if top:
-        return Path(top).name
-    return Path(cwd or ".").resolve().name
+# resolve_toplevel/resolve_project 는 이제 `notionmemory.core.projects` 가 원본이다
+# (I2 — transcripts.collect_excerpts 도 같은 판정이 필요해져 core 로 옮겼다). 여기서는
+# 재-임포트만 해 하위호환을 지킨다 — 기존 `monkeypatch.setattr(session_start,
+# "resolve_toplevel", ...)` 테스트들이 그대로 동작한다.
 
 
 def git_queue_reminder(toplevel: str) -> str:
@@ -314,8 +306,19 @@ def main(harness: str = "claude") -> int:
     (Stop/PreCompact 는 반대로 이벤트별 상이함이 실기로 확인돼 save_reminder 가
     harness 를 실제로 분기한다).
     """
+    # M6 — consolidate_guard 의 no-op return 보다 stdin 소비가 먼저다. 하네스는
+    # 훅이 stdin 을 읽든 말든 프로세스가 끝나면 그 파이프를 정리하니 기능적으로는
+    # 차이가 없어 보이지만, 순서를 훅마다 다르게 두면(어떤 훅은 읽고 어떤 훅은
+    # 안 읽고) "이 훅이 stdin 을 읽는지"가 훅마다 달라 예측 불가능해진다 — 모든
+    # 훅이 항상 stdin 을 먼저 비운다는 단일 규율로 통일한다.
     try:
-        payload = json.loads(sys.stdin.read() or "{}")
+        raw = sys.stdin.read()
+    except Exception:
+        raw = ""
+    if consolidate_guard():
+        return 0
+    try:
+        payload = json.loads(raw or "{}")
         cwd = str(payload.get("cwd") or "")
         top = resolve_toplevel(cwd)
     except Exception:
@@ -366,6 +369,18 @@ def main(harness: str = "claude") -> int:
         queue_note = git_queue_reminder(top)
         if queue_note:
             print(queue_note)
+    except Exception:
+        pass
+    # SessionEnd 는 세션이 실제로 끝날 때만 발화하지만, 세션이 오래 지속되거나
+    # 하네스가 SessionEnd 를 아예 안 보내는 경우를 위한 폴백 — 세션 *시작* 시점에도
+    # 이미 큐에 쌓인 미처리 job 이 있으면 스폰을 한 번 더 시도한다. 별도 try 로
+    # 격리한다: 위 주입 섹션들이 이미 성공적으로 출력을 냈으면 스폰 실패가 그걸
+    # 무효화하면 안 되고(첫 번째 이유), 반대로 주입 섹션 중 하나가 던져도(이미 각자
+    # 감싸여 있지만 방어적으로) 스폰 시도 자체는 방해받지 않아야 한다(두 번째 이유).
+    try:
+        if not consolidate_guard():
+            from notionmemory.skills.memory import autorun
+            autorun.maybe_spawn(sys.argv[0])
     except Exception:
         pass
     return 0

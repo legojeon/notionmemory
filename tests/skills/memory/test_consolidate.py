@@ -14,6 +14,7 @@ from notionmemory.core.agent_runtime import AgentRuntimeError
 from notionmemory.core.config import Config
 from notionmemory.skills.memory import consolidate
 from notionmemory.skills.memory import consolidation_queue as q
+from notionmemory.skills.memory import transcripts
 
 CFG = Config({"skills": {}})
 
@@ -91,12 +92,39 @@ class FakeStoreFactory:
     def __call__(self, *a, **k):
         store = object.__new__(_FakeStore)
         store.db, store._ds = self.db, self.ds
+        store.remembered = []
         return store
 
 
 class _FakeStore:
-    def _data_source(self):
+    """`_data_source()`(기존)에 더해 `remember()` 를 흉내낸다 — `action:"new"` 발굴
+    항목이 `store.remember(...)` 로 곧장 Active 로 랜딩하는 경로를 검증할 때 쓴다.
+    실제 `MemoryStore.remember` 처럼 mem_id/page_id 를 새로 발급하고 호출 인자를
+    `self.remembered` 에 그대로 기록한다."""
+
+    def _data_source(self, *, create: bool = True):
+        # 실제 MemoryStore 와 같은 계약(C1) — create=False 인데 아직 바인딩 전(빈 ds)
+        # 이면 "" 를 돌려준다(부트스트랩 안 함). create=True 는 그대로 self._ds.
+        if not self._ds and not create:
+            return ""
         return self._ds
+
+    def remember(self, content, *, mem_type, concepts=(), project="", source="manual",
+                status="Active", strength=7):
+        rec = {"content": content, "mem_type": mem_type, "concepts": list(concepts),
+              "project": project, "source": source, "status": status, "strength": strength}
+        self.remembered.append(rec)
+        n = len(self.remembered)
+        return {"mem_id": f"mined_{n}", "page_id": f"pg_mined_{n}", "concepts": list(concepts)}
+
+
+@pytest.fixture
+def fake_store():
+    """`_apply()` 단위테스트용 최소 store — `.db`(빈 FakeDB) + `.remembered` 기록."""
+    store = object.__new__(_FakeStore)
+    store.db, store._ds = FakeDB([]), "ds_1"
+    store.remembered = []
+    return store
 
 
 def _wire(monkeypatch, runtime_text, drafts):
@@ -210,7 +238,7 @@ def test_consolidate_strips_code_fence_before_parsing(qroot, monkeypatch):
 
 def test_consolidate_no_jobs_is_noop(qroot):
     res = consolidate.run(CFG, print, project="proj")
-    assert res == {"promoted": 0, "dropped": 0, "merged": 0, "brief_updated": False}
+    assert res == {"promoted": 0, "dropped": 0, "merged": 0, "brief_updated": False, "mined": 0}
 
 
 def test_consolidate_project_filter_ignores_other_projects_jobs(qroot, monkeypatch):
@@ -219,7 +247,7 @@ def test_consolidate_project_filter_ignores_other_projects_jobs(qroot, monkeypat
 
     res = consolidate.run(CFG, print, project="proj")
 
-    assert res == {"promoted": 0, "dropped": 0, "merged": 0, "brief_updated": False}
+    assert res == {"promoted": 0, "dropped": 0, "merged": 0, "brief_updated": False, "mined": 0}
     assert runtime.calls == []                          # LLM 호출 자체가 안 됨
     assert len(q.list_jobs()) == 1                       # other 잡은 그대로
 
@@ -259,7 +287,7 @@ def test_consolidate_drafts_missing_for_project_still_acks_stale_job(qroot, monk
 
     res = consolidate.run(CFG, print, project="empty")
 
-    assert res == {"promoted": 0, "dropped": 0, "merged": 0, "brief_updated": False}
+    assert res == {"promoted": 0, "dropped": 0, "merged": 0, "brief_updated": False, "mined": 0}
     assert runtime.calls == []
     assert q.list_jobs() == []
 
@@ -493,3 +521,449 @@ def test_consolidate_reindex_failure_does_not_fail_consolidation(qroot, monkeypa
     assert "error" not in res
     assert res["promoted"] == 1
     assert db.props["m1_page"]["Status"]["select"]["name"] == "Active"  # consolidate 성공은 유효
+
+
+# ── 세션 발췌 발굴 (Task 3) ────────────────────────────────
+
+def _claude_line(role, content):
+    return json.dumps({"type": role, "isSidechain": False,
+                       "message": {"role": role, "content": content}}, ensure_ascii=False)
+
+
+def _write_transcript(tmp_path, name, lines):
+    p = tmp_path / name
+    p.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return p
+
+
+def _enqueue_session(project, sid, transcript_path, harness="claude",
+                     ts="2026-08-01T00:00:00Z"):
+    q.enqueue(project, "/cwd", ts,
+             session={"session_id": sid, "transcript_path": str(transcript_path),
+                      "harness": harness, "ts": ts})
+
+
+def test_prompt_includes_excerpts_and_active_dedup_context():
+    drafts = [{"mem_id": "m1", "type": "fact", "concepts": ["a"], "content": "d"}]
+    excerpts = [{"session_id": "s1", "harness": "claude", "text": "[user] 결정 X"}]
+    active = [{"title": "기존 결정", "concepts": ["x-y"]}]
+    p = consolidate._build_prompt("proj", drafts, excerpts=excerpts, active_summaries=active)
+    assert "세션 대화 발췌" in p and "[user] 결정 X" in p
+    assert "기존 결정" in p and "이미 커버" in consolidate.SYSTEM
+
+
+def test_apply_creates_new_item_as_active(fake_store):
+    result = {"items": [{"action": "new", "type": "architecture",
+                         "content": "BM25 로 간다\n근거...", "concepts": ["bm25-choice"],
+                         "strength": 8}], "merges": [], "brief": ""}
+    totals = dict(consolidate._EMPTY_TOTALS)
+    consolidate._apply(fake_store, "ds", "proj", [], result, totals,
+                       harness_by_default="claude")
+    assert totals["mined"] == 1
+    saved = fake_store.remembered[0]
+    assert saved["status"] == "Active" and saved["strength"] == 8
+    assert saved["mem_type"] == "architecture"
+
+
+def test_apply_new_item_invalid_type_falls_back_to_fact(fake_store):
+    result = {"items": [{"action": "new", "type": "not-a-real-type",
+                         "content": "그래도 저장은 된다", "strength": 5}],
+             "merges": [], "brief": ""}
+    totals = dict(consolidate._EMPTY_TOTALS)
+    consolidate._apply(fake_store, "ds", "proj", [], result, totals,
+                       harness_by_default="claude")
+    assert fake_store.remembered[0]["mem_type"] == "fact"
+
+
+def test_apply_new_item_with_empty_content_is_ignored(fake_store):
+    result = {"items": [{"action": "new", "type": "fact", "content": "   ", "strength": 5}],
+             "merges": [], "brief": ""}
+    totals = dict(consolidate._EMPTY_TOTALS)
+    consolidate._apply(fake_store, "ds", "proj", [], result, totals,
+                       harness_by_default="claude")
+    assert totals["mined"] == 0
+    assert fake_store.remembered == []
+
+
+def test_apply_new_item_uses_harness_default_as_source(fake_store):
+    result = {"items": [{"action": "new", "type": "fact", "content": "출처 확인용",
+                         "strength": 4}], "merges": [], "brief": ""}
+    totals = dict(consolidate._EMPTY_TOTALS)
+    consolidate._apply(fake_store, "ds", "proj", [], result, totals,
+                       harness_by_default="codex")
+    assert fake_store.remembered[0]["source"] == "codex"
+
+
+def test_run_mines_when_no_drafts_but_sessions_exist(qroot, tmp_path, monkeypatch):
+    # 큐: drafts 0 + 세션 1(발췌 임계치 이상) → 예전엔 ack-and-skip 하던 경로가 이제
+    # LLM 패스를 돈다.
+    transcript = _write_transcript(tmp_path, "s1.jsonl", [
+        _claude_line("user", "x" * 2100),
+        _claude_line("user", "y" * 2100),
+    ])
+    _enqueue_session("proj", "s1", transcript)
+    fake_json = json.dumps({
+        "items": [{"action": "new", "type": "fact", "content": "발굴된 사실", "strength": 5}],
+        "merges": [], "brief": ""})
+    db, runtime = _wire(monkeypatch, fake_json, [])   # drafts 없음
+
+    res = consolidate.run(CFG, print, project="proj")
+
+    assert runtime.calls                                # LLM 이 실제로 불림
+    assert "세션 대화 발췌" in runtime.calls[0][1]
+    assert res["mined"] == 1
+    assert q.list_jobs() == []                          # 성공 → ack
+
+
+def test_run_skips_llm_below_min_excerpt_chars(qroot, tmp_path, monkeypatch):
+    # drafts 0 + 발췌 합계가 MIN_EXCERPT_CHARS 미만 → generate 미호출, 잡 미ack(보존).
+    transcript = _write_transcript(tmp_path, "s1.jsonl", [_claude_line("user", "x" * 100)])
+    _enqueue_session("proj", "s1", transcript)
+    db, runtime = _wire(monkeypatch, "{}", [])          # drafts 없음
+
+    res = consolidate.run(CFG, print, project="proj")
+
+    assert not runtime.calls
+    assert res["mined"] == 0
+    assert q.list_jobs()                                # 큐 보존 — ack 안 됨
+
+
+def test_run_gate_still_acks_when_no_drafts_and_no_sessions(qroot, monkeypatch):
+    """레거시 잡(sessions 없음) + drafts 도 없음 — 기존 ack-and-skip 동작 유지."""
+    q.enqueue("proj", "/cwd", "2026-07-29T00:00:00Z")   # session 인자 없음
+    db, runtime = _wire(monkeypatch, "{}", [])
+
+    res = consolidate.run(CFG, print, project="proj")
+
+    assert not runtime.calls
+    assert q.list_jobs() == []
+
+
+def test_run_updates_ledger_on_success(qroot, tmp_path, monkeypatch):
+    transcript = _write_transcript(tmp_path, "s1.jsonl", [
+        _claude_line("user", "x" * 2100),
+        _claude_line("user", "y" * 2100),
+    ])
+    _enqueue_session("proj", "s1", transcript)
+    fake_json = json.dumps({"items": [], "merges": [], "brief": ""})
+    db, runtime = _wire(monkeypatch, fake_json, [])
+
+    res = consolidate.run(CFG, print, project="proj")
+
+    assert "error" not in res
+    led = transcripts.load_ledger()
+    assert led["s1"]["bytes"] > 0
+
+
+# ── fix round 1 ────────────────────────────────────────────
+
+def test_run_survives_ledger_write_failure_and_still_acks(qroot, tmp_path, monkeypatch):
+    """finding 1(reviewer) — `save_ledger` 는 내부적으로 mkdir/write_text 를 하고 OSError
+    를 안 삼킨다. 이게 per-project try 안에서 잡히지 않고 밖으로 새면 같은 run() 안의
+    나머지 프로젝트까지 끌고 내려간다(per-project 격리 불변식 위반). 디스크 풀/권한
+    같은 상황에서도 Notion 반영은 이미 끝났으니 ack 은 그대로 진행해야 한다(품질
+    저하: 원장이 안 앞당겨져 다음 회차에 같은 발췌를 다시 읽는다 — dedup 컨텍스트가
+    흡수) — job 을 큐에 남기면 디스크가 고쳐지기 전까지 매 회차 계속 실패할 뿐이다."""
+    transcript = _write_transcript(tmp_path, "s1.jsonl", [
+        _claude_line("user", "x" * 2100),
+        _claude_line("user", "y" * 2100),
+    ])
+    _enqueue_session("proj", "s1", transcript)
+    fake_json = json.dumps({"items": [], "merges": [], "brief": ""})
+    db, runtime = _wire(monkeypatch, fake_json, [])
+
+    def boom(led, now=None):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(consolidate.transcripts, "save_ledger", boom)
+
+    res = consolidate.run(CFG, print, project="proj")
+
+    assert "error" not in res                # 트레이스백/에러로 안 번짐
+    assert runtime.calls                       # LLM 패스는 정상적으로 돌았다
+    assert q.list_jobs() == []                 # ledger 쓰기 실패해도 ack 은 그대로 진행
+
+
+def test_run_isolates_ledger_write_failure_per_project(qroot, tmp_path, monkeypatch):
+    """ledger 쓰기 실패가 이 프로젝트만의 일이어야 한다 — 같은 run() 안의 다른
+    프로젝트는 영향받지 않는다(flusher.py 와 동일 규율)."""
+    t_good = _write_transcript(tmp_path, "good.jsonl", [
+        _claude_line("user", "x" * 2100), _claude_line("user", "y" * 2100)])
+    t_flaky = _write_transcript(tmp_path, "flaky.jsonl", [
+        _claude_line("user", "x" * 2100), _claude_line("user", "y" * 2100)])
+    _enqueue_session("good", "sg", t_good, ts="2026-08-01T00:00:00Z")
+    _enqueue_session("flaky", "sf", t_flaky, ts="2026-08-01T00:00:01Z")
+    fake_json = json.dumps({"items": [], "merges": [], "brief": ""})
+    db, runtime = _wire(monkeypatch, fake_json, [])
+
+    real_save_ledger = consolidate.transcripts.save_ledger
+
+    def flaky_save(led, now=None):
+        if "sf" in led:
+            raise OSError("disk full")
+        return real_save_ledger(led, now=now)
+
+    monkeypatch.setattr(consolidate.transcripts, "save_ledger", flaky_save)
+
+    res = consolidate.run(CFG, print)
+
+    assert "error" not in res
+    assert q.list_jobs() == []                 # 둘 다 ack(쓰기 실패해도 ack 은 진행)
+    led = transcripts.load_ledger()
+    assert "sg" in led                          # 정상 프로젝트는 원장 갱신됨
+    assert "sf" not in led                      # 실패한 프로젝트만 원장 미갱신
+
+
+def test_run_skips_ledger_update_for_truncated_excerpt_but_advances_others(
+        qroot, tmp_path, monkeypatch):
+    """finding 2(controller) — TOTAL_CAP 에 걸려 잘린 세션은 `consumed_bytes` 가
+    (파싱은 끝까지 됐으니) 여전히 파일 전체 오프셋이다. 그걸 원장에 그대로 쓰면 LLM
+    이 못 본 뒷부분이 "이미 발굴됨"으로 표시돼 영원히 유실된다 — 잘린 세션은 원장을
+    건너뛰고, 안 잘린 세션은 정상 갱신돼야 한다."""
+    monkeypatch.setattr(consolidate.transcripts, "TOTAL_CAP", 2500)
+    t1 = _write_transcript(tmp_path, "s1.jsonl", [_claude_line("user", "x" * 2100)])
+    t2 = _write_transcript(tmp_path, "s2.jsonl", [_claude_line("user", "y" * 2100)])
+    _enqueue_session("proj", "s1", t1, ts="2026-08-01T01:00:00Z")   # 최신 → 먼저 처리, 안 잘림
+    _enqueue_session("proj", "s2", t2, ts="2026-08-01T00:00:00Z")   # 오래됨 → 나중 처리, 잘림
+    fake_json = json.dumps({"items": [], "merges": [], "brief": ""})
+    db, runtime = _wire(monkeypatch, fake_json, [])
+
+    res = consolidate.run(CFG, print, project="proj")
+
+    assert "error" not in res
+    assert q.list_jobs() == []
+    led = transcripts.load_ledger()
+    assert "s1" in led                          # 안 잘린 세션은 원장 갱신
+    assert "s2" not in led                       # 잘린 세션은 원장 미갱신 — 재발굴 대기
+
+
+def test_run_does_not_update_ledger_when_gated_below_min_chars(qroot, tmp_path, monkeypatch):
+    """게이트에 걸려 LLM 패스를 안 돌면 원장도 안 건드려야 다음 회차에 같은 발췌가
+    다시 잡힌다(누적을 위해 소비량을 미리 기록하면 안 된다)."""
+    transcript = _write_transcript(tmp_path, "s1.jsonl", [_claude_line("user", "x" * 100)])
+    _enqueue_session("proj", "s1", transcript)
+    _wire(monkeypatch, "{}", [])
+
+    consolidate.run(CFG, print, project="proj")
+
+    assert transcripts.load_ledger() == {}
+
+
+# ── I3: dedup 컨텍스트는 Notion 전체 스캔이 아니라 로컬 mem_index 에서만 뽑는다
+# (network 0) ────────────────────────────────────────────────────────────
+
+def _fake_index(docs):
+    return {"version": 2, "meta": {"n": len(docs), "avgdl": 0.0, "df": {}}, "docs": docs}
+
+
+def test_dedup_context_built_from_local_index(monkeypatch):
+    idx = _fake_index({
+        "m1": {"title": "이미 아는 결정", "concepts": ["x"], "type": "fact",
+              "project": "proj", "status": "Active"},
+        "m2": {"title": "다른 프로젝트", "concepts": ["y"], "type": "fact",
+              "project": "other", "status": "Active"},
+        "m3": {"title": "아직 초안", "concepts": ["z"], "type": "fact",
+              "project": "proj", "status": "Draft"},
+    })
+    monkeypatch.setattr(consolidate.mem_index, "load", lambda: idx)
+
+    out = consolidate._dedup_context("proj")
+
+    assert out == [{"title": "이미 아는 결정", "concepts": ["x"]}]
+
+
+def test_dedup_context_excludes_brief_rows(monkeypatch):
+    idx = _fake_index({
+        "brief-proj": {"title": "Project brief: proj", "concepts": [], "type": "brief",
+                      "project": "proj", "status": "Active"},
+        "m1": {"title": "진짜 메모리", "concepts": ["a"], "type": "fact",
+              "project": "proj", "status": "Active"},
+    })
+    monkeypatch.setattr(consolidate.mem_index, "load", lambda: idx)
+
+    out = consolidate._dedup_context("proj")
+
+    assert out == [{"title": "진짜 메모리", "concepts": ["a"]}]
+
+
+def test_dedup_context_empty_when_index_missing(monkeypatch):
+    monkeypatch.setattr(consolidate.mem_index, "load", lambda: {})
+    assert consolidate._dedup_context("proj") == []
+
+
+def test_run_wires_dedup_context_into_prompt(qroot, tmp_path, monkeypatch):
+    transcript = _write_transcript(tmp_path, "s1.jsonl", [
+        _claude_line("user", "x" * 2100),
+        _claude_line("user", "y" * 2100),
+    ])
+    _enqueue_session("proj", "s1", transcript)
+    fake_json = json.dumps({"items": [], "merges": [], "brief": ""})
+    db, runtime = _wire(monkeypatch, fake_json, [])
+    idx = _fake_index({"m1": {"title": "이미 아는 결정", "concepts": ["x"], "type": "fact",
+                              "project": "proj", "status": "Active"}})
+    monkeypatch.setattr(consolidate.mem_index, "load", lambda: idx)
+
+    consolidate.run(CFG, print, project="proj")
+
+    assert "이미 아는 결정" in runtime.calls[0][1]
+
+
+def test_run_continues_when_index_missing(qroot, tmp_path, monkeypatch):
+    """색인이 없거나 손상됐어도(mem_index.load()가 이미 {} 로 방어) 발굴 패스는
+    dedup 컨텍스트 없이 계속 돈다 — 옛 Notion query_active_summaries 실패-흡수
+    테스트의 후신(I3 이후로는 네트워크 자체가 없어 실패할 일도 없다)."""
+    transcript = _write_transcript(tmp_path, "s1.jsonl", [
+        _claude_line("user", "x" * 2100),
+        _claude_line("user", "y" * 2100),
+    ])
+    _enqueue_session("proj", "s1", transcript)
+    fake_json = json.dumps({"items": [], "merges": [], "brief": ""})
+    db, runtime = _wire(monkeypatch, fake_json, [])
+    monkeypatch.setattr(consolidate.mem_index, "load", lambda: {})
+
+    res = consolidate.run(CFG, print, project="proj")
+
+    assert "error" not in res
+    assert runtime.calls
+    assert q.list_jobs() == []
+
+
+# ── M1: ack 는 LLM 패스 도중 끼어든 새 세션을 지우지 않는다(compare-and-delete) ──
+
+def test_ack_preserves_session_enqueued_during_llm_call(qroot, tmp_path, monkeypatch):
+    """Stop 이 LLM 패스 도중(스냅샷~ack 사이, 최대 600초) 같은 프로젝트에 새 세션을
+    enqueue 하면, 옛 `ack()`(무조건 unlink)는 그 새 세션까지 함께 날려버렸다.
+    compare-and-delete(`ack_sessions`)는 ts 변경을 감지해 새로 들어온 세션만 남기고
+    다시 쓴다."""
+    t1 = _write_transcript(tmp_path, "s1.jsonl", [
+        _claude_line("user", "x" * 2100), _claude_line("user", "y" * 2100)])
+    _enqueue_session("proj", "s1", t1, ts="2026-08-01T00:00:00Z")
+    fake_json = json.dumps({"items": [], "merges": [], "brief": ""})
+    db = FakeDB([])
+
+    class RacyRuntime:
+        def __init__(self):
+            self.calls = []
+
+        def generate(self, system, user):
+            self.calls.append((system, user))
+            # LLM 호출 도중 같은 프로젝트에 새 Stop 이 도착했다고 시뮬레이션 —
+            # 스냅샷(run() 시작 시점의 queue.list_jobs())과 이 시점 사이의 race.
+            _enqueue_session("proj", "s2", tmp_path / "s2.jsonl",
+                             ts="2026-08-01T00:05:00Z")
+            return fake_json
+
+    runtime = RacyRuntime()
+    monkeypatch.setattr(consolidate, "build_runtime", lambda cfg: runtime)
+    monkeypatch.setattr(consolidate, "MemoryStore", FakeStoreFactory(db))
+    monkeypatch.setattr(consolidate, "NotionSession", lambda: object())
+
+    res = consolidate.run(CFG, print, project="proj")
+
+    assert "error" not in res
+    remaining = q.list_jobs()
+    assert len(remaining) == 1                      # 잡 자체는 남아있다(완전 ack 아님)
+    sids = {s["session_id"] for s in remaining[0]["sessions"]}
+    assert sids == {"s2"}         # s1 은 처리 완료로 제거, s2 는 레이스로 살아남음
+
+
+def test_run_sets_recursion_guard_env(qroot, tmp_path, monkeypatch):
+    monkeypatch.delenv("NOTIONMEMORY_CONSOLIDATE", raising=False)
+    _wire(monkeypatch, "{}", [])
+
+    consolidate.run(CFG, print, project="proj")
+
+    assert consolidate.os.environ.get("NOTIONMEMORY_CONSOLIDATE") == "1"
+
+
+# ── C1: 무인 백그라운드(--auto) 경로는 Second Brain DB 를 절대 만들지 않는다 ──
+
+def test_run_auto_true_with_unbound_store_does_not_create_or_ack(qroot, monkeypatch):
+    """memory 가 아직 바인딩 안 된 상태(ds="")에서 `auto=True` 로 부르면 —
+    `_data_source(create=False)` 가 ""를 돌려주고, 그 자리에서 바로 빈 totals 로
+    돌아온다. Draft 조회(query_drafts)도, LLM 호출도, 큐 ack 도 전혀 일어나면 안
+    된다(큐 보존 — 다음 회차/수동 실행이 여전히 이 잡을 볼 수 있어야 한다)."""
+    q.enqueue("proj", "/cwd", "2026-07-29T00:00:00Z")
+    db = FakeDB([_draft("m1")])
+    runtime = FakeRuntime("{}")
+    monkeypatch.setattr(consolidate, "build_runtime", lambda cfg: runtime)
+    monkeypatch.setattr(consolidate, "MemoryStore", FakeStoreFactory(db, ds=""))
+    monkeypatch.setattr(consolidate, "NotionSession", lambda: object())
+
+    res = consolidate.run(CFG, print, project="proj", auto=True)
+
+    assert res == dict(consolidate._EMPTY_TOTALS)
+    assert runtime.calls == []                    # LLM 패스 자체가 안 돎(Draft 조회 전 bail)
+    assert db.props == {}                          # Notion 에 아무것도 안 씀
+    assert len(q.list_jobs()) == 1                  # 잡 보존(ack 안 됨)
+
+
+def test_run_auto_true_with_bound_store_behaves_normally(qroot, monkeypatch):
+    """이미 바인딩된 memory(ds 존재)면 `auto=True` 도 평소처럼 LLM 패스를 돌고
+    ack 한다 — C1 가드는 "미바인딩일 때만" 막는다."""
+    q.enqueue("proj", "/cwd", "2026-07-29T00:00:00Z")
+    fake_json = json.dumps({"items": [{"mem_id": "m1", "action": "keep", "strength": 8}],
+                            "merges": [], "brief": ""})
+    db, runtime = _wire(monkeypatch, fake_json, [_draft("m1")])
+
+    res = consolidate.run(CFG, print, project="proj", auto=True)
+
+    assert "error" not in res
+    assert res["promoted"] == 1
+    assert q.list_jobs() == []
+
+
+def test_cli_consolidate_output_includes_mined_count(qroot, tmp_path, monkeypatch, capsys):
+    from notionmemory import cli
+
+    transcript = _write_transcript(tmp_path, "s1.jsonl", [
+        _claude_line("user", "x" * 2100),
+        _claude_line("user", "y" * 2100),
+    ])
+    _enqueue_session("proj", "s1", transcript)
+    fake_json = json.dumps({
+        "items": [{"action": "new", "type": "fact", "content": "발굴된 사실", "strength": 5}],
+        "merges": [], "brief": ""})
+    _wire(monkeypatch, fake_json, [])
+
+    class Args:
+        config = str(tmp_path / "config.yaml")   # 존재하지 않음 → 빈 Config
+        action = "consolidate"
+        project = "proj"
+        auto = False
+
+    rc = cli._cmd_memory(Args())
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "발굴 1건" in out
+
+
+def test_cli_consolidate_auto_logs_exception_and_releases_lock(tmp_path, monkeypatch):
+    """fix round 1 finding 1: run() 내부 per-project try/except 를 벗어난 예외
+    (여기선 monkeypatch 로 직접 시뮬레이션)가 `--auto` 경로에서 stderr=DEVNULL 로
+    조용히 삼켜지지 않고 file_log 에 남아야 하며, rc 는 여전히 0(백그라운드는 절대
+    비정상 종료코드를 내지 않는다) 이고 락은 finally 로 반드시 풀려야 한다."""
+    from notionmemory import cli
+    from notionmemory.skills.memory import autorun
+
+    monkeypatch.setattr(autorun.paths, "state_dir", lambda: tmp_path)
+
+    def _boom(config, log, project="", auto=False):
+        raise OSError("ledger 로드 실패")
+
+    monkeypatch.setattr(cli.mem_consolidate, "run", _boom)
+
+    class Args:
+        config = str(tmp_path / "config.yaml")   # 존재하지 않음 → 빈 Config
+        action = "consolidate"
+        project = ""
+        auto = True
+
+    rc = cli._cmd_memory(Args())
+
+    assert rc == 0
+    assert not autorun.lock_path().exists()                        # 락 해제됨
+    log_text = autorun.log_path().read_text(encoding="utf-8")
+    assert "consolidate --auto 실패" in log_text
+    assert "ledger 로드 실패" in log_text

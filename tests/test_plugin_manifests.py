@@ -71,13 +71,14 @@ def test_claude_hooks_match_the_cli_hook_contract():
     # 같은 훅을 두 경로가 기술한다 — 이벤트 집합이 CLI install 과 드리프트하면 안 된다
     cli_events = set(manifest.HOOK_EVENTS("/x/notionmemory", "claude").keys())
     assert set(m["hooks"]) == cli_events == {
-        "SessionStart", "PreCompact", "Stop", "UserPromptSubmit"}
+        "SessionStart", "PreCompact", "Stop", "UserPromptSubmit", "SessionEnd"}
     cmds = [h["command"] for grp in m["hooks"].values()
             for entry in grp for h in entry["hooks"]]
     assert any("notionmemory hook session-start" in c for c in cmds)
     assert any("notionmemory hook save-reminder" in c for c in cmds)
     assert any("notionmemory hook session-stop" in c for c in cmds)
     assert any("notionmemory hook user-prompt" in c for c in cmds)
+    assert any("notionmemory hook session-end" in c for c in cmds)
 
 
 def test_codex_marketplace_points_at_the_plugin_dir():

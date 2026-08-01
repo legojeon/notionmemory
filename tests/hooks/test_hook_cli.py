@@ -208,3 +208,13 @@ def test_reminder_survives_malformed_stdin(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(sys, "stdin", io.StringIO("이거 json 아님 {{{"))
     assert save_reminder.main() == 0
     assert "remember --auto" in capsys.readouterr().out
+
+
+def test_save_reminder_noop_under_consolidate_guard(monkeypatch, tmp_path, capsys):
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("skills:\n  memory:\n    capture_mode: auto\n", encoding="utf-8")
+    monkeypatch.setattr(common.paths, "config_path", lambda: cfg)
+    monkeypatch.setenv("NOTIONMEMORY_CONSOLIDATE", "1")
+    monkeypatch.setattr(sys, "stdin", io.StringIO("{}"))
+    assert save_reminder.main() == 0
+    assert capsys.readouterr().out == ""

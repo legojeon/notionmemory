@@ -28,7 +28,10 @@ def _sample(slug="job-tracker") -> P.Profile:
         body="## 무엇에 쓰는 템플릿인가\n지원 추적.\n")
 
 
-def test_store_dir_is_under_state_dir(state_home):
+def test_store_dir_is_under_state_dir(state_home, monkeypatch, no_real_state_dir):
+    # 파생 규칙(HOME→state_dir→templates) 자체가 검증 대상 — conftest 격리를 원본으로 되돌린다.
+    from notionmemory.core import paths
+    monkeypatch.setattr(paths, "state_dir", no_real_state_dir)
     assert P.store_dir() == state_home / ".local" / "state" / "notionmemory" / "templates"
 
 

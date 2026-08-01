@@ -55,6 +55,29 @@ def no_harness_home_override(monkeypatch):
         monkeypatch.delenv(var, raising=False)
 
 
+# no_real_state_dir 가 패치하기 전의 진짜 구현 — 파생 규칙(HOME→state_dir) 자체를
+# 검증하는 테스트가 이걸 받아 되돌린다(fixture 반환값).
+REAL_STATE_DIR = paths.state_dir
+
+
+@pytest.fixture(autouse=True)
+def no_real_state_dir(monkeypatch, tmp_path):
+    """`paths.state_dir()`는 기본적으로 실사용 `~/.local/state/notionmemory`를 가리킨다.
+    `store.remember`의 write-through(`mem_index.add_memory`)를 타는 테스트가 격리 없이
+    돌면 **실사용 memory 색인에 유닛테스트 픽스처가 들어간다** — 실제로 일어났다
+    (index.json에 "첫 줄 제목"·"수동 저장" 등 7건, UserPromptSubmit 힌트훅과 recall
+    로컬랭킹이 가짜 문서 위에서 돌게 됨). calendar 테스트가 실사용 config를 침범했던
+    것과 같은 계열의 격리 누락이라 여기(루트, 전 테스트 autouse)서 막는다 — 앞으로
+    어떤 테스트가 write-through·library 색인·install receipt 를 타든 tmp 로 간다.
+    프로덕션 코드는 전부 `paths.state_dir()` 모듈 경유 호출이라(직접-이름 임포트 0건)
+    함수 패치로 충분하고, 자체 state_dir 를 patch 하는 테스트는 이 fixture 이후
+    자기 값으로 다시 덮으므로 그쪽이 우선한다. 반환값 = 패치 전 진짜 구현
+    (파생 규칙을 검증하는 테스트가 `monkeypatch.setattr(paths, "state_dir", 반환값)`
+    로 되돌린다)."""
+    monkeypatch.setattr(paths, "state_dir", lambda: tmp_path / "state")
+    return REAL_STATE_DIR
+
+
 @pytest.fixture(autouse=True)
 def no_real_repo_config(monkeypatch, tmp_path):
     """`paths.legacy_repo_config()`는 기본적으로 `paths.__file__`을 거슬러 올라가

@@ -5,8 +5,13 @@ LLM pass(consolidate)는 여기서 절대 돌지 않는다 — agent_runtime 을
 """
 from __future__ import annotations
 
+import io
+import json
 import subprocess
 import sys
+
+from notionmemory.hooks import session_stop
+from notionmemory.skills.memory import consolidation_queue as cq
 
 
 def test_stop_hook_enqueues_one_job(tmp_path, monkeypatch):
@@ -19,6 +24,9 @@ def test_stop_hook_enqueues_one_job(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "notionmemory.hooks.session_start.subprocess.run",
         lambda *a, **k: subprocess.CompletedProcess(a[0] if a else [], 1, "", ""))
+    # payload 없는 호출(빈 stdin)도 project-only enqueue 로 동작해야 한다 — cwd 는
+    # payload 에 없으니 os.getcwd() 폴백을 탄다.
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
     from notionmemory.hooks import session_stop
     assert session_stop.main() == 0
     from notionmemory.skills.memory import consolidation_queue as q
@@ -56,6 +64,7 @@ def test_stop_hook_swallows_exceptions_and_returns_zero(monkeypatch):
         raise RuntimeError("boom")
 
     monkeypatch.setattr("notionmemory.hooks.session_stop.os.getcwd", boom)
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
     from notionmemory.hooks import session_stop
     assert session_stop.main() == 0
 
@@ -63,6 +72,7 @@ def test_stop_hook_swallows_exceptions_and_returns_zero(monkeypatch):
 def test_stop_hook_swallows_enqueue_failure(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "notionmemory.hooks.session_stop.os.getcwd", lambda: str(tmp_path))
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
 
     def boom(*a, **k):
         raise OSError("disk full")
@@ -78,5 +88,68 @@ def test_stop_hook_accepts_harness_kwarg(tmp_path, monkeypatch):
     monkeypatch.setenv("NOTIONMEMORY_MEMQUEUE_DIR", str(tmp_path / "q"))
     monkeypatch.setattr(
         "notionmemory.hooks.session_stop.os.getcwd", lambda: str(tmp_path))
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
     from notionmemory.hooks import session_stop
     assert session_stop.main(harness="codex") == 0
+
+
+def test_stop_hook_enqueues_transcript_session(tmp_path, monkeypatch):
+    monkeypatch.setenv(cq.QUEUE_ROOT_ENV, str(tmp_path))
+    monkeypatch.setattr(session_stop, "resolve_project", lambda cwd: "proj")
+    payload = json.dumps({"session_id": "sid1", "transcript_path": "/tr.jsonl",
+                          "cwd": "/proj"})
+    monkeypatch.setattr("sys.stdin", io.StringIO(payload))
+    assert session_stop.main(harness="claude") == 0
+    job = cq.list_jobs()[0]
+    assert job["sessions"][0] == {"session_id": "sid1", "transcript_path": "/tr.jsonl",
+                                  "harness": "claude", "ts": job["sessions"][0]["ts"]}
+
+
+def test_stop_hook_noop_when_capture_mode_off(tmp_path, monkeypatch):
+    monkeypatch.setenv(cq.QUEUE_ROOT_ENV, str(tmp_path))
+    monkeypatch.setattr(session_stop, "capture_mode", lambda: "off")
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
+    assert session_stop.main() == 0
+    assert cq.list_jobs() == []
+
+
+def test_stop_hook_codex_glob_fallback(tmp_path, monkeypatch):
+    monkeypatch.setenv(cq.QUEUE_ROOT_ENV, str(tmp_path))
+    monkeypatch.setattr(session_stop, "resolve_project", lambda cwd: "proj")
+    monkeypatch.setattr(session_stop.transcripts, "find_codex_rollout",
+                        lambda sid: "/roll.jsonl" if sid == "sid2" else "")
+    payload = json.dumps({"session_id": "sid2", "cwd": "/proj"})  # transcript_path 없음
+    monkeypatch.setattr("sys.stdin", io.StringIO(payload))
+    assert session_stop.main(harness="codex") == 0
+    assert cq.list_jobs()[0]["sessions"][0]["transcript_path"] == "/roll.jsonl"
+
+
+def test_hook_noop_under_consolidate_guard(monkeypatch, capsys, tmp_path):
+    monkeypatch.setenv(cq.QUEUE_ROOT_ENV, str(tmp_path))
+    monkeypatch.setenv("NOTIONMEMORY_CONSOLIDATE", "1")
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
+    assert session_stop.main() == 0
+    assert capsys.readouterr().out == ""
+    assert cq.list_jobs() == []  # 재귀 가드 아래서는 큐잉조차 하지 않는다
+
+
+def test_hook_reads_stdin_before_consolidate_guard_noop(monkeypatch, tmp_path):
+    """M6 — 재귀 가드로 no-op 하더라도 stdin 은 이미 소비돼 있어야 한다(모든 훅이
+    stdin 을 먼저 비운다는 단일 규율). 커스텀 스트림으로 `.read()` 호출 여부를
+    직접 관측한다."""
+    monkeypatch.setenv(cq.QUEUE_ROOT_ENV, str(tmp_path))
+    monkeypatch.setenv("NOTIONMEMORY_CONSOLIDATE", "1")
+
+    class _TrackedStdin(io.StringIO):
+        def __init__(self, *a, **k):
+            super().__init__(*a, **k)
+            self.read_called = False
+
+        def read(self, *a, **k):
+            self.read_called = True
+            return super().read(*a, **k)
+
+    stdin = _TrackedStdin("{}")
+    monkeypatch.setattr("sys.stdin", stdin)
+    assert session_stop.main() == 0
+    assert stdin.read_called is True

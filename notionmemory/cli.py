@@ -424,10 +424,33 @@ def _cmd_memory(args) -> int:
                            exc_types=(NotASecondBrainError, ValueError, RuntimeError),
                            url_fn=mem_db_url)
     if args.action == "consolidate":
+        if args.auto:
+            # 훅이 detached 로 스폰한 백그라운드 경로 — stdout 이 없다(DEVNULL).
+            # 락을 여기서 잡고 반드시 여기서 놓는다(autorun.maybe_spawn 은
+            # pre-check 만 하고 락을 잡지 않으므로, 실제 상호배제는 이 블록의 몫).
+            # 실패해도 조용히 0 반환 — 큐는 보존되고 다음 회차에 재시도, 자세한
+            # 내용은 file_log 로만 남는다(터미널로 노출되면 안 됨).
+            from notionmemory.skills.memory import autorun
+            if not autorun.acquire_lock():
+                return 0
+            try:
+                mem_consolidate.run(config, autorun.file_log, project=args.project or "",
+                                    auto=True)
+            except Exception as exc:
+                # 백그라운드 프로세스의 유일한 관측 창구가 file_log 다 — run() 내부
+                # per-project try/except 를 벗어난 예외(예: 루프 진입 전 큐/원장
+                # 로드 실패)가 stderr=DEVNULL 로 조용히 삼켜지면 실패 흔적이 아예
+                # 남지 않는다. 여기서 잡아 로그에 남기고도 return 0 은 유지한다
+                # (백그라운드 경로는 절대 실패 종료코드를 내지 않는다 — 큐는 보존됨).
+                autorun.file_log(f"consolidate --auto 실패: {exc!r}")
+            finally:
+                autorun.release_lock()
+            return 0
         res = mem_consolidate.run(config, print, project=args.project or "")
         if res.get("error"):
             return 1
         print(f"승격 {res['promoted']}건 · 드롭 {res['dropped']}건 · 병합 {res['merged']}건"
+             f" · 발굴 {res.get('mined', 0)}건"
              f" · 브리프 갱신 {'예' if res['brief_updated'] else '아니오'}")
         return 0
     if args.action == "reindex":
@@ -1010,6 +1033,8 @@ def main(argv=None) -> int:
     mco = mem_sub.add_parser("consolidate")
     mco.add_argument("--project", default="",
                      help="이 프로젝트의 큐 잡만 처리(미지정이면 큐에 있는 전체 프로젝트)")
+    mco.add_argument("--auto", action="store_true",
+                     help="훅 스폰용 — 락을 잡고, stdout 대신 상태 로그 파일에 기록")
     mco.add_argument("--config", default=DEFAULT_CONFIG)
     mri = mem_sub.add_parser("reindex")
     mri.add_argument("--config", default=DEFAULT_CONFIG)
@@ -1129,7 +1154,7 @@ def main(argv=None) -> int:
 
     hook = sub.add_parser("hook")
     hook.add_argument("name", choices=["session-start", "save-reminder", "session-stop",
-                                       "user-prompt"])
+                                       "user-prompt", "session-end"])
     hook.add_argument("--harness", choices=["claude", "codex"], default="claude",
                       help="호출한 하네스 — 훅 stdout 형태가 이벤트별로 달라서 필요"
                            "(기본값 claude, 안 주면 지금까지 동작 그대로)")
@@ -1243,11 +1268,13 @@ def main(argv=None) -> int:
     if args.cmd == "language":
         return _cmd_language(args)
     if args.cmd == "hook":
-        from notionmemory.hooks import save_reminder, session_start, session_stop, user_prompt
+        from notionmemory.hooks import (save_reminder, session_end, session_start,
+                                        session_stop, user_prompt)
         return {"session-start": session_start.main,
                 "save-reminder": save_reminder.main,
                 "session-stop": session_stop.main,
-                "user-prompt": user_prompt.main}[args.name](harness=args.harness)
+                "user-prompt": user_prompt.main,
+                "session-end": session_end.main}[args.name](harness=args.harness)
     if args.cmd == "install":
         from notionmemory.core.install import runner
         _resolve_install_language(args)

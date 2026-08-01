@@ -2,15 +2,22 @@
 브리프를 갱신한다(Second Brain v2 Phase 2a Task 4).
 
 주 경로: `notionmemory memory consolidate`(사용자 터미널/cron, **비중첩** — 세션
-안에서 재귀 호출하지 않는다). Stop 훅(Task 3)이 세션 종료마다 큐에 잡을 쌓아두고,
+안에서 재귀 호출하지 않는다). Stop 훅(Task 2)이 세션 종료마다 큐에 잡을 쌓아두고,
 이 모듈이 그 큐를 드레인한다. 프로젝트 단위로 LLM 판정을 받아 Notion 에 반영하고
 성공한 프로젝트의 잡만 ack 한다 — LLM 실패/파싱 실패/Notion 쓰기 실패 시 그
-프로젝트의 잡은 큐에 남아 다음 회차에 재시도되고 Draft 는 그대로 보존된다."""
+프로젝트의 잡은 큐에 남아 다음 회차에 재시도되고 Draft 는 그대로 보존된다.
+
+Task 3(발굴): 잡에는 Draft 뿐 아니라 세션 트랜스크립트 발췌(`sessions`)도 실려
+있을 수 있다 — 이 모듈이 `transcripts.collect_excerpts` 로 대화 원문을 읽어 같은
+LLM 패스에 얹고, 지속 가치가 있으면 `action:"new"` 로 곧장 Active 메모리를 만든다
+(Draft 를 안 거친다 — 세션 발췌는 애초에 초안화할 대상이 아니라 발굴 원료다)."""
 from __future__ import annotations
 
 import json
+import os
 import re
 from collections import defaultdict
+from datetime import datetime, timezone
 
 import requests
 
@@ -18,8 +25,10 @@ from notionmemory.core.agent_runtime import AgentRuntimeError, build_runtime
 from notionmemory.core.config import Config
 from notionmemory.core.notion_client import NotionSession
 from notionmemory.skills.memory import consolidation_queue as queue
+from notionmemory.skills.memory import mem_index
 from notionmemory.skills.memory import reindex
-from notionmemory.skills.memory.notion_db import _ms_name, excerpt_rt
+from notionmemory.skills.memory import transcripts
+from notionmemory.skills.memory.notion_db import CAPTURE_TYPES, _ms_name, excerpt_rt
 from notionmemory.skills.memory.store import MemoryStore
 
 SYSTEM = (
@@ -40,9 +49,22 @@ SYSTEM = (
     '"content": "정제된 본문(선택, keep 일 때만 의미 있음)", '
     '"concepts": ["소문자-구체적", "..."] (선택, keep 일 때 3~6개 권장)}], '
     '"merges": [{"keep": "<mem_id>", "drop": ["<mem_id>", ...]}], '
-    '"brief": "<마크다운 롤업>"}')
+    '"brief": "<마크다운 롤업>"}'
+    " 입력에는 이번에 정리할 세션들의 대화 발췌(세션별 [USER]/[ASSISTANT] 원문 조각)와 "
+    "이 프로젝트의 기존 Active 메모리 목록(제목·concepts)이 함께 주어질 수 있다. 발췌에서 "
+    "지속 가치가 있는 결정·패턴·선호·버그 교훈을 찾아 items 배열에 "
+    '{"action": "new", "type": "pattern|preference|architecture|bug|workflow|fact", '
+    '"content": "...", "concepts": ["...", ...], "strength": 1-10} 형태로 함께 내라. '
+    "가치 있는 게 없으면 new 는 0건이 정상이다 — 억지로 만들지 말 것. new 는 이번에 "
+    "keep 한 초안과 같은 사실을 중복해서 내지 말고(같은 사실이면 keep 만 남긴다), "
+    "기존 Active 메모리 목록에 이미 커버된 사실도 new 로 다시 내지 말 것. new 항목도 "
+    "keep 과 같은 규율을 따른다: 고유명사·수치·날짜는 원문 보존, 3~8문장의 밀도 높은 "
+    "사실 서술, concepts 는 소문자·구체적 3~6개.")
 
-_EMPTY_TOTALS = {"promoted": 0, "dropped": 0, "merged": 0, "brief_updated": False}
+MIN_EXCERPT_CHARS = 2000  # 이보다 적으면 LLM 을 안 돌린다 — Draft 없이 발췌만 조금
+                          # 있는 상태에서 매 consolidate 회차마다 헛돈다(스펙 §3).
+
+_EMPTY_TOTALS = {"promoted": 0, "dropped": 0, "merged": 0, "brief_updated": False, "mined": 0}
 
 
 def _parse_result(text: str) -> dict:
@@ -53,7 +75,7 @@ def _parse_result(text: str) -> dict:
     return data
 
 
-def _build_prompt(project: str, drafts: list[dict]) -> str:
+def _build_prompt(project: str, drafts: list[dict], excerpts=(), active_summaries=()) -> str:
     parts = [f"프로젝트: {project}", "초안 메모리 목록:"]
     for d in drafts:
         concepts = ", ".join(d.get("concepts") or [])
@@ -63,6 +85,21 @@ def _build_prompt(project: str, drafts: list[dict]) -> str:
         # 읽힌다. 그보다 좁은 상한으로 잘라 프롬프트에 넣으면 consolidation 이 distill
         # 해야 할 내용을 그 전에 이미 좁혀버리는 꼴이 된다(I4) — 저장 창과 맞춘다.
         parts.append(f"  content: {(d.get('content') or '')[:6000]}")
+    if active_summaries:
+        # dedup 컨텍스트 — new 가 이미 Active 인 사실을 다시 만들지 않도록 참고만.
+        parts.append("")
+        parts.append("기존 Active 메모리 목록(제목 · concepts) — 이미 커버된 사실은 "
+                     "new 로 내지 말 것:")
+        for a in active_summaries:
+            concepts = ", ".join(a.get("concepts") or [])
+            parts.append(f"- {a.get('title', '')} · [{concepts}]")
+    if excerpts:
+        parts.append("")
+        parts.append("세션 대화 발췌:")
+        for e in excerpts:
+            parts.append(f"--- session {e.get('session_id', '')} "
+                         f"({e.get('harness', '')}) ---")
+            parts.append(e.get("text", ""))
     return "\n".join(parts)
 
 
@@ -72,6 +109,47 @@ def _clamp_strength(value) -> int:
     except (TypeError, ValueError):
         n = 5
     return max(1, min(10, n))
+
+
+_DEDUP_LIMIT = 100
+
+
+def _dedup_context(project: str) -> list[dict]:
+    """new-발굴 dedup 컨텍스트를 로컬 mem_index 에서만 뽑는다(I3, network 0).
+
+    예전엔 `db.query_active_summaries` 로 프로젝트마다 Active 행 전량을 매 회차
+    Notion 에서 페이지네이션해 왔다 — 무인 백그라운드 잡이 매 pass 마다 프로젝트당
+    전체 DB 스캔을 하는 건 과하다. `remember()`의 write-through 와 매 consolidate
+    성공 뒤의 `reindex.run()`이 로컬 색인을 계속 최신으로 맞추므로, "이미 아는 사실
+    다시 만들지 말 것" 참고 목적엔 로컬 색인으로 충분하다. 색인이 없거나 손상됐으면
+    `mem_index.load()`가 이미 {} 로 방어하므로 빈 리스트를 돌려주고 발굴 패스는 그냥
+    dedup 컨텍스트 없이 계속 돈다(있으면 좋고 없어도 되는 정보)."""
+    idx = mem_index.load()
+    out: list[dict] = []
+    for doc in mem_index.docs(idx).values():
+        if doc.get("type") == "brief":
+            continue  # 방어적 — build()/add_memory() 가 이미 브리프를 색인에서 제외한다
+        if doc.get("status") != "Active":
+            continue
+        proj = doc.get("project", "")
+        if project and proj != project:
+            continue
+        out.append({"title": doc.get("title", ""), "concepts": list(doc.get("concepts") or [])})
+        if len(out) >= _DEDUP_LIMIT:
+            break
+    return out
+
+
+def _ack_jobs(proj_jobs: list[dict], sessions: list[dict]) -> None:
+    """이 프로젝트의 job(들)을 compare-and-delete 로 ack 한다(M1).
+
+    `sessions`는 이 회차 시작 시점에 `proj_jobs`에서 읽은 스냅샷이다 — 그 session_id
+    들만 "처리 완료"로 넘기고, 각 잡의 스냅샷 `ts`를 함께 넘겨 `ack_sessions`가
+    ack 시점에 파일이 그 사이 바뀌었는지(=Stop 이 LLM 패스 도중 새 세션을 끼워
+    넣었는지) 판정하게 한다. 바뀌었으면 새로 들어온 세션은 살아남는다."""
+    mined_ids = {s.get("session_id") for s in sessions if s.get("session_id")}
+    for j in proj_jobs:
+        queue.ack_sessions(j["id"], mined_ids, j.get("ts", ""))
 
 
 def _upsert_brief(db, ds: str, project: str, content: str) -> None:
@@ -95,7 +173,8 @@ def _upsert_brief(db, ds: str, project: str, content: str) -> None:
         })
 
 
-def _apply(db, ds: str, project: str, drafts: list[dict], result: dict, totals: dict) -> None:
+def _apply(store, ds: str, project: str, drafts: list[dict], result: dict, totals: dict,
+          harness_by_default: str = "claude") -> None:
     """판정 결과를 Notion 에 반영한다.
 
     **재시도 안전성(진짜 트랜잭션은 불가능하므로)**: 이 함수는 원자적이지 않다 — 항목을
@@ -106,7 +185,12 @@ def _apply(db, ds: str, project: str, drafts: list[dict], result: dict, totals: 
     재실행은 그 페이지를 건드리지 않고 나머지 Draft 만 다시 판정한다 — 같은 판정을
     다시 써도(Active→Active 등) `set_properties` 는 멱등이라 안전하다. `by_mem` 은 매
     호출마다 그 시점의 Draft 로만 새로 구성되므로, 이전 회차에 이미 승격/병합된
-    mem_id 를 이번 회차 LLM 판정이 다시 언급해도(예: merge 가 참조) 그냥 무시된다."""
+    mem_id 를 이번 회차 LLM 판정이 다시 언급해도(예: merge 가 참조) 그냥 무시된다.
+
+    `action:"new"`(세션 발췌 발굴)는 Draft 를 안 거치고 `store.remember()` 로 곧장
+    Active 메모리를 만든다(mem_id 발급·제목 파생·write-through 를 재사용) — 그래서
+    이 함수가 이제 `db` 가 아니라 `store` 를 받는다."""
+    db = store.db
     by_mem = {d["mem_id"]: d for d in drafts if d.get("mem_id")}
     superseded: set[str] = set()
     for m in (result.get("merges") or []):
@@ -126,11 +210,28 @@ def _apply(db, ds: str, project: str, drafts: list[dict], result: dict, totals: 
     for item in (result.get("items") or []):
         if not isinstance(item, dict):
             continue
+        action = item.get("action")
+        if action == "new":
+            # 세션 발췌 발굴 — mem_id 가 없다(Draft 를 안 거쳤으니 by_mem 에 없는 게
+            # 정상). content 없으면 무시(LLM 이 껍데기만 낸 경우 방어).
+            content = item.get("content")
+            if not isinstance(content, str) or not content.strip():
+                continue
+            mem_type = item.get("type")
+            if mem_type not in CAPTURE_TYPES:
+                mem_type = "fact"
+            raw_concepts = item.get("concepts")
+            concepts = ([c for c in raw_concepts if isinstance(c, str) and c][:6]
+                       if isinstance(raw_concepts, list) else [])
+            store.remember(content.strip(), mem_type=mem_type, concepts=concepts,
+                           project=project, source=harness_by_default, status="Active",
+                           strength=_clamp_strength(item.get("strength")))
+            totals["mined"] += 1
+            continue
         mem_id = item.get("mem_id")
         if not isinstance(mem_id, str) or mem_id not in by_mem or mem_id in superseded:
             continue
         page_id = by_mem[mem_id]["page_id"]
-        action = item.get("action")
         if action == "keep":
             props = {"Status": {"select": {"name": "Active"}},
                      "Strength": {"number": _clamp_strength(item.get("strength"))}}
@@ -159,7 +260,13 @@ def _apply(db, ds: str, project: str, drafts: list[dict], result: dict, totals: 
         totals["brief_updated"] = True
 
 
-def run(config: Config, log, project: str = "") -> dict:
+def run(config: Config, log, project: str = "", auto: bool = False) -> dict:
+    # 재귀 가드 — 스폰하는 쪽(훅)이 아니라 여기서 세팅한다: 사용자 터미널/cron 의
+    # 수동 실행 경로도 이 env 를 거치지 않으므로, 훅 밖에서 세팅하면 그 경로는
+    # 가드가 안 걸려 consolidate 도중의 Notion 쓰기·LLM 호출이 다시 Stop 훅을 태워
+    # 자기 세션을 재큐잉하는 루프가 생긴다(Task 4 에서 훅들이 이 변수를 보고
+    # no-op 하게 만든다).
+    os.environ["NOTIONMEMORY_CONSOLIDATE"] = "1"
     jobs = queue.list_jobs()
     if project:
         jobs = [j for j in jobs if j.get("project") == project]
@@ -175,7 +282,21 @@ def run(config: Config, log, project: str = "") -> dict:
     try:
         store = MemoryStore(NotionSession(), config)
         db = store.db
-        ds = store._data_source()
+        if auto:
+            # C1 — 무인 백그라운드 스폰(훅) 경로는 DB 를 만들면 안 된다. autorun.
+            # maybe_spawn 이 이미 한 번 "memory bound?" 를 로컬로 확인하지만(1차
+            # 방어선), 그 판정과 이 실행 사이에 무언가 달라질 수 있으므로(다른
+            # 프로세스가 그 사이 언바인드했다거나) 여기서도 create=False 로 다시
+            # 확인한다(2차 방어선, defense in depth) — `SecondBrainDB.ensure`
+            # 자신의 계약(조회/훅 경로가 DB 를 만들면 안 됨)을 이 경로에도 그대로
+            # 적용하는 것뿐이다. 수동 실행(`auto=False`, 사용자가 터미널에서 직접
+            # 돌린 것)은 기존과 동일하게 필요하면 부트스트랩한다.
+            ds = store._data_source(create=False)
+            if not ds:
+                log("memory 미바인딩 — 자동 consolidate 건너뜀, 큐 보존")
+                return dict(_EMPTY_TOTALS)
+        else:
+            ds = store._data_source()
     except (RuntimeError, requests.RequestException) as e:
         log(f"Notion 세션 불가 — {e} (Draft 보존)")
         return {**_EMPTY_TOTALS, "error": str(e)}
@@ -189,12 +310,64 @@ def run(config: Config, log, project: str = "") -> dict:
     for proj, proj_jobs in by_project.items():
         job_ids = [j["id"] for j in proj_jobs]
         try:
+            # M2 — 이 Notion 왕복(query_drafts)은 아래 min-material 게이트보다 먼저
+            # 온다, 그리고 그건 불가피하다: 게이트가 "발췌만 있고 Draft 는 없을 때
+            # MIN_EXCERPT_CHARS 미만이면 스킵"을 판정하려면 애초에 Draft 개수를 알아야
+            # 한다(drafts 가 하나라도 있으면 발췌량과 무관하게 게이트를 우회한다 —
+            # 아래 `if not drafts and excerpt_chars < MIN_EXCERPT_CHARS`). 세션이
+            # 아예 없는 잡이라고 미리 건너뛸 수도 없다 — Draft 는 세션과 독립적으로
+            # 존재할 수 있어(사용자가 `remember --auto` 로만 쌓은 경우) sessions 유무로
+            # query_drafts 자체를 생략하면 안 된다. 그래서 auto 모드에서도 (C1 의
+            # no-create 가드를 통과한 뒤엔) 이 조회 자체는 막지 않는다 — 막을 수 있는
+            # 안전하고 정확한 재정렬을 찾지 못했다(정직하게 comment-only로 남긴다).
             drafts = db.query_drafts(ds, proj)
-            if not drafts:
-                queue.ack(job_ids)  # 이미 정리된/빈 프로젝트 — 고아 잡만 치운다
+            sessions = [s for j in proj_jobs for s in (j.get("sessions") or [])]
+            ledger = transcripts.load_ledger()
+            excerpts, notes = transcripts.collect_excerpts(
+                sessions, ledger, expect_project=proj)
+            for note in notes:
+                log(f"{proj}: {note}")
+            if not drafts and not excerpts:
+                _ack_jobs(proj_jobs, sessions)  # 이미 정리된/빈 프로젝트 — 고아 잡만 치운다
                 continue
-            result = _parse_result(runtime.generate(SYSTEM, _build_prompt(proj, drafts)))
-            _apply(db, ds, proj, drafts, result, totals)
+            excerpt_chars = sum(len(e["text"]) for e in excerpts)
+            if not drafts and excerpt_chars < MIN_EXCERPT_CHARS:
+                # 재료가 아직 얇다 — ack 하지 않는다: 다음 세션들이 큐에 계속 쌓여
+                # 발췌가 누적되게 둔다(원장도 안 건드려 같은 바이트가 다시 잡힌다).
+                log(f"{proj}: 발췌 {excerpt_chars}자 — 최소 {MIN_EXCERPT_CHARS}자 "
+                    "미달, 누적 대기(큐 보존)")
+                continue
+            active_summaries = _dedup_context(proj)
+            harness_by_default = excerpts[0]["harness"] if excerpts else "claude"
+            prompt = _build_prompt(proj, drafts, excerpts=excerpts,
+                                   active_summaries=active_summaries)
+            result = _parse_result(runtime.generate(SYSTEM, prompt))
+            _apply(store, ds, proj, drafts, result, totals,
+                  harness_by_default=harness_by_default)
+            if excerpts:
+                # 성공한 뒤에만 원장을 갱신한다 — 게이트에 걸려 continue 한 경로는
+                # 여기 안 오므로 같은 바이트가 다음 회차에 다시 발굴 후보가 된다.
+                now_iso = datetime.now(timezone.utc).isoformat()
+                for e in excerpts:
+                    if e.get("truncated"):
+                        # TOTAL_CAP 에 걸려 이 세션의 뒷부분을 LLM 이 못 봤다 —
+                        # `consumed_bytes`(파일 오프셋)를 원장에 그대로 기록하면 못 본
+                        # 뒷부분이 "이미 발굴됨"으로 표시돼 영원히 유실된다. 원장을
+                        # 안 건드려 다음 회차에 같은 오프셋부터 재발굴한다(중복은
+                        # 프롬프트의 기존 Active dedup 컨텍스트가 흡수).
+                        continue
+                    ledger[e["session_id"]] = {"bytes": e["consumed_bytes"], "ts": now_iso}
+                try:
+                    transcripts.save_ledger(ledger)
+                except OSError as exc2:
+                    # 디스크 풀/권한 등 — 원장 쓰기 실패가 이 프로젝트를(나아가 같은
+                    # run() 안의 나머지 프로젝트까지) 죽이면 안 된다(per-project 격리
+                    # 불변식, flusher.py 와 동일 규율). Notion 반영은 이미 끝났으니
+                    # ack 은 그대로 진행한다 — 최악의 결과는 원장이 안 앞당겨져 다음
+                    # 회차에 같은 발췌를 다시 읽는 것뿐이고(재발굴은 dedup 컨텍스트가
+                    # 흡수), job 을 큐에 남기면(=ack 안 하면) 디스크가 고쳐지기 전까지
+                    # 매 회차 이 프로젝트만 계속 실패해 더 나쁘다.
+                    log(f"{proj}: mined ledger 저장 실패(무시, 다음 회차 재발굴) — {exc2}")
         except (AgentRuntimeError, ValueError, json.JSONDecodeError, RuntimeError,
                 requests.RequestException) as exc:
             # 이 프로젝트만 격리해서 실패시킨다 — 네트워크 순간 장애 하나가 같은 run()
@@ -202,7 +375,7 @@ def run(config: Config, log, project: str = "") -> dict:
             log(f"consolidation 실패({proj}) — Draft 보존, 다음 회차에 재시도: {exc}")
             errors.append(f"{proj}: {exc}")
             continue
-        queue.ack(job_ids)
+        _ack_jobs(proj_jobs, sessions)
         log(f"{proj}: consolidation 완료 (잡 {len(job_ids)}건 정리)")
     if errors:
         totals["error"] = "; ".join(errors)

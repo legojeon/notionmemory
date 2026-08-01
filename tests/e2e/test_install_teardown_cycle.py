@@ -3,6 +3,7 @@
 수용 기준 매트릭스의 1층: 설치·teardown 칸 (Claude·Codex 양쪽).
 """
 import json
+import re
 
 import pytest
 
@@ -99,7 +100,14 @@ def test_both_targets_are_functionally_equivalent(home, monkeypatch):
     codex_blob = json.dumps(codex_hooks["hooks"], sort_keys=True)
     assert "--harness codex" not in claude_blob      # Claude 쪽은 플래그 없이 그대로
     assert "--harness codex" in codex_blob            # Codex 쪽은 실제로 플래그가 박혀 있다
-    assert claude_blob == codex_blob.replace(" --harness codex", "")
+    # SessionEnd 는 의도적으로 Codex 쪽 timeout 이 다르다(공식문서 최대 3초) —
+    # `--harness codex` 제거와 같은 방식으로, 기능 동등성 비교에서 그 한 군데만
+    # 정규화한다(manifest.HOOK_EVENTS 의 명시적 설계, tests/core/install/test_manifest.py
+    # test_hook_events_include_session_end_with_codex_timeout 참조).
+    normalized_codex_blob = re.sub(
+        r'"timeout": 3\b', '"timeout": 20',
+        codex_blob.replace(" --harness codex", ""))
+    assert claude_blob == normalized_codex_blob
 
     claude_skills = sorted(p.name for p in (home / ".claude" / "skills").iterdir())
     codex_skills = sorted(p.name for p in (home / ".codex" / "skills").iterdir())

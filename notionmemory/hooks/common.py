@@ -4,6 +4,13 @@ from __future__ import annotations
 from notionmemory.core import paths
 
 
+def consolidate_guard() -> bool:
+    """스폰된(또는 수동 실행된) consolidate 의 헤드리스 에이전트 세션이 발화시킨
+    훅인지 — 맞으면 모든 훅은 no-op(자기 트랜스크립트 재큐잉 무한루프 방지)."""
+    import os
+    return os.environ.get("NOTIONMEMORY_CONSOLIDATE") == "1"
+
+
 def capture_mode() -> str:
     """`skills.memory.capture_mode`. 읽지 못하면 기본값 auto.
 

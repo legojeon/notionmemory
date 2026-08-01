@@ -108,6 +108,32 @@ def test_accepts_harness_kwarg(monkeypatch, capsys):
     assert user_prompt.main(harness="codex") == 0
 
 
+def test_hook_noop_under_consolidate_guard(monkeypatch, capsys):
+    monkeypatch.setenv("NOTIONMEMORY_CONSOLIDATE", "1")
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
+    assert user_prompt.main() == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_hook_reads_stdin_before_consolidate_guard_noop(monkeypatch):
+    """M6 — 재귀 가드로 no-op 하더라도 stdin 은 이미 소비돼 있어야 한다."""
+    monkeypatch.setenv("NOTIONMEMORY_CONSOLIDATE", "1")
+
+    class _TrackedStdin(io.StringIO):
+        def __init__(self, *a, **k):
+            super().__init__(*a, **k)
+            self.read_called = False
+
+        def read(self, *a, **k):
+            self.read_called = True
+            return super().read(*a, **k)
+
+    stdin = _TrackedStdin("{}")
+    monkeypatch.setattr("sys.stdin", stdin)
+    assert user_prompt.main() == 0
+    assert stdin.read_called is True
+
+
 def test_hook_never_imports_network_modules():
     """`import`/`from ... import` 문에 notion_client/requests/agent_runtime 이 없어야
     한다 — 이 훅은 로컬 색인만 보는 것이 계약이다(session_stop 의 AST 가드와 같은

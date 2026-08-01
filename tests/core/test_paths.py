@@ -15,7 +15,9 @@ def test_config_path_falls_back_to_home(tmp_path, monkeypatch):
     assert paths.config_path() == tmp_path / ".config" / "notionmemory" / "config.yaml"
 
 
-def test_state_dir_and_receipt(tmp_path, monkeypatch):
+def test_state_dir_and_receipt(tmp_path, monkeypatch, no_real_state_dir):
+    # 파생 규칙(HOME→state_dir) 자체가 검증 대상 — conftest 의 격리 패치를 원본으로 되돌린다.
+    monkeypatch.setattr(paths, "state_dir", no_real_state_dir)
     monkeypatch.setenv("HOME", str(tmp_path))
     assert paths.state_dir() == tmp_path / ".local" / "state" / "notionmemory"
     assert paths.receipt_path() == paths.state_dir() / "install-receipt.json"
