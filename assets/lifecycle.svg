@@ -44,7 +44,7 @@
     <text class="t st" x="650" y="80">3 · Recall</text>
     <text class="t li" x="650" y="106">Session start: brief + <tspan font-weight="700">top</tspan> memories</text>
     <text class="t li" x="650" y="128">Per message: relevant-memory hint</text>
-    <text class="t li" x="650" y="150">Search &#8594; live read (never stale)</text>
+    <text class="t li" x="650" y="150">Local BM25 rank &#8594; verified live</text>
     <text class="t hk" x="650" y="178">SessionStart · UserPromptSubmit</text>
   </g>
 

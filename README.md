@@ -243,8 +243,10 @@ then recall the *important* things at the right moment:
 
 There is still no vector database and no embedding model. Memory search runs on **BM25** —
 the classic lexical ranking (rare terms weigh more, long entries don't dominate) — over a
-tiny local index of titles, concepts, and content, with the statistics precomputed at
-reindex time so per-message lookups stay in milliseconds. On top of that:
+tiny local index of titles, concepts, and content. The index holds only precomputed word
+statistics plus a 200-character excerpt per memory — **your memory bodies are never
+duplicated on disk** — so it stays small and per-message lookups stay in milliseconds.
+On top of that:
 
 - `recall` **ranks locally, then live-verifies** the winners against Notion in one batched
   query — you get index speed with live truth (vanished pages self-heal out of the index).
