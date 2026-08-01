@@ -4,6 +4,10 @@
       <stop offset="0" stop-color="#1f1f1f"/>
       <stop offset="1" stop-color="#0e0e0e"/>
     </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#2e75cc" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#2e75cc" stop-opacity="0"/>
+    </radialGradient>
   </defs>
   <rect width="880" height="220" rx="20" fill="url(#bg)"/>
 
@@ -14,15 +18,35 @@
           fill="#191919" text-anchor="middle">N</text>
   </g>
 
-  <!-- memory: a small connected-node graph, tucked into the top-right corner -->
-  <g stroke="#2e75cc" stroke-width="3" fill="#2e75cc">
-    <line x1="820" y1="34" x2="820" y2="70" stroke-opacity="0.55"/>
-    <line x1="820" y1="70" x2="792" y2="98" stroke-opacity="0.55"/>
-    <line x1="820" y1="70" x2="848" y2="98" stroke-opacity="0.55"/>
-    <circle cx="820" cy="34" r="7"/>
-    <circle cx="820" cy="70" r="7"/>
-    <circle cx="792" cy="98" r="7"/>
-    <circle cx="848" cy="98" r="7"/>
+  <!-- memory constellation: an organic node graph filling the right side.
+       Hub glows; two accent nodes echo the lifecycle colors (purple=consolidate, green=recall). -->
+  <g>
+    <circle cx="800" cy="84" r="34" fill="url(#glow)"/>
+    <g stroke="#2e75cc" stroke-width="2" fill="none" stroke-linecap="round">
+      <line x1="800" y1="84" x2="842" y2="44" stroke-opacity="0.5"/>
+      <line x1="800" y1="84" x2="756" y2="48" stroke-opacity="0.45"/>
+      <line x1="800" y1="84" x2="858" y2="108" stroke-opacity="0.5"/>
+      <line x1="800" y1="84" x2="820" y2="152" stroke-opacity="0.4"/>
+      <line x1="842" y1="44" x2="756" y2="48" stroke-opacity="0.2"/>
+      <line x1="842" y1="44" x2="866" y2="64" stroke-opacity="0.3"/>
+      <line x1="858" y1="108" x2="866" y2="64" stroke-opacity="0.28"/>
+      <line x1="858" y1="108" x2="820" y2="152" stroke-opacity="0.3"/>
+      <line x1="820" y1="152" x2="768" y2="178" stroke-opacity="0.3"/>
+      <line x1="820" y1="152" x2="850" y2="172" stroke-opacity="0.28"/>
+      <line x1="756" y1="48" x2="712" y2="60" stroke-opacity="0.25"/>
+    </g>
+    <g fill="#2e75cc">
+      <circle cx="800" cy="84" r="7.5" fill="#6ea8e8"/>
+      <circle cx="842" cy="44" r="5.5"/>
+      <circle cx="756" cy="48" r="5" fill="#8b5cf6"/>
+      <circle cx="858" cy="108" r="5"/>
+      <circle cx="820" cy="152" r="6" fill="#16a34a"/>
+      <circle cx="866" cy="64" r="3.5" fill-opacity="0.6"/>
+      <circle cx="712" cy="60" r="4" fill-opacity="0.55"/>
+      <circle cx="768" cy="178" r="4.5" fill-opacity="0.6"/>
+      <circle cx="850" cy="172" r="3.5" fill-opacity="0.5"/>
+      <circle cx="742" cy="112" r="2.5" fill-opacity="0.35"/>
+    </g>
   </g>
 
   <!-- wordmark + tagline -->
