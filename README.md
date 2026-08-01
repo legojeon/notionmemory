@@ -118,8 +118,14 @@ create it at [app.notion.com/developers/tokens](https://app.notion.com/developer
 
 ## Quick start
 
-After onboarding you never type notionmemory commands — you just talk to your agent and it runs
-the right skill. For example:
+The core of it runs by itself: **as you code and work, your agent automatically keeps context
+through your Notion memory.** Every session starts pre-loaded with the project brief and your
+most important memories, a per-message hint surfaces a relevant memory the moment one matches,
+and decisions worth keeping are captured along the way — so a new session (or a different
+agent) picks up right where the last one left off.
+
+On top of that, you just talk — the agent runs the right skill, and you never type notionmemory
+commands. For example:
 
 **Remember & recall**
 > *"Remember that we moved auth to JWT refresh-token rotation."*
@@ -138,8 +144,8 @@ the right skill. For example:
 > *"Register this Notion page as my weekly-report template."* (paste the URL)
 > *"Draft this week's report from what we did."*
 
-You never see the CLI. And at session start the agent is already primed with this project's
-brief and your most important memories — so it can pick up where you left off.
+You never see the CLI — and the memory keeps working between these moments, not just when
+you ask.
 
 ## Benchmarks
 
