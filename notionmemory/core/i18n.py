@@ -3,6 +3,10 @@ from __future__ import annotations
 
 VALID = ("en", "ko")
 DEFAULT = "en"
+# 선택 UI(온보딩·CLI·대시보드)가 제시하는 저장 언어 목록. `language` 는 "메모리가
+# 어떤 언어로 적히는가"(consolidate 가 원시값을 템플릿에 통과)이고, UI 문구는 카탈로그가
+# 있는 VALID 로만 클램프된다 — zh/ja 를 고르면 메모리는 그 언어, UI 는 영어 폴백.
+OUTPUT_LANGS = ("en", "ko", "zh", "ja")
 
 
 def language(config) -> str:

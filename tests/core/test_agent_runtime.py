@@ -131,3 +131,87 @@ def test_build_runtime_detects_claude_first(monkeypatch):
 def test_build_runtime_raises_when_undetected():
     with pytest.raises(AgentRuntimeError):
         build_runtime(Config({}))  # 전역 안전망: which → None
+
+
+def test_model_flag_appended_when_configured_claude(monkeypatch):
+    seen = {}
+    def fake_run(argv, **kw):
+        seen["argv"] = argv
+        return _cp(stdout="ok")
+    monkeypatch.setattr(agent_runtime.subprocess, "run", fake_run)
+    rt = agent_runtime.AgentRuntime("claude", "/bin/claude", model="claude-sonnet-4-20250514")
+    rt.generate("s", "u")
+    assert seen["argv"] == ["/bin/claude", "-p", "--output-format", "text",
+                            "--model", "claude-sonnet-4-20250514"]
+
+
+def test_model_flag_appended_when_configured_codex(monkeypatch):
+    seen = {}
+    def fake_run(argv, **kw):
+        seen["argv"] = argv
+        idx = argv.index("--output-last-message")
+        with open(argv[idx + 1], "w", encoding="utf-8") as f:
+            f.write("ok")
+        return _cp()
+    monkeypatch.setattr(agent_runtime.subprocess, "run", fake_run)
+    rt = agent_runtime.AgentRuntime("codex", "/bin/codex", model="gpt-5.5-mini")
+    rt.generate("s", "u")
+    assert seen["argv"][:4] == ["/bin/codex", "exec", "--skip-git-repo-check", "-m"]
+    assert seen["argv"][4] == "gpt-5.5-mini"
+
+
+def test_build_runtime_reads_agent_model_from_config(monkeypatch):
+    from notionmemory.core.config import Config
+    monkeypatch.setattr(agent_runtime.detection, "probe_cli",
+                        lambda c: type("P", (), {"ok": c == "claude", "path": "/bin/claude"})())
+    cfg = Config({"integrations": {"agent": {"model": "claude-sonnet-4-20250514"}}})
+    rt = agent_runtime.build_runtime(cfg)
+    assert rt.model == "claude-sonnet-4-20250514"
+    rt2 = agent_runtime.build_runtime(Config({}))
+    assert rt2.model == "sonnet"  # 미설정 → claude 기본 별칭(별도 테스트가 상세 검증)
+
+
+def test_build_runtime_defaults_claude_to_sonnet_when_unset(monkeypatch):
+    """배치 작업(판정+요약)엔 상위 티어가 불필요 — agentmemory 와 같은 정책으로 claude
+    백엔드는 sonnet 을 기본 핀. codex 는 모델명 변동이 잦아 CLI 기본에 위임(빈 값)."""
+    from notionmemory.core.config import Config
+    monkeypatch.setattr(agent_runtime.detection, "probe_cli",
+                        lambda c: type("P", (), {"ok": c == "claude", "path": "/bin/claude"})())
+    assert agent_runtime.build_runtime(Config({})).model == "sonnet"
+    monkeypatch.setattr(agent_runtime.detection, "probe_cli",
+                        lambda c: type("P", (), {"ok": c == "codex", "path": "/bin/codex"})())
+    assert agent_runtime.build_runtime(Config({})).model == ""
+
+
+def test_build_runtime_explicit_model_overrides_backend_default(monkeypatch):
+    from notionmemory.core.config import Config
+    monkeypatch.setattr(agent_runtime.detection, "probe_cli",
+                        lambda c: type("P", (), {"ok": c == "claude", "path": "/bin/claude"})())
+    cfg = Config({"integrations": {"agent": {"model": "opus"}}})
+    assert agent_runtime.build_runtime(cfg).model == "opus"
+
+
+def test_build_runtime_defaults_claude_to_sonnet_alias(monkeypatch):
+    """모델 미설정 시 claude 는 sonnet 별칭이 기본 — 판정+요약 급 배치 작업에 상위
+    티어(CLI 기본이 opus 인 사용자)를 쓰는 낭비 방지. 별칭이라 모델 세대가 바뀌어도
+    안 썩는다. codex 는 안정적 별칭이 없어 CLI 기본 유지(하드코딩 ID 는 개명 시
+    백그라운드 전체가 조용히 깨진다)."""
+    from notionmemory.core.config import Config
+    monkeypatch.setattr(agent_runtime.detection, "probe_cli",
+                        lambda c: type("P", (), {"ok": c == "claude", "path": "/bin/claude"})())
+    assert agent_runtime.build_runtime(Config({})).model == "sonnet"
+
+
+def test_build_runtime_codex_default_model_stays_empty(monkeypatch):
+    from notionmemory.core.config import Config
+    monkeypatch.setattr(agent_runtime.detection, "probe_cli",
+                        lambda c: type("P", (), {"ok": c == "codex", "path": "/bin/codex"})())
+    assert agent_runtime.build_runtime(Config({})).model == ""
+
+
+def test_build_runtime_explicit_model_overrides_default(monkeypatch):
+    from notionmemory.core.config import Config
+    monkeypatch.setattr(agent_runtime.detection, "probe_cli",
+                        lambda c: type("P", (), {"ok": c == "claude", "path": "/bin/claude"})())
+    cfg = Config({"integrations": {"agent": {"model": "opus"}}})
+    assert agent_runtime.build_runtime(cfg).model == "opus"

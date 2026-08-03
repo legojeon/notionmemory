@@ -890,14 +890,22 @@ def _cmd_status(args) -> int:
 
 
 def _cmd_language(args) -> int:
-    """`language <en|ko>` 로 config 언어를 저장(대시보드·CLI·훅 문구가 이걸 따른다),
-    인자 없으면 현재값 출력. 온보딩 첫 스텝이 사용자의 선택을 이걸로 기록한다."""
+    """`language <en|ko|zh|ja>` 로 저장 언어를 기록, 인자 없으면 현재값 출력.
+
+    이 값은 일차적으로 **메모리가 적히는 언어**다(consolidate 출력 템플릿). UI 문구
+    (대시보드·CLI·훅)는 en/ko 카탈로그만 있어서 zh/ja 를 고르면 영어로 폴백된다 —
+    설정 시 그 사실을 한 줄로 알려준다. 온보딩 첫 스텝이 사용자의 선택을 이걸로
+    기록한다."""
     from notionmemory.core.config import Config, save_language
     if getattr(args, "lang", None):
         save_language(args.config, args.lang)
-        print(f"language set to {args.lang}")
+        note = ("" if args.lang in i18n.VALID
+                else " (memories in this language; UI falls back to English)")
+        print(f"language set to {args.lang}{note}")
         return 0
-    print(f"language: {i18n.language(Config.load(args.config))}")
+    raw = str(Config.load(args.config).get("language") or "en")
+    shown = raw if raw in i18n.OUTPUT_LANGS else i18n.DEFAULT
+    print(f"language: {shown}")
     return 0
 
 
@@ -911,12 +919,15 @@ def _resolve_install_language(args) -> None:
     if getattr(args, "language", None):
         save_language(p, args.language)
         return
-    if Config.load(p).get("language") in ("en", "ko"):
+    if Config.load(p).get("language") in i18n.OUTPUT_LANGS:
         return
     if not sys.stdin.isatty():
         return
-    choice = input("Select language / 언어 선택:\n  1) English\n  2) 한국어\n> ").strip()
-    save_language(p, "ko" if choice == "2" else "en")
+    choice = input(
+        "Select memory language / 저장 언어 선택 (UI: English/한국어 only):\n"
+        "  1) English\n  2) 한국어\n  3) 中文 (UI: English)\n  4) 日本語 (UI: English)\n> "
+    ).strip()
+    save_language(p, {"2": "ko", "3": "zh", "4": "ja"}.get(choice, "en"))
 
 
 def main(argv=None) -> int:
@@ -1149,7 +1160,7 @@ def main(argv=None) -> int:
     stc.add_argument("--config", default=DEFAULT_CONFIG)
 
     lang_p = sub.add_parser("language")
-    lang_p.add_argument("lang", nargs="?", choices=["en", "ko"])
+    lang_p.add_argument("lang", nargs="?", choices=list(i18n.OUTPUT_LANGS))
     lang_p.add_argument("--config", default=DEFAULT_CONFIG)
 
     hook = sub.add_parser("hook")
@@ -1167,8 +1178,9 @@ def main(argv=None) -> int:
     inst.add_argument("--skip-skills", action="store_true",
                       help="스킬 미러를 생략하고 훅/신뢰만 설치한다 "
                            "(스킬을 플러그인으로 배포하는 Codex 사용자용)")
-    inst.add_argument("--language", choices=["en", "ko"],
-                      help="UI/프롬프트 언어를 config 에 기록한다 (기본 en)")
+    inst.add_argument("--language", choices=list(i18n.OUTPUT_LANGS),
+                      help="저장(메모리) 언어를 config 에 기록한다 (기본 en). "
+                           "UI 문구는 en/ko 만 — zh/ja 는 UI 영어 폴백")
 
     td = sub.add_parser("teardown")
     td.add_argument("--claude", action="store_true")

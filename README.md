@@ -242,7 +242,12 @@ then recall the *important* things at the right moment:
   preferred over codex by default; pin that key if you want a specific CLI/account, since
   it can differ from the harness that actually ran the session). Notion only ever receives
   the distilled memory. Set `skills.memory.consolidate_mode: nudge` in config to turn the
-  automatic pass off and go back to manual/cron-only runs.
+  automatic pass off and go back to manual/cron-only runs. Background passes default to
+  a **sonnet-class model** on the claude backend (plenty for judge-and-summarize work;
+  codex keeps its CLI default) — override either way with `integrations.agent.model`.
+  All of these knobs live in `~/.config/notionmemory/config.yaml` — edit the file
+  directly, or ask your agent to change it. `notionmemory teardown` keeps this file
+  (settings survive a reinstall) unless you add `--purge-config`.
 
 ### When it reads
 

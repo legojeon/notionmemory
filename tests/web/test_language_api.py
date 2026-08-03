@@ -13,17 +13,31 @@ def _client(tmp_path, cfg_dict=None):
 
 def test_get_language_defaults_to_en(tmp_path):
     client, _ = _client(tmp_path)
-    assert client.get("/api/language").get_json() == {"language": "en"}
+    assert client.get("/api/language").get_json() == {"language": "en", "ui": "en"}
 
 
 def test_get_language_reads_config(tmp_path):
     client, _ = _client(tmp_path, {"language": "ko"})
-    assert client.get("/api/language").get_json() == {"language": "ko"}
+    assert client.get("/api/language").get_json() == {"language": "ko", "ui": "ko"}
 
 
 def test_get_language_invalid_config_falls_back_to_en(tmp_path):
     client, _ = _client(tmp_path, {"language": "fr"})
-    assert client.get("/api/language").get_json() == {"language": "en"}
+    assert client.get("/api/language").get_json() == {"language": "en", "ui": "en"}
+
+
+def test_get_language_zh_raw_with_ui_clamped_to_en(tmp_path):
+    """저장 언어 zh 는 선택기용 원시값으로 그대로, UI 렌더 언어는 en 클램프."""
+    client, _ = _client(tmp_path, {"language": "zh"})
+    assert client.get("/api/language").get_json() == {"language": "zh", "ui": "en"}
+
+
+def test_post_language_accepts_zh_and_ja(tmp_path):
+    client, p = _client(tmp_path)
+    assert client.post("/api/language", json={"language": "zh"}).status_code == 200
+    assert Config.load(str(p)).get("language") == "zh"
+    assert client.get("/api/language").get_json() == {"language": "zh", "ui": "en"}
+    assert client.post("/api/language", json={"language": "ja"}).status_code == 200
 
 
 def test_post_language_saves_and_is_reflected(tmp_path):
@@ -32,7 +46,7 @@ def test_post_language_saves_and_is_reflected(tmp_path):
     assert resp.status_code == 200
     assert resp.get_json() == {"language": "ko"}
     assert Config.load(str(p)).get("language") == "ko"          # persisted to disk
-    assert client.get("/api/language").get_json() == {"language": "ko"}  # in-memory too
+    assert client.get("/api/language").get_json() == {"language": "ko", "ui": "ko"}  # in-memory too
 
 
 def test_post_invalid_language_rejected_and_writes_nothing(tmp_path):

@@ -22,12 +22,19 @@ _BACKENDS = {"claude", "codex"}
 
 
 class AgentRuntime:
-    def __init__(self, backend: str, binary: str, timeout: float = 300.0):
+    def __init__(self, backend: str, binary: str, timeout: float = 300.0,
+                 model: str = ""):
         if backend not in _BACKENDS:
             raise AgentRuntimeError(f"지원하지 않는 backend: {backend}")
         self.backend = backend
         self.binary = binary
         self.timeout = timeout
+        # config `integrations.agent.model` — 배치 작업(consolidate·git 요약·템플릿
+        # 설명/노트)의 모델을 고정한다. 빈 값이면 CLI 기본 모델(무변경 기본값 —
+        # 판정+요약 급 작업엔 sonnet 급이면 충분해서, 기본 모델이 상위 티어인
+        # 사용자의 비용 절감 노브. 레퍼런스 둘 다 같은 노브를 둔다: agentmemory 는
+        # *_MODEL env 기본 gpt-4o-mini, claude-mem 은 CLAUDE_MEM_MODEL+티어 별칭).
+        self.model = model
 
     def _prompt(self, system: str, user: str, image_paths: list | None) -> str:
         parts = [system, "---", user]
@@ -38,6 +45,8 @@ class AgentRuntime:
 
     def _run_claude(self, prompt: str) -> tuple[str, str]:
         argv = [self.binary, "-p", "--output-format", "text"]
+        if self.model:
+            argv += ["--model", self.model]
         try:
             out = subprocess.run(argv, input=prompt, capture_output=True,
                                  text=True, timeout=self.timeout)
@@ -55,8 +64,10 @@ class AgentRuntime:
         fd, path = tempfile.mkstemp(prefix="notionmemory-codex-", suffix=".txt")
         os.close(fd)
         try:
-            argv = [self.binary, "exec", "--skip-git-repo-check",
-                    "--output-last-message", path]
+            argv = [self.binary, "exec", "--skip-git-repo-check"]
+            if self.model:
+                argv += ["-m", self.model]
+            argv += ["--output-last-message", path]
             try:
                 out = subprocess.run(argv, input=prompt, capture_output=True,
                                      text=True, timeout=self.timeout)
@@ -92,8 +103,15 @@ class AgentRuntime:
 def build_runtime(config: Config, timeout: float = 300.0) -> AgentRuntime:
     backend = config.integration("agent").get("backend")
     candidates = [backend] if backend else ["claude", "codex"]
+    configured = str(config.integration("agent").get("model") or "")
+    # 백엔드별 기본 모델 — 배치 작업(판정+요약)엔 상위 티어가 불필요해서 agentmemory 와
+    # 같은 정책으로 claude 는 sonnet 을 핀(별칭 — 날짜 ID 와 달리 버전 교체에도 유효).
+    # codex 는 모델명 변동이 잦아 핀이 오히려 깨질 위험이 커 CLI 기본에 위임(빈 값).
+    # 명시 설정(integrations.agent.model)은 언제나 우선한다.
+    backend_default = {"claude": "sonnet", "codex": ""}
     for cand in candidates:
         probe = detection.probe_cli(cand)
         if probe.ok:
-            return AgentRuntime(cand, probe.path, timeout=timeout)
+            model = configured or backend_default.get(cand, "")
+            return AgentRuntime(cand, probe.path, timeout=timeout, model=model)
     raise AgentRuntimeError("agent 런타임 미감지 — claude 또는 codex CLI가 필요합니다")

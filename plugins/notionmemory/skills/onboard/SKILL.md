@@ -35,14 +35,23 @@ The PAT step is an instruction, not a choice — no menu there.
 
 ## 1. Language (ask first)
 
-Ask which language notionmemory's dashboard, CLI output, and setup nudges should use —
-present it as a structured choice (skip if the user has clearly set one already):
+Ask which language notionmemory should **write memories in** (the content that lands in
+the user's Notion). Present it as a structured choice (skip if the user has clearly set
+one already):
 
 1. **English**
 2. **한국어 (Korean)**
+3. **中文 (Chinese)**
+4. **日本語 (Japanese)**
 
-Then record it: `notionmemory language en` (or `notionmemory language ko`). This sets only
-the shipped-string language; you keep replying to the user in whatever language they write.
+When presenting the choice, state the UI caveat plainly: notionmemory's own UI strings
+(dashboard, CLI output, setup nudges) exist in **English and Korean only** — picking
+English or Korean sets the UI to match, while picking Chinese or Japanese stores
+memories in that language with the UI shown in English.
+
+Then record it: `notionmemory language en|ko|zh|ja`. This sets only the storage language
+(and the UI language where a catalog exists); you keep replying to the user in whatever
+language they write.
 
 ## 2. Notion PAT (if `status` shows not connected)
 

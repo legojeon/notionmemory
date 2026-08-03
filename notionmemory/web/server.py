@@ -57,14 +57,17 @@ def create_app(registry: Registry) -> Flask:
 
     @app.get("/api/language")
     def get_language():
-        return jsonify({"language": i18n.language(registry.config)})
+        # language = 저장(메모리) 언어 원시값(선택기 표시용), ui = en/ko 클램프(문구 렌더용).
+        raw = str(registry.config.get("language") or "en")
+        return jsonify({"language": raw if raw in i18n.OUTPUT_LANGS else i18n.DEFAULT,
+                        "ui": i18n.language(registry.config)})
 
     @app.post("/api/language")
     def set_language():
         from notionmemory.core import config as cfg
         lang = (request.get_json(silent=True) or {}).get("language")
-        if lang not in ("en", "ko"):
-            return jsonify({"error": "language must be en or ko"}), 400
+        if lang not in i18n.OUTPUT_LANGS:
+            return jsonify({"error": f"language must be one of {'/'.join(i18n.OUTPUT_LANGS)}"}), 400
         if registry.config.path:
             cfg.save_language(registry.config.path, lang)
         registry.config.data["language"] = lang    # 재로드 없이 GET 에 반영

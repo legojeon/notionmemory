@@ -11,7 +11,8 @@ const html = (strs, ...vals) => strs.reduce((out, s, i) => {
 
 // ---- i18n: 활성 언어 카탈로그 조회(없으면 en 폴백, {name} 치환) ----
 // tr 이라 이름 붙인 이유: 이 파일 곳곳의 콜백이 템플릿 객체를 `t` 로 받아 t() 와 충돌한다.
-let LANG = "en";
+let LANG = "en";        // UI 문구 렌더 언어 (en/ko)
+let STORE_LANG = "en";  // 저장(메모리) 언어 원시값 — 선택기가 표시 (zh/ja 가능)
 let I18N = {en: {}, ko: {}};
 function tr(key, fmt) {
   let s = (I18N[LANG] && I18N[LANG][key]) || (I18N.en && I18N.en[key]) || key;
@@ -20,7 +21,12 @@ function tr(key, fmt) {
 }
 async function loadI18n() {
   try { I18N = await j("/assets/i18n.json"); } catch (e) { /* 기본값 유지 */ }
-  try { LANG = (await j("/api/language")).language || "en"; } catch (e) { LANG = "en"; }
+  // ui = 문구 렌더 언어(en/ko 클램프), language = 저장 언어 원시값(선택기 표시용 — zh/ja 가능)
+  try {
+    const r = await j("/api/language");
+    LANG = r.ui || "en";
+    STORE_LANG = r.language || LANG;
+  } catch (e) { LANG = "en"; STORE_LANG = "en"; }
 }
 
 async function j(url, opts) { return (await fetch(url, opts)).json(); }
@@ -444,7 +450,7 @@ function applyStaticI18n() {
   document.querySelectorAll("[data-i18n-aria]").forEach(el =>
     el.setAttribute("aria-label", tr(el.dataset.i18nAria)));
   const sel = document.getElementById("lang-select");
-  if (sel) sel.value = LANG;
+  if (sel) sel.value = STORE_LANG;
 }
 
 // node 테스트가 파일을 평가해 esc/html 헬퍼만 검사할 수 있도록 브라우저에서만 초기 렌더

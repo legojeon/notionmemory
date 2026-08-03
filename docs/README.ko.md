@@ -246,7 +246,12 @@ notionmemory는 **에이전트가 주도**합니다. CLI는 에이전트가 호�
   — 기본은 claude 우선·codex 차선입니다)으로 전송됩니다. 세션을 실제로 돌린 하네스와 다를 수
   있으니, 어느 쪽을 쓸지 고정하고 싶다면 이 키를 설정하세요. Notion에는 증류된 메모리만
   들어갑니다. 이걸 끄고 수동/cron 실행만 쓰고 싶다면 config에서 `skills.memory.consolidate_mode:
-  nudge`로 바꾸면 됩니다.
+  nudge`로 바꾸면 됩니다. 백그라운드 패스는 claude 백엔드에서 기본적으로 **sonnet급 모델**을
+  씁니다(판정+요약 작업엔 충분; codex는 CLI 기본 유지). 다른 모델을 원하면
+  `integrations.agent.model`로 바꾸면 됩니다. 이런 설정 키들은 전부
+  `~/.config/notionmemory/config.yaml`에 있습니다 — 파일을 직접 고치거나 에이전트에게
+  바꿔 달라고 하면 됩니다. `notionmemory teardown`은 이 파일을 남겨 두므로(재설치 시
+  설정 유지) 지우려면 `--purge-config`를 붙이세요.
 
 ### 언제 읽나
 
