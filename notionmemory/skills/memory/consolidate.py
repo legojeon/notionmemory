@@ -31,35 +31,84 @@ from notionmemory.skills.memory import transcripts
 from notionmemory.skills.memory.notion_db import CAPTURE_TYPES, _ms_name, excerpt_rt
 from notionmemory.skills.memory.store import MemoryStore
 
+# SYSTEM 은 영어가 canonical 이다(사용자 결정 2026-08-02: 지시문은 영어가 토큰 효율이
+# 좋고, 출력 언어는 config `language` 를 따르는 한 줄을 _system_for 가 덧붙인다).
+# WHAT TO SKIP 목록과 GOOD/BAD 예시는 실측 결함에서 나왔다: 라이브 운용 첫날 저장분의
+# ~40%가 "태스크 N 완료(커밋 해시…)" 류 진행 저널이었다 — git 히스토리가 이미 기록하는
+# 것과 유효기간 지난 상태는 애초에 저장하지 않는다(claude-mem 의 recording_focus/
+# skip_guidance 구조 차용).
 SYSTEM = (
-    "너는 한 프로젝트의 세션 초안 메모리를 정리하는 도우미다(claude-mem 의 관찰 정리 "
-    "스타일 차용). 입력은 초안 목록 {mem_id, type, concepts, content} 이다. 각 항목을 "
-    "판정하라: keep(요약·정제한 뒤 Strength 1~10 부여 — architecture/preference/durable "
-    "패턴=8~10, workflow/재사용 가능한 bug=5~7, 스쳐가는 fact=1~4) 또는 drop(기록 가치 "
-    "없음). 중복 초안은 merge 로 대표 하나만 keep 대상에 남기고 나머지 mem_id 를 "
-    "drop 목록에 넣어라. "
-    "keep 정제는 검색을 염두에 두고 써라: 고유명사·수치·날짜·제품명은 원문 표기 "
-    "그대로 보존하고(일반화·바꿔쓰기 금지 — 나중에 이 값을 검색할 사람이 있다), "
-    "요약은 3~8문장의 밀도 높은 사실 서술로 써서 나중에 물어볼 세부를 버리지 말 것. "
-    "각 keep 항목에는 검색어로 쓸 concepts 도 함께 내라: 소문자·구체적인 개념 3~6개 "
-    "(예: \"jwt-refresh-rotation\", 금지: \"auth\" 처럼 너무 넓은 단어). "
-    "그리고 이 프로젝트의 핵심 개념·결정·선호를 롤업한 짧은 "
-    "브리프(마크다운 8~15줄)를 작성하라. 설명·코드펜스 없이 JSON 객체 하나만 출력하라: "
-    '{"items": [{"mem_id": "<mem_id>", "action": "keep|drop", "strength": 1-10, '
-    '"content": "정제된 본문(선택, keep 일 때만 의미 있음)", '
-    '"concepts": ["소문자-구체적", "..."] (선택, keep 일 때 3~6개 권장)}], '
-    '"merges": [{"keep": "<mem_id>", "drop": ["<mem_id>", ...]}], '
-    '"brief": "<마크다운 롤업>"}'
-    " 입력에는 이번에 정리할 세션들의 대화 발췌(세션별 [USER]/[ASSISTANT] 원문 조각)와 "
-    "이 프로젝트의 기존 Active 메모리 목록(제목·concepts)이 함께 주어질 수 있다. 발췌에서 "
-    "지속 가치가 있는 결정·패턴·선호·버그 교훈을 찾아 items 배열에 "
+    "You are the memory curator for a coding agent's long-term memory; each pass covers one "
+    "project. Input: a list of draft memories {mem_id, type, concepts, content}, and "
+    "optionally session conversation excerpts ([USER]/[ASSISTANT] fragments per session) plus "
+    "the project's existing Active memory list (title + concepts).\n"
+    "\n"
+    "JUDGE each draft: keep (refine it, assign Strength 1-10) or drop (no lasting value). "
+    "Merge duplicate drafts: keep one representative, list the rest under merges. "
+    "MINE the session excerpts for durable knowledge and emit each finding as a new item: "
     '{"action": "new", "type": "pattern|preference|architecture|bug|workflow|fact", '
-    '"content": "...", "concepts": ["...", ...], "strength": 1-10} 형태로 함께 내라. '
-    "가치 있는 게 없으면 new 는 0건이 정상이다 — 억지로 만들지 말 것. new 는 이번에 "
-    "keep 한 초안과 같은 사실을 중복해서 내지 말고(같은 사실이면 keep 만 남긴다), "
-    "기존 Active 메모리 목록에 이미 커버된 사실도 new 로 다시 내지 말 것. new 항목도 "
-    "keep 과 같은 규율을 따른다: 고유명사·수치·날짜는 원문 보존, 3~8문장의 밀도 높은 "
-    "사실 서술, concepts 는 소문자·구체적 3~6개.")
+    '"content": "...", "concepts": [...], "strength": 1-10}.\n'
+    "\n"
+    "WHAT TO RECORD — knowledge someone will still need a month from now:\n"
+    "- decisions and their rationale (what was chosen, what was rejected, why)\n"
+    "- durable patterns and architecture facts (how the system now works)\n"
+    "- user preferences and corrections (include why, and how to apply them)\n"
+    "- bug root causes and their fixes (the lesson, not the incident timeline)\n"
+    "\n"
+    "WHAT TO SKIP — never record:\n"
+    "- session progress narration: 'completed task N', 'finished the design phase', "
+    "'review found 3 issues', commit hashes and commit lineages — git history already records "
+    "these\n"
+    "- transient state that expires: missing env vars later fixed, temporary blockers, "
+    "in-progress status\n"
+    "- process descriptions ('analyzed X', 'reviewed Y and noted findings') — record what "
+    "changed or what was learned, never what was done\n"
+    "GOOD: 'Speech-style switching is a propose-accept-confirm three-way split; automatic "
+    "switching on level-up was rejected because users must opt in.'\n"
+    "BAD: 'Completed tasks 1-2 of Phase 1 (commits 86c76c6, 1dd0712).'\n"
+    "Producing ZERO new items is normal when a session holds no durable knowledge — never "
+    "force one. Prefer fewer, denser memories: merge related findings into one item.\n"
+    "\n"
+    "Strength rubric: architecture / preference / durable pattern = 8-10; workflow / reusable "
+    "bug lesson = 5-7; passing fact = 1-4. Progress-journal content never deserves 5+ — it "
+    "should have been skipped entirely.\n"
+    "\n"
+    "Write for future SEARCH: preserve proper nouns, numbers, dates and product names verbatim "
+    "(no paraphrasing — someone will search for these exact values); 3-8 dense factual "
+    "sentences per item; give each kept/new item 3-6 lowercase, specific concepts "
+    '(e.g. "jwt-refresh-rotation"; never broad words like "auth").\n'
+    "Deduplicate: a new item must not repeat a kept draft (keep only the draft), and must not "
+    "repeat anything already covered by the existing Active memory list.\n"
+    "Also write a short rolled-up project brief (8-15 lines of markdown) covering the "
+    "project's core concepts, decisions and preferences.\n"
+    "\n"
+    "Output exactly one JSON object — no prose, no code fences:\n"
+    '{"items": [{"mem_id": "<mem_id>", "action": "keep|drop", "strength": 1-10, '
+    '"content": "refined body (keep only)", "concepts": ["lowercase-specific", ...]}, '
+    '{"action": "new", "type": "...", "content": "...", "concepts": [...], '
+    '"strength": 1-10}], '
+    '"merges": [{"keep": "<mem_id>", "drop": ["<mem_id>", ...]}], '
+    '"brief": "<markdown rollup>"}')
+
+# 출력 언어 지시 — Notion 에 적히는 내용의 언어는 config `language` 를 따른다(템플릿).
+# UI 언어(i18n.VALID: en|ko — 카탈로그 번역이 필요)와 달리, 출력 언어는 LLM 지시 한
+# 줄이라 어떤 언어든 즉시 동작한다. 그래서 여기서는 i18n.language() 의 en 클램프를
+# 일부러 안 탄다: 이름 맵에 없는 값(예: "vi")은 코드 그대로 템플릿에 넣는다 — LLM 이
+# 이해한다. UI 는 그 값에서 여전히 en 으로 폴백하므로 충돌이 없다.
+_LANG_NAMES = {
+    "en": "English",
+    "ko": "Korean (한국어)",
+    "zh": "Chinese (中文)",
+    "ja": "Japanese (日本語)",
+}
+_LANG_LINE_TMPL = ("Write every memory content and the brief in {name}. Keep code "
+                   "identifiers, proper nouns and established technical terms as-is.")
+
+
+def _system_for(config) -> str:
+    """SYSTEM + 출력 언어 한 줄(config `language` 기반 템플릿, 기본 en)."""
+    raw = str(config.get("language") or "en").strip() or "en"
+    return SYSTEM + "\n" + _LANG_LINE_TMPL.format(name=_LANG_NAMES.get(raw, raw))
 
 MIN_EXCERPT_CHARS = 2000  # 이보다 적으면 LLM 을 안 돌린다 — Draft 없이 발췌만 조금
                           # 있는 상태에서 매 consolidate 회차마다 헛돈다(스펙 §3).
@@ -76,7 +125,7 @@ def _parse_result(text: str) -> dict:
 
 
 def _build_prompt(project: str, drafts: list[dict], excerpts=(), active_summaries=()) -> str:
-    parts = [f"프로젝트: {project}", "초안 메모리 목록:"]
+    parts = [f"Project: {project}", "Draft memories:"]
     for d in drafts:
         concepts = ", ".join(d.get("concepts") or [])
         parts.append(f"- mem_id={d.get('mem_id', '')} type={d.get('type', '')} "
@@ -88,14 +137,14 @@ def _build_prompt(project: str, drafts: list[dict], excerpts=(), active_summarie
     if active_summaries:
         # dedup 컨텍스트 — new 가 이미 Active 인 사실을 다시 만들지 않도록 참고만.
         parts.append("")
-        parts.append("기존 Active 메모리 목록(제목 · concepts) — 이미 커버된 사실은 "
-                     "new 로 내지 말 것:")
+        parts.append("Existing Active memories (title · concepts) — do not emit a new item "
+                     "for facts already covered here:")
         for a in active_summaries:
             concepts = ", ".join(a.get("concepts") or [])
             parts.append(f"- {a.get('title', '')} · [{concepts}]")
     if excerpts:
         parts.append("")
-        parts.append("세션 대화 발췌:")
+        parts.append("Session conversation excerpts:")
         for e in excerpts:
             parts.append(f"--- session {e.get('session_id', '')} "
                          f"({e.get('harness', '')}) ---")
@@ -341,7 +390,7 @@ def run(config: Config, log, project: str = "", auto: bool = False) -> dict:
             harness_by_default = excerpts[0]["harness"] if excerpts else "claude"
             prompt = _build_prompt(proj, drafts, excerpts=excerpts,
                                    active_summaries=active_summaries)
-            result = _parse_result(runtime.generate(SYSTEM, prompt))
+            result = _parse_result(runtime.generate(_system_for(config), prompt))
             _apply(store, ds, proj, drafts, result, totals,
                   harness_by_default=harness_by_default)
             if excerpts:

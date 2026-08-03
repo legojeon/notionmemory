@@ -448,8 +448,50 @@ def test_build_prompt_widens_excerpt_cap_to_6000():
 
 def test_system_prompt_demands_searchable_distillation():
     from notionmemory.skills.memory.consolidate import SYSTEM
-    for marker in ("고유명사", "수치", "그대로 보존", "concepts", "3~6"):
+    for marker in ("proper nouns", "verbatim", "concepts", "3-6"):
         assert marker in SYSTEM, marker
+
+
+def test_system_prompt_has_explicit_skip_list():
+    """진행 저널·커밋 로그가 S5~7로 저장되던 실측 결함(2026-08-02 감사)의 회귀 가드 —
+    claude-mem 식 WHAT TO SKIP 목록과 ✅/❌ 예시, 0건 정상 명시가 있어야 한다."""
+    from notionmemory.skills.memory.consolidate import SYSTEM
+    for marker in ("WHAT TO SKIP", "git history already records",
+                   "progress narration", "commit hashes",
+                   "ZERO new items is normal", "GOOD:", "BAD:"):
+        assert marker in SYSTEM, marker
+
+
+def test_system_for_appends_output_language():
+    class _Cfg:
+        def __init__(self, lang):
+            self._lang = lang
+        def get(self, key, default=None):
+            return self._lang if key == "language" else default
+    ko = consolidate._system_for(_Cfg("ko"))
+    en = consolidate._system_for(_Cfg("en"))
+    zh = consolidate._system_for(_Cfg("zh"))
+    passthrough = consolidate._system_for(_Cfg("vi"))
+    empty = consolidate._system_for(_Cfg(None))
+    assert "Korean" in ko and "한국어" in ko
+    assert "in English" in en and "Korean" not in en
+    assert "Chinese" in zh and "中文" in zh
+    # 이름 맵에 없는 언어는 코드 그대로 통과 — UI 와 달리 출력 언어는 번역 작업이
+    # 필요 없어 클램프하지 않는다(LLM 이 언어 코드를 이해).
+    assert "in vi." in passthrough
+    assert "in English" in empty  # 미설정 → en
+
+
+def test_run_passes_language_line_to_runtime(qroot, tmp_path, monkeypatch):
+    """run() 이 SYSTEM 상수가 아니라 _system_for(config) 를 쓰는지 — config
+    language: ko 면 LLM 호출의 system 에 한국어 출력 지시가 실려야 한다."""
+    transcript = _write_transcript(tmp_path, "s1.jsonl", [
+        _claude_line("user", "x" * 2100), _claude_line("user", "y" * 2100)])
+    _enqueue_session("proj", "s1", transcript)
+    db, runtime = _wire(monkeypatch,
+                        json.dumps({"items": [], "merges": [], "brief": ""}), [])
+    consolidate.run(Config({"skills": {}, "language": "ko"}), print, project="proj")
+    assert runtime.calls and "Korean" in runtime.calls[0][0]
 
 
 def test_apply_updates_concepts_when_present(qroot, monkeypatch):
@@ -548,8 +590,8 @@ def test_prompt_includes_excerpts_and_active_dedup_context():
     excerpts = [{"session_id": "s1", "harness": "claude", "text": "[user] 결정 X"}]
     active = [{"title": "기존 결정", "concepts": ["x-y"]}]
     p = consolidate._build_prompt("proj", drafts, excerpts=excerpts, active_summaries=active)
-    assert "세션 대화 발췌" in p and "[user] 결정 X" in p
-    assert "기존 결정" in p and "이미 커버" in consolidate.SYSTEM
+    assert "Session conversation excerpts" in p and "[user] 결정 X" in p
+    assert "기존 결정" in p and "already covered" in consolidate.SYSTEM
 
 
 def test_apply_creates_new_item_as_active(fake_store):
@@ -610,7 +652,7 @@ def test_run_mines_when_no_drafts_but_sessions_exist(qroot, tmp_path, monkeypatc
     res = consolidate.run(CFG, print, project="proj")
 
     assert runtime.calls                                # LLM 이 실제로 불림
-    assert "세션 대화 발췌" in runtime.calls[0][1]
+    assert "Session conversation excerpts" in runtime.calls[0][1]
     assert res["mined"] == 1
     assert q.list_jobs() == []                          # 성공 → ack
 
