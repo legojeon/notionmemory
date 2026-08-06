@@ -42,6 +42,15 @@ def test_broker_never_reflects_a_pat_in_an_error(monkeypatch):
     assert reply == {"error": "Broker request failed"}
 
 
+def test_broker_connection_status_never_returns_the_pat(monkeypatch):
+    monkeypatch.setattr(notion_broker.notion_auth, "load_pat", lambda: "ntn_secret")
+
+    reply = notion_broker._handle(b'{"operation":"connection-status"}')
+
+    assert reply == {"connected": True}
+    assert "ntn_secret" not in repr(reply)
+
+
 def test_launch_agent_is_marked_and_removable(tmp_path, monkeypatch):
     path = tmp_path / "com.notionmemory.notion-broker.plist"
     spec = ArtifactSpec(

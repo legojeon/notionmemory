@@ -1,4 +1,4 @@
-from notionmemory.core import detection, notion_auth
+from notionmemory.core import detection, notion_auth, notion_broker
 from notionmemory.core.config import Config
 from notionmemory.core.integrations import IntegrationStatus, build_integrations
 
@@ -94,6 +94,14 @@ def test_notion_config_token_fallback():
 
 
 def test_notion_disconnected_without_any_token():
+    assert ints_status(Config({}), "notion").connected is False
+
+
+def test_notion_broker_socket_without_pat_is_not_connected(monkeypatch):
+    """Disconnect leaves the broker process running but must clear connection state."""
+    monkeypatch.setattr(notion_broker, "available", lambda: True)
+    monkeypatch.setattr(notion_broker, "connected", lambda: False)
+
     assert ints_status(Config({}), "notion").connected is False
 
 

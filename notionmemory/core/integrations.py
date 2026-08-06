@@ -40,7 +40,7 @@ class NotionIntegration(Integration):
             return IntegrationStatus(self.id, True, detail)
         if meta.get("token"):
             return IntegrationStatus(self.id, True, tui(lang, "ui.int.notion.config_token", "config token"))
-        if notion_broker.available():
+        if notion_broker.available() and notion_broker.connected():
             return IntegrationStatus(self.id, True, "PAT via local broker")
         return IntegrationStatus(self.id, False,
                                  tui(lang, "ui.int.notion.no_pat", "no PAT (connect required)"))

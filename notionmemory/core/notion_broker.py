@@ -47,6 +47,10 @@ def _readline(conn: socket.socket) -> bytes:
 def _handle(raw: bytes) -> dict:
     try:
         data = json.loads(raw)
+        if data.get("operation") == "connection-status":
+            # This is deliberately only a boolean.  Sandboxed clients need to
+            # know whether Disconnect succeeded, but must never receive a PAT.
+            return {"connected": bool(notion_auth.load_pat())}
         method = str(data["method"]).upper()
         path = str(data["path"])
         if method not in {"GET", "POST", "PATCH", "DELETE"}:
@@ -96,15 +100,28 @@ def serve_forever(listener: socket.socket | None = None) -> None:
             path.unlink(missing_ok=True)
 
 
-def request(method: str, path: str, *, json_body=None, params=None) -> dict:
+def _call(data: dict) -> dict:
     if not available():
         raise RuntimeError("Notion broker is unavailable. Reinstall notionmemory to start it.")
     with socket.socket(socket.AF_UNIX) as client:
         client.settimeout(65)
         client.connect(str(socket_path()))
-        client.sendall(json.dumps({"method": method, "path": path,
-                                   "json": json_body, "params": params}).encode() + b"\n")
+        client.sendall(json.dumps(data).encode() + b"\n")
         reply = json.loads(_readline(client))
+    return reply
+
+
+def connected() -> bool:
+    """Whether the broker can currently access a saved PAT (without returning it)."""
+    try:
+        return bool(_call({"operation": "connection-status"}).get("connected"))
+    except (OSError, RuntimeError, ValueError):
+        return False
+
+
+def request(method: str, path: str, *, json_body=None, params=None) -> dict:
+    reply = _call({"method": method, "path": path,
+                   "json": json_body, "params": params})
     if "error" in reply:
         raise RuntimeError(reply["error"])
     reply["content"] = base64.b64decode(reply["content"])
