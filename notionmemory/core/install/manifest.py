@@ -55,6 +55,20 @@ def hook_file_is_dedicated(target: str) -> bool:
     return target == "codex"
 
 
+def broker_agent_path() -> Path:
+    """The macOS service that can read the user's Keychain outside agent sandboxes."""
+    return paths.home() / "Library" / "LaunchAgents" / "com.notionmemory.notion-broker.plist"
+
+
+def broker_spec(cli_path: str = "notionmemory") -> ArtifactSpec:
+    return ArtifactSpec(
+        id="shared.notion_broker", owner="_core", handler="launch_agent", target="shared",
+        path=broker_agent_path(),
+        payload={"label": "com.notionmemory.notion-broker", "program": cli_path,
+                 "home": str(paths.home())},
+        markers=("notionmemory broker",))
+
+
 def HOOK_EVENTS(cli_path: str, harness: str = "claude") -> dict:
     """`harness` 는 hook 명령에 `--harness <값>` 으로 그대로 박힌다 — Codex 는
     Stop/PreCompact 에서 평문 stdout 을 실패 처리하므로(실측) 훅이 자신을 부른
@@ -129,4 +143,7 @@ def build(targets: list[str], cli_path: str) -> list[ArtifactSpec]:
     specs.append(ArtifactSpec(
         id="shared.git_hooks", owner="git", handler="git_hooks", target="shared",
         path=paths.config_path(), payload={}, markers=("notionmemory git",)))
+    # Codex 같은 sandbox 안의 CLI는 macOS Keychain을 직접 읽을 수 없다. 이 서비스는
+    # PAT를 노출하지 않고 private Unix socket을 통해 Notion 요청만 프록시한다.
+    specs.append(broker_spec(cli_path))
     return specs

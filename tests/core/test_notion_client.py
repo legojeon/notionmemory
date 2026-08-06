@@ -18,6 +18,23 @@ def test_requires_token(fake_keyring):
         NotionSession()
 
 
+def test_session_uses_private_broker_when_keychain_is_unavailable(monkeypatch):
+    from notionmemory.core import notion_broker
+
+    monkeypatch.setattr("notionmemory.core.notion_auth.load_pat", lambda: "")
+    monkeypatch.setattr(notion_broker, "available", lambda: True)
+    monkeypatch.setattr(notion_broker, "request", lambda *a, **kw: {
+        "status_code": 200,
+        "headers": {"Content-Type": "application/json"},
+        "content": b'{"id":"user-1"}',
+    })
+
+    response = NotionSession().request("GET", "/users/me")
+
+    assert response.status_code == 200
+    assert response.json() == {"id": "user-1"}
+
+
 def test_request_sets_headers_and_relative_path(monkeypatch):
     seen = {}
 

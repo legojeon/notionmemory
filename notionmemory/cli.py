@@ -938,6 +938,10 @@ def main(argv=None) -> int:
     serve.add_argument("--config", default=DEFAULT_CONFIG)
     serve.add_argument("--port", type=int, default=8765)
 
+    broker = sub.add_parser("broker", help="run the private Keychain-backed Notion request broker")
+    broker_sub = broker.add_subparsers(dest="broker_cmd", required=True)
+    broker_sub.add_parser("serve")
+
     run_p = sub.add_parser("run")
     run_p.add_argument("--config", default=DEFAULT_CONFIG)
     run_p.add_argument("rest", nargs=argparse.REMAINDER)
@@ -1193,6 +1197,10 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     if args.cmd == "serve":
         build_app(args.config).run(port=args.port)
+        return 0
+    if args.cmd == "broker":
+        from notionmemory.core import notion_broker
+        notion_broker.serve_forever()
         return 0
     if args.cmd == "run":
         return _cmd_run(args.rest, args.config)

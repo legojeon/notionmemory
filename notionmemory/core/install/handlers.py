@@ -7,8 +7,12 @@ JsonHookBlock 은 Claude(settings.json)와 Codex(hooks.json) 양쪽에 쓰인다
 from __future__ import annotations
 
 import json
+import os
+import platform
+import plistlib
 import re
 import shutil
+import subprocess
 from pathlib import Path
 
 from notionmemory.core.install.spec import ArtifactSpec
@@ -391,9 +395,69 @@ class CodexTrust:
         return changed
 
 
+class LaunchAgent:
+    """A notionmemory-owned macOS LaunchAgent plist.
+
+    The process holds no copy of the secret on disk.  It reads the PAT from
+    Keychain for each proxied request, which lets sandboxed agents share the
+    user's existing connection without gaining access to the PAT.
+    """
+
+    def _is_ours(self, path: Path, markers: tuple[str, ...]) -> bool:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            return False
+        return any(marker in text for marker in markers)
+
+    def _launchctl(self, action: str, path: Path) -> None:
+        if platform.system() != "Darwin":
+            return
+        domain = f"gui/{os.getuid()}"
+        if action == "load":
+            subprocess.run(["launchctl", "bootstrap", domain, str(path)],
+                           check=False, capture_output=True, text=True)
+            subprocess.run(["launchctl", "kickstart", "-k",
+                            f"{domain}/com.notionmemory.notion-broker"],
+                           check=False, capture_output=True, text=True)
+        else:
+            subprocess.run(["launchctl", "bootout", domain, str(path)],
+                           check=False, capture_output=True, text=True)
+
+    def install(self, spec: ArtifactSpec) -> bool:
+        path = Path(spec.path)
+        payload = {
+            "Label": spec.payload["label"],
+            "ProgramArguments": [spec.payload["program"], "broker", "serve"],
+            "RunAtLoad": True,
+            "KeepAlive": True,
+            "ProcessType": "Background",
+            "EnvironmentVariables": {"HOME": str(spec.payload["home"])},
+        }
+        text = "<!-- " + spec.markers[0] + " -->\n" + plistlib.dumps(payload).decode("utf-8")
+        changed = not path.exists() or path.read_text(encoding="utf-8") != text
+        if changed:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+        self._launchctl("load", path)
+        return changed
+
+    def detect(self, spec: ArtifactSpec) -> bool:
+        return self._is_ours(Path(spec.path), spec.markers)
+
+    def remove(self, spec: ArtifactSpec) -> bool:
+        path = Path(spec.path)
+        if not self.detect(spec):
+            return False
+        self._launchctl("unload", path)
+        path.unlink(missing_ok=True)
+        return True
+
+
 HANDLERS: dict[str, object] = {
     "skill_mirror": SkillMirror(),
     "json_hook_block": JsonHookBlock(),
     "git_hooks": GitHooks(),
     "codex_trust": CodexTrust(),
+    "launch_agent": LaunchAgent(),
 }

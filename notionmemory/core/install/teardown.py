@@ -65,6 +65,7 @@ def _sweep(targets: list[str]) -> list[ArtifactSpec]:
     out.append(ArtifactSpec(
         id="shared.git_hooks", owner="git", handler="git_hooks", target="shared",
         path=paths.config_path(), payload={}, markers=("notionmemory git",)))
+    out.append(manifest.broker_spec())
     return out
 
 

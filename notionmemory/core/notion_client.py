@@ -9,7 +9,7 @@ import time as _time
 
 import requests
 
-from notionmemory.core import notion_auth
+from notionmemory.core import notion_auth, notion_broker
 from notionmemory.core.notion_auth import NOTION_VERSION as VERSION
 
 API = "https://api.notion.com/v1"
@@ -34,10 +34,28 @@ def _auth_error_message() -> str:
                 "dashboard, then re-check with `notionmemory status`.")
 
 
+class BrokerResponse:
+    """Small ``requests.Response``-compatible view of a broker reply."""
+
+    def __init__(self, reply: dict):
+        self.status_code = int(reply["status_code"])
+        self.headers = reply.get("headers") or {}
+        self.content = reply.get("content") or b""
+
+    @property
+    def text(self) -> str:
+        return self.content.decode("utf-8", errors="replace")
+
+    def json(self):
+        import json
+        return json.loads(self.content)
+
+
 class NotionSession:
     def __init__(self, token: str = "", log=None):
         self.token = token or notion_auth.load_pat()
-        if not self.token:
+        self._broker = not self.token and notion_broker.available()
+        if not self.token and not self._broker:
             raise RuntimeError("Notion 토큰이 없습니다. 대시보드에서 Notion을 연결하세요.")
         self.log = log or (lambda *_: None)
         self._headers = {
@@ -47,6 +65,15 @@ class NotionSession:
         }
 
     def request(self, method: str, path: str, **kwargs) -> requests.Response:
+        if self._broker:
+            if path.startswith("http") or "files" in kwargs or "data" in kwargs:
+                raise RuntimeError("Notion broker only supports JSON API requests.")
+            reply = notion_broker.request(method, path, json_body=kwargs.get("json"),
+                                          params=kwargs.get("params"))
+            resp = BrokerResponse(reply)
+            if resp.status_code == 401:
+                raise NotionAuthError(_auth_error_message())
+            return resp
         url = path if path.startswith("http") else f"{API}{path}"
         timeout = kwargs.pop("timeout", 60)
         headers = self._headers

@@ -46,6 +46,8 @@ def _residue(home) -> list[str]:
         out.append(str(cfg))
     if (home / ".local" / "state" / "notionmemory").exists():
         out.append("state dir")
+    if (home / "Library" / "LaunchAgents" / "com.notionmemory.notion-broker.plist").exists():
+        out.append("notion broker LaunchAgent")
     return out
 
 

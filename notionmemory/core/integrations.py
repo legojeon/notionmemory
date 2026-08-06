@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from notionmemory.core import detection, i18n, notion_auth
+from notionmemory.core import detection, i18n, notion_auth, notion_broker
 from notionmemory.core.i18n import tui
 from notionmemory.core.config import Config
 from notionmemory.skills.git import hooks as gc_hooks
@@ -40,12 +40,24 @@ class NotionIntegration(Integration):
             return IntegrationStatus(self.id, True, detail)
         if meta.get("token"):
             return IntegrationStatus(self.id, True, tui(lang, "ui.int.notion.config_token", "config token"))
+        if notion_broker.available():
+            return IntegrationStatus(self.id, True, "PAT via local broker")
         return IntegrationStatus(self.id, False,
                                  tui(lang, "ui.int.notion.no_pat", "no PAT (connect required)"))
 
     def test(self, config: Config) -> IntegrationStatus:
         lang = i18n.language(config)
         token = self._token(config)
+        if not token and notion_broker.available():
+            try:
+                from notionmemory.core.notion_client import NotionSession
+                response = NotionSession().request("GET", "/users/me")
+                if response.status_code == 200:
+                    return IntegrationStatus(self.id, True, "verified via local broker")
+                return IntegrationStatus(self.id, False,
+                                         f"broker verification failed (HTTP {response.status_code})")
+            except RuntimeError as exc:
+                return IntegrationStatus(self.id, False, str(exc))
         if not token:
             return IntegrationStatus(self.id, False,
                                      tui(lang, "ui.int.notion.no_pat", "no PAT (connect required)"))

@@ -3,6 +3,16 @@ from notionmemory.core.registry import SkillCard
 from notionmemory.core.skill_base import RunResult
 
 
+def test_broker_serve_starts_private_request_service(monkeypatch):
+    from notionmemory.core import notion_broker
+
+    seen = []
+    monkeypatch.setattr(notion_broker, "serve_forever", lambda: seen.append(True))
+
+    assert cli.main(["broker", "serve"]) == 0
+    assert seen == [True]
+
+
 def test_parse_kv_variants():
     got = cli._parse_kv(["--limit", "1", "--dry-run", "--doc-type", "paper", "--k=v"])
     assert got == {"limit": "1", "dry_run": "true", "doc_type": "paper", "k": "v"}
