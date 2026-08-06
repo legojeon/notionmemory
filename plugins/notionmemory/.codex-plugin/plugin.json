@@ -1,6 +1,6 @@
 {
   "name": "notionmemory",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Notion second-brain skills for Codex: calendar, memory, templates, library, and settings. Backed by the notionmemory Python CLI.",
   "author": { "name": "Jaewoo Jeon", "email": "learnsteam.kr@gmail.com" },
   "license": "MIT",
@@ -9,6 +9,10 @@
   "interface": {
     "displayName": "notionmemory",
     "shortDescription": "Notion second-brain skills (calendar, memory, templates, library)",
+    "longDescription": "A private Notion second brain for Codex, with memory, calendar, templates, library search, and settings skills backed by the notionmemory CLI.",
+    "developerName": "Jaewoo Jeon",
+    "defaultPrompt": "Use notionmemory to organize or retrieve my Notion knowledge.",
+    "capabilities": ["skills"],
     "category": "Productivity"
   }
 }
