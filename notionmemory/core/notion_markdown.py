@@ -256,6 +256,7 @@ _LANG_MAP = {
     "py": "python", "python": "python", "js": "javascript", "ts": "typescript",
     "cpp": "c++", "c": "c", "java": "java", "sql": "sql", "r": "r",
     "bash": "bash", "sh": "shell", "json": "json", "yaml": "yaml",
+    "mermaid": "mermaid",
 }
 
 

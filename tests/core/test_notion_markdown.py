@@ -11,3 +11,12 @@ def test_heading_and_paragraph():
 def test_module_location_is_core_not_notes():
     import notionmemory.core.notion_markdown as m
     assert m.__name__ == "notionmemory.core.notion_markdown"
+
+
+def test_mermaid_fence_renders_as_diagram():
+    # ```mermaid 은 plain text 로 떨어지면 Notion 이 다이어그램으로 그리지 않는다 —
+    # 언어가 그대로 'mermaid' 로 실려야 코드블록이 다이어그램으로 렌더된다.
+    blocks = markdown_to_blocks("```mermaid\nflowchart LR\n  A --> B\n```")
+    code = [b for b in blocks if b["type"] == "code"]
+    assert len(code) == 1
+    assert code[0]["code"]["language"] == "mermaid"
