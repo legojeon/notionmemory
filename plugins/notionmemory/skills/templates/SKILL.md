@@ -6,7 +6,7 @@ description: Use to look up, add, update, or author against a registered Notion 
 # templates
 
 Register an arbitrary Notion template, then CRUD it according to its schema. Unlike the DBs
-we built ourselves (calendar, second brain), **the code doesn't know the schema** — so every
+we built ourselves (second brain), **the code doesn't know the schema** — so every
 time, read the profile first and use the names in it verbatim.
 
 ## 3-step protocol — follow the order
@@ -244,9 +244,9 @@ filename or an invented summary. If a lecture number and topic are visible, use
 
 ## Connection & onboarding
 
-Unlike memory/calendar, templates has no built-in DB to connect — there is nothing to gate
+Unlike memory, templates has no built-in DB to connect — there is nothing to gate
 on a PAT check here, and no setup menu to run through onboarding. If the user's Notion isn't
-connected yet, that's memory/calendar's onboarding to handle (settings dashboard), not this
+connected yet, that's memory's onboarding to handle (settings dashboard), not this
 skill's. All this skill needs on first use is a one-line explanation: templates registers
 **the user's own** Notion pages/databases (arbitrary schema) so they can be queried and
 edited by name — register one via the settings dashboard's "+ template" button, or just ask
@@ -254,21 +254,15 @@ this skill to `templates register <page URL>`.
 
 ## Relationship to other skills — parallel sources
 
-Built-in skills (calendar / memory / git) and registered templates are **not competitors.**
+Built-in skills (memory / git) and registered templates are **not competitors.**
 Users don't tell you where their data lives.
 
 1. Before answering, check the `notionmemory templates:` list injected at session start.
 2. If a template overlaps the request's domain, **query both and merge with sources
-   attached** — e.g. "2 from calendar · 1 from todo-list".
+   attached** — e.g. "2 from reading-list · 1 from todo-list".
 3. **Never conclude "nothing" from checking only one source.** A silent omission is the only
    real failure here.
 4. Narrow down only once the user names a specific template.
-
-**Writing is different.** If something overlaps a built-in like calendar — a schedule/
-deadline — and the user says "add it," you must pick one place. If `notionmemory calendar
-add` exits 2 with a list of candidates, ask the user, and if they say they want this
-template going forward, lock it in with `notionmemory calendar target
-template:<slug>/<db-key>`. To revert, use `notionmemory calendar target calendar`.
 
 ## Limits — know these up front
 

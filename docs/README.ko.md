@@ -22,17 +22,17 @@
 </p>
 
 **notionmemory**는 여러분의 Notion을 코딩 에이전트(Claude Code, Codex)를 위한 장기 기억으로
-바꿔줍니다. 장기 기억, 캘린더, 템플릿, 내용 검색을 **설치형 스킬**로 제공하고, 세션 훅이 필요한
+바꿔줍니다. 장기 기억, 템플릿, 내용 검색을 **설치형 스킬**로 제공하고, 세션 훅이 필요한
 맥락을 알아서 띄워줍니다. 모든 데이터는 **여러분의 Notion**에 그대로 쌓입니다 — 별도의 DB도,
 서버도 없습니다.
 
 명령어를 직접 입력할 필요는 없습니다. 에이전트에게 **평소처럼 말만 하세요** — "이거 기억해둬",
-"이거 어디에 정리했더라?", "캘린더에 넣어줘", "이 페이지 템플릿으로 등록해줘" — 그러면 에이전트가
+"이거 어디에 정리했더라?", "이 페이지 템플릿으로 등록해줘" — 그러면 에이전트가
 notionmemory를 알아서 실행합니다.
 
 <p align="center">
   <img src="../assets/flow.svg" width="100%"
-       alt="Claude Code·Codex가 notionmemory에게 말을 걸면, notionmemory가 Notion·Notion Calendar에 저장하고 불러온다">
+       alt="Claude Code·Codex가 notionmemory에게 말을 걸면, notionmemory가 Notion에 저장하고 불러온다">
 </p>
 
 ## Why notionmemory
@@ -48,7 +48,7 @@ DB**에 저장합니다. 빠르고 프라이빗하지만, 저에게는 두 가�
   메모리는 다른 기기와 공유되지 않습니다. Notion은 이미 **클라우드**라, 어디서 작업하든 같은
   기억을 씁니다.
 
-여기에 더해, 에이전트가 코드뿐 아니라 제 **공부 노트와 일정**까지 다뤄주면 좋겠다고 생각했습니다.
+여기에 더해, 에이전트가 코드뿐 아니라 제 **공부 노트**까지 다뤄주면 좋겠다고 생각했습니다.
 그 자료들은 이미 Notion에 있으니까요. 메모리까지 같은 곳에 두면, 숨겨진 별도 DB가 아니라 저와
 에이전트가 어디서든 닿는 하나의 공간이 됩니다. 그래서 notionmemory는 **Notion을 클라우드처럼**
 씁니다 — 눈에 보이고, 직접 고칠 수 있고, 공유되고, 이미 제 일상이 담긴 곳으로요.
@@ -108,7 +108,7 @@ pipx install notionmemory && notionmemory install
 설치가 끝나면 **에이전트에게 "온보딩해줘"라고 말해 보세요.** `notionmemory:onboard` 스킬이
 실행되고, 첫 세션에서는 에이전트가 먼저 제안합니다. Notion 연결(페이지를 integration에 공유하는
 것까지)부터
-memory, calendar, 검색 설정까지 선택지로 안내하고, 이미 끝난 단계는 건너뜁니다. 직접 하실 일은
+memory, 검색 설정까지 선택지로 안내하고, 이미 끝난 단계는 건너뜁니다. 직접 하실 일은
 Notion 토큰을 붙여넣는 것 하나뿐입니다(비밀 값은 채팅으로 주고받으면 안 되니까요). 토큰은
 [app.notion.com/developers/tokens](https://app.notion.com/developers/tokens)에서 만들며,
 이때 아래를 확인하세요.
@@ -135,10 +135,6 @@ Notion 토큰을 붙여넣는 것 하나뿐입니다(비밀 값은 채팅으로 
 > *"인증을 JWT refresh-token 회전 방식으로 바꿨다고 기억해둬."*
 > *"레이트 리밋은 어떻게 처리하기로 했었지?"*
 > *"이 프로젝트에 대해 지금까지 뭘 알고 있어?"*
-
-**캘린더**
-> *"내일 오후 3시부터 4시까지 디자인 리뷰 잡아줘."*
-> *"이번 주 일정 뭐 있어?"*
 
 **Notion 검색**
 > *"배포 런북 어디에 적어놨더라?"*
@@ -204,14 +200,13 @@ notionmemory는 **에이전트가 주도**합니다. CLI는 에이전트가 호�
 
 | 에이전트 | 설치 방법 | 사용법 |
 | --- | --- | --- |
-| **Claude Code** | 플러그인(또는 `notionmemory install`) | *"이 결정 기억해둬", "예전에 X 얘기한 적 있나?", "이거 캘린더에 넣어줘"*처럼 말하기 |
+| **Claude Code** | 플러그인(또는 `notionmemory install`) | *"이 결정 기억해둬", "예전에 X 얘기한 적 있나?"*처럼 말하기 |
 | **Codex** | 플러그인 + `install --codex --trust-codex-hooks` | 동일 — 말만 하면 에이전트가 notionmemory를 대신 실행 |
 
 에이전트가 쓸 수 있는 **스킬**:
 
-- **onboard** — 처음 설정 안내 (Notion + memory + calendar + 검색)
+- **onboard** — 처음 설정 안내 (Notion + memory + 검색)
 - **memory** — Notion 세컨드 브레인에 장기적인 결정·패턴을 저장하고 불러오기
-- **calendar** — Notion 캘린더 DB의 일정 조회·생성·이동
 - **templates** — Notion 페이지·DB 등록 및 내용 작성
 - **library** — Notion 전체 내용 검색
 - **settings** — 연결·설정을 위한 로컬 웹 대시보드

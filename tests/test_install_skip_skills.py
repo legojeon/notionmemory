@@ -30,11 +30,11 @@ def test_skip_skills_installs_hooks_not_skill_mirror(home):
 
 def test_default_install_still_mirrors_skills(home):
     runner.install(["codex"])                  # skip_skills 기본 False
-    assert (home / ".codex" / "skills" / "calendar").is_dir()
+    assert (home / ".codex" / "skills" / "memory").is_dir()
     assert "skill_mirror" in _receipt_handlers(home)
 
 
 def test_skip_skills_is_codex_scoped_not_claude(home):
     runner.install(["claude"], skip_skills=True)
-    assert (home / ".claude" / "skills" / "calendar").is_dir(), \
+    assert (home / ".claude" / "skills" / "memory").is_dir(), \
         "skip-skills is codex-only; claude skills must still mirror"

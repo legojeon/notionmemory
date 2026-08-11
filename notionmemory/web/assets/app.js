@@ -44,7 +44,7 @@ function closeModal() { document.getElementById("modal").hidden = true; }
 
 let TEMPLATES = [];
 
-// calendar·memory 의 연동 DB 링크(db_url, "" 면 비바인딩) — 카드가 아니라 스킬 설정 모달
+// memory 의 연동 DB 링크(db_url, "" 면 비바인딩) — 카드가 아니라 스킬 설정 모달
 // 상단에 detail 행으로 띄운다(카드에 두면 클릭형 카드 안 링크라 모호하고, 중첩 <a>/레이아웃
 // 문제가 생김). 다른 스킬은 db_url 필드가 없을 수 있어 falsy 로 안전 흡수. href/텍스트 모두
 // html`` 을 거쳐 이스케이프(raw 금지 — db_url 은 API 유래 문자열).

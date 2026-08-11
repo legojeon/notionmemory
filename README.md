@@ -23,16 +23,16 @@
 
 **notionmemory** turns your own Notion workspace into a shared, long-term brain for coding
 agents (Claude Code, Codex). It ships a set of installable **skills** — long-term memory,
-calendar, templates, and content search — plus session hooks that surface the right context
+templates, and content search — plus session hooks that surface the right context
 automatically. Everything lives in **your** Notion; there's no separate database or server.
 
 You don't run its commands by hand. **You talk to your agent in plain language** — "remember
-that", "where did I file this?", "add this to my calendar", "register this page as a template"
+that", "where did I file this?", "register this page as a template"
 — and the agent runs notionmemory for you under the hood.
 
 <p align="center">
   <img src="assets/flow.svg" width="100%"
-       alt="Claude Code and Codex talk to notionmemory, which captures and recalls in your Notion and Notion Calendar">
+       alt="Claude Code and Codex talk to notionmemory, which captures and recalls in your Notion">
 </p>
 
 ## Why notionmemory
@@ -47,7 +47,7 @@ database** — fast and private, but two things kept getting in my way:
 - **It didn't follow me.** I develop across a server and a laptop, and memory that lives on one
   machine doesn't sync to the other. Notion is already **cloud** — the same brain everywhere.
 
-I also wanted my agent beyond code: my **study notes and schedule** already live in Notion.
+I also wanted my agent beyond code: my **study notes** already live in Notion.
 Keeping memory there too gives my agent (and me) one place to reach from anywhere, instead of a
 hidden sidecar database. So notionmemory uses **Notion as the cloud** — visible, editable,
 shared, and already where the rest of my life is.
@@ -105,7 +105,7 @@ pipx install notionmemory && notionmemory install
 
 Once installed, **just ask your agent to onboard you** — it runs the `notionmemory:onboard`
 skill (and offers it automatically on your first session). It walks you through **connecting
-Notion** — including sharing your pages with the integration — and setting up memory, calendar,
+Notion** — including sharing your pages with the integration — and setting up memory
 and search as guided choices, skipping anything already done. The only thing it hands to you is
 pasting the Notion token, because a secret must never go through chat — so mind these when you
 create it at [app.notion.com/developers/tokens](https://app.notion.com/developers/tokens):
@@ -131,10 +131,6 @@ commands. For example:
 > *"Remember that we moved auth to JWT refresh-token rotation."*
 > *"Did we ever decide how to handle rate limiting?"*
 > *"What do you already know about this project?"*
-
-**Calendar**
-> *"Add a design review tomorrow 3–4pm."*
-> *"What's on my calendar this week?"*
 
 **Search your Notion**
 > *"Where did I write the deployment runbook?"*
@@ -199,14 +195,13 @@ in natural language; the agent picks the right skill and runs it.
 
 | Agent | How it's installed | How you use it |
 | --- | --- | --- |
-| **Claude Code** | plugin (or `notionmemory install`) | Ask it: *"remember this decision", "did we discuss X before?", "put this on my calendar"* |
+| **Claude Code** | plugin (or `notionmemory install`) | Ask it: *"remember this decision", "did we discuss X before?"* |
 | **Codex** | plugin + `install --codex --trust-codex-hooks` | Same — talk to it; it runs notionmemory for you |
 
 **Skills** the agent can reach:
 
-- **onboard** — first-time guided setup (Notion + memory + calendar + search)
+- **onboard** — first-time guided setup (Notion + memory + search)
 - **memory** — save/recall long-term decisions & patterns in a Notion Second Brain
-- **calendar** — read/create/move events in a Notion calendar database
 - **templates** — register Notion pages/DBs and author content into them
 - **library** — content search across your Notion pages
 - **settings** — a local web dashboard for connections & configuration

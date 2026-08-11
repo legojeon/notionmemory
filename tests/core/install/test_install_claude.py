@@ -23,7 +23,7 @@ def test_resolve_cli_raises_when_missing(monkeypatch):
 def test_install_claude_creates_skills_and_hooks(fake_home):
     runner.install(["claude"])
     skills = fake_home / ".claude" / "skills"
-    for name in ("memory", "calendar", "templates", "settings"):
+    for name in ("memory", "library", "templates", "settings"):
         assert (skills / name / "SKILL.md").is_file(), name
     settings = json.loads((fake_home / ".claude" / "settings.json").read_text(encoding="utf-8"))
     for event in ("SessionStart", "PreCompact", "Stop"):
@@ -88,11 +88,11 @@ def test_install_skips_unowned_skill_dir_and_keeps_going(fake_home):
     assert (mine / "SKILL.md").read_text(encoding="utf-8") == "사용자가 직접 만든 것\n"
     assert any(str(mine) in ln for ln in lines), lines
     # 부분 실패 — 나머지는 정상 설치된다
-    for name in ("calendar", "templates", "settings"):
+    for name in ("library", "templates", "settings"):
         assert (fake_home / ".claude" / "skills" / name / "SKILL.md").is_file(), name
     assert json.loads(
         (fake_home / ".claude" / "settings.json").read_text(encoding="utf-8"))["hooks"]
     # 심지 못한 것은 영수증에 없다 — teardown 이 남의 디렉터리를 지우면 안 되므로
     ids = {e["id"] for e in receipt.read()}
     assert "claude.skills.memory" not in ids
-    assert "claude.skills.calendar" in ids
+    assert "claude.skills.library" in ids

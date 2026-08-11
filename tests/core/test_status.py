@@ -6,7 +6,6 @@ def test_probe_reports_unbound_when_config_empty(monkeypatch):
     monkeypatch.setattr(status.notion_auth, "load_pat", lambda: "")
     p = status.probe(Config({}))
     assert p["notion"]["connected"] is False
-    assert p["calendar"]["bound"] is False and p["calendar"]["url"] == ""
     assert p["memory"]["bound"] is False
 
 

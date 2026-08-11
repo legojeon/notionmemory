@@ -15,7 +15,7 @@ def test_skills_root_is_inside_package():
 
 def test_skill_names_are_the_final_set():
     assert skill_assets.skill_names() == [
-        "calendar", "library", "memory", "onboard", "settings", "templates"]
+        "library", "memory", "onboard", "settings", "templates"]
 
 
 def test_skill_names_include_library():
@@ -61,14 +61,6 @@ def test_memory_skill_conventions():
     assert "recall --get" in text and "forget" in text
 
 
-def test_calendar_frontmatter_and_body():
-    text = (CANONICAL / "calendar" / "SKILL.md").read_text(encoding="utf-8")
-    head = text.split("---", 2)[1]
-    assert "name: calendar" in head and "description:" in head
-    assert "notionmemory calendar" in text
-    assert "--auto" not in text
-
-
 def test_settings_skill_wraps_serve():
     text = (CANONICAL / "settings" / "SKILL.md").read_text(encoding="utf-8")
     head = text.split("---", 2)[1]
@@ -112,48 +104,15 @@ def _crossref_section(name: str) -> str:
 
 
 def test_built_in_skills_point_content_recall_at_library():
-    for name in ("calendar", "memory"):        # notes 은퇴 — 2개
+    for name in ("memory",):        # notes·calendar 은퇴 — 1개
         section = _crossref_section(name)
         assert "library" in section, f"{name}: library 안내 없음"
 
 
-def test_cross_reference_sections_are_byte_identical():
-    """두 파일이 갈라지면 한쪽만 낡는다 — 문구 동일성을 코드로 못 박는다.
-
-    상호 참조는 두 SKILL.md 에 같은 규칙을 복사한 것이라, 한 파일만 리워드되면
-    나머지 하나는 조용히 뒤처진다. 존재 여부만 보는 테스트로는 그 드리프트를 못 잡는다.
-    """
-    sections = {name: _crossref_section(name) for name in ("calendar", "memory")}
-    assert len(set(sections.values())) == 1, (
-        "상호 참조 절이 파일마다 다릅니다: "
-        + ", ".join(sorted(n for n, s in sections.items() if s != sections["calendar"])))
-
-
 def test_old_templates_crossref_section_is_gone():
-    for name in ("calendar", "memory"):
+    for name in ("memory",):
         text = (CANONICAL / name / "SKILL.md").read_text(encoding="utf-8")
         assert "## 등록된 Notion 템플릿도 함께 본다" not in text
-
-
-def test_calendar_skill_documents_write_routing():
-    text = (CANONICAL / "calendar" / "SKILL.md").read_text(encoding="utf-8")
-    section = text.split("Where to write", 1)[1]
-    assert "--here" in section              # 이번만
-    assert "calendar target" in section     # 앞으로 계속
-    assert "templates add" in section       # 템플릿을 골랐을 때 갈 곳
-    # calendar 가 남의 DB 에 쓴다는 오해를 주면 안 된다
-    low = section.lower()
-    assert "just this time" in low and "going forward" in low
-
-
-def test_calendar_skill_tells_the_agent_to_ask_not_to_guess():
-    text = (CANONICAL / "calendar" / "SKILL.md").read_text(encoding="utf-8")
-    assert "guess" in text or "arbitrarily" in text
-
-
-def test_templates_skill_mentions_the_calendar_write_handoff():
-    text = (CANONICAL / "templates" / "SKILL.md").read_text(encoding="utf-8")
-    assert "calendar target" in text
 
 
 def test_templates_skill_documents_document_editing():

@@ -1,6 +1,6 @@
 ---
 name: onboard
-description: First-time (and resumable) setup for notionmemory. Use when the user asks to set up / onboard / get started with notionmemory, when a SessionStart note offers guided onboarding, or when a core connection (Notion PAT, memory, or calendar) is missing. Walks language → Notion → memory → calendar → library → templates as structured choices, skipping whatever is already configured.
+description: First-time (and resumable) setup for notionmemory. Use when the user asks to set up / onboard / get started with notionmemory, when a SessionStart note offers guided onboarding, or when a core connection (Notion PAT or memory) is missing. Walks language → Notion → memory → library → templates as structured choices, skipping whatever is already configured.
 ---
 
 # onboard — guided setup
@@ -16,8 +16,8 @@ only present choices for what's missing. Safe to run again anytime the user asks
 notionmemory status
 ```
 
-Read which of these are already set: Notion (PAT connected), memory (bound), calendar
-(bound), library (scanned). **Skip every step that's already done** — never re-ask a
+Read which of these are already set: Notion (PAT connected), memory (bound),
+library (scanned). **Skip every step that's already done** — never re-ask a
 bound DB or a connected PAT. Then walk the missing ones in the sequence below.
 
 ## Present each decision as a structured choice
@@ -75,7 +75,7 @@ The raw PAT/token is a secret and **must never be pasted into chat** — there i
   **shares the pages/DBs with that integration**. On each top-level page or database they
   want notionmemory to use, they open the page's `•••` menu → **Connections** (or "Add
   connections") and add the integration; sub-pages inherit, so sharing a parent covers its
-  children. Say this explicitly — otherwise memory/calendar/library connect but see nothing.
+  children. Say this explicitly — otherwise memory/library connect but see nothing.
 - Wait for them to say they're done, then re-check:
 
 ```bash
@@ -99,19 +99,7 @@ Present a choice — create / connect / skip:
 resulting DB link on success. If it refuses, relay the reason verbatim and re-offer the
 choice — don't guess a fix. On skip, move on without setting anything.
 
-## 4. calendar (if `status` shows not bound)
-
-Same create / connect / skip choice:
-
-1. **Create a new Calendar DB**: `notionmemory calendar connect --new`
-2. **Connect an existing one**: `notionmemory calendar connect --url <url>`
-3. **Skip for now**
-
-`calendar connect --url` adopts an existing DB: it adds any missing columns the calendar
-schema needs, but **refuses on a hard type conflict** rather than guessing. Report the DB
-link and any added columns. If it refuses, relay the reason and re-offer.
-
-## 5. library (if `status` shows not scanned)
+## 4. library (if `status` shows not scanned)
 
 Offer a scan — yes / no:
 
@@ -119,7 +107,7 @@ Offer a scan — yes / no:
   `library search` works).
 - **No**: skip — they can run it later.
 
-## 6. templates (usage note only — no setup)
+## 5. templates (usage note only — no setup)
 
 No connection needed. In one or two lines, tell the user that — going forward — they can
 just **ask you in plain language** to register a Notion page/DB as a template or to author

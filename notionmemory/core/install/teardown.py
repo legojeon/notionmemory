@@ -16,7 +16,7 @@ from notionmemory.core.install.spec import ArtifactSpec
 from notionmemory.skills.git import queue as gc_queue
 
 # 구 이름으로 설치된 스킬 디렉터리. 우리만 쓰던 이름이라 이름 매칭으로 안전하다.
-LEGACY_SKILL_NAMES = ("notes-capture", "git-capture", "memory-capture", "notes")
+LEGACY_SKILL_NAMES = ("notes-capture", "git-capture", "memory-capture", "notes", "calendar")
 
 
 def _from_receipt() -> list[ArtifactSpec]:

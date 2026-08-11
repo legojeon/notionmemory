@@ -1,11 +1,10 @@
-"""calendar/memory 페이지네이션 진행 불변식 — templates `_fetch`(실기 재현 2건)와
+"""memory 페이지네이션 진행 불변식 — templates `_fetch`(실기 재현 2건)와
 library crawl 엔 있던 가드가 형제 모듈엔 없어, `has_more:true`+`next_cursor:null`(또는
 빈 results)에서 무한 요청 루프가 됐다(opus 스윕 실측: 5초에 요청 수백만). 계약:
 서버가 진행을 못 시켜주면 지금까지 모은 것을 돌려주고 멈춘다. `results: null` 도
 빈 목록으로 총체 처리한다(.get(key, []) 는 명시적 null 에 무력)."""
 import pytest
 
-from notionmemory.skills.calendar.notion_db import CalendarDB
 from notionmemory.skills.memory.notion_db import SecondBrainDB
 
 
@@ -36,7 +35,7 @@ class _StallSession:
 _PAGE = {"id": "pg1", "properties": {}}
 
 
-@pytest.mark.parametrize("db_cls", [CalendarDB, SecondBrainDB])
+@pytest.mark.parametrize("db_cls", [SecondBrainDB])
 def test_query_stops_on_null_cursor_stall(db_cls):
     sess = _StallSession([{"results": [_PAGE], "has_more": True, "next_cursor": None}])
     pages = db_cls(sess).query("ds1", {"property": "X", "rich_text": {"equals": "y"}})
@@ -44,7 +43,7 @@ def test_query_stops_on_null_cursor_stall(db_cls):
     assert sess.calls <= 2
 
 
-@pytest.mark.parametrize("db_cls", [CalendarDB, SecondBrainDB])
+@pytest.mark.parametrize("db_cls", [SecondBrainDB])
 def test_query_stops_on_empty_results_stall(db_cls):
     sess = _StallSession([{"results": [], "has_more": True, "next_cursor": "c-static"}])
     pages = db_cls(sess).query("ds1", {"property": "X", "rich_text": {"equals": "y"}})
@@ -52,7 +51,7 @@ def test_query_stops_on_empty_results_stall(db_cls):
     assert sess.calls <= 2
 
 
-@pytest.mark.parametrize("db_cls", [CalendarDB, SecondBrainDB])
+@pytest.mark.parametrize("db_cls", [SecondBrainDB])
 def test_query_results_null_is_empty_not_typeerror(db_cls):
     sess = _StallSession([{"results": None, "has_more": False}])
     assert db_cls(sess).query("ds1", {}) == []
@@ -77,6 +76,4 @@ def test_replace_content_enumeration_stops_on_stall():
 
 def test_find_page_results_null_is_none_not_typeerror():
     sess = _StallSession([{"results": None}])
-    assert CalendarDB(sess).find_page_by_event_id("ds1", "ev1") is None
-    sess2 = _StallSession([{"results": None}])
-    assert SecondBrainDB(sess2).find_page_by_mem_id("ds1", "m1") is None
+    assert SecondBrainDB(sess).find_page_by_mem_id("ds1", "m1") is None

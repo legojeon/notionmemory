@@ -50,10 +50,6 @@ skills:
     repos: []                   # 훅 설치된 리포 목록 (CLI install 이 관리)
     exclude: []                 # 자동 설치 제외 리포 (uninstall 이 등록)
 
-  calendar:
-    parent_page_id: ""          # Calendar DB를 만들 부모 페이지 ID(비우면 워크스페이스 최상위)
-    # database_id/data_source_id 는 최초 사용 시 CLI가 자동 기록
-
   library:
     full_refresh_days: 7        # `library refresh --full`(삭제/공유해제 prune) 넛지 최소 간격(일).
                                 # 라이브 read-404로 드리프트를 관측한 뒤 이 간격이 지나면 SessionStart가

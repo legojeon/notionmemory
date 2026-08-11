@@ -5,8 +5,8 @@ description: 등록된 Notion 템플릿/데이터베이스를 조회·추가·�
 
 # templates
 
-임의의 Notion 템플릿을 등록해 두고 그 스키마대로 CRUD 한다. 우리가 만든 DB(calendar,
-second brain)와 달리 **스키마를 코드가 모른다** — 그래서 매번 프로필을 읽고 그 안의 이름을
+임의의 Notion 템플릿을 등록해 두고 그 스키마대로 CRUD 한다. 우리가 만든 DB(second
+brain)와 달리 **스키마를 코드가 모른다** — 그래서 매번 프로필을 읽고 그 안의 이름을
 그대로 써야 한다.
 
 ## 3단계 규약 — 순서를 지킨다
@@ -203,8 +203,8 @@ CRUD(행) + 문서 편집(본문)의 조합이다.
 
 ## 연결 & 온보딩
 
-memory/calendar와 달리 templates엔 내장 DB가 없어 여기서 PAT을 게이팅할 것도, 온보딩
-설정 메뉴를 돌릴 것도 없다. 사용자의 Notion이 아직 미연결이면 그건 memory/calendar
+memory와 달리 templates엔 내장 DB가 없어 여기서 PAT을 게이팅할 것도, 온보딩
+설정 메뉴를 돌릴 것도 없다. 사용자의 Notion이 아직 미연결이면 그건 memory
 온보딩(settings 대시보드)이 처리할 몫이지 이 스킬 몫이 아니다. 이 스킬이 처음 쓰일 때
 필요한 건 한 줄 설명뿐이다: templates는 **사용자 자신의** Notion 페이지/DB(임의 스키마)를
 등록해 이름으로 조회·편집할 수 있게 한다 — settings 대시보드의 "+ 템플릿" 버튼으로
@@ -212,20 +212,14 @@ memory/calendar와 달리 templates엔 내장 DB가 없어 여기서 PAT을 게�
 
 ## 다른 스킬과의 관계 — 병렬 소스다
 
-내장 스킬(calendar / memory / git)과 등록 템플릿은 **경쟁 관계가 아니다.**
+내장 스킬(memory / git)과 등록 템플릿은 **경쟁 관계가 아니다.**
 사용자는 자기 데이터가 어디 있는지 말하지 않는다.
 
 1. 답하기 전에 세션 시작 시 주입된 `notionmemory templates:` 목록을 본다.
 2. 요청 도메인과 겹치는 템플릿이 있으면 **둘 다 조회하고 출처를 붙여 합친다** —
-   "calendar 2건 · todo-list 1건".
+   "reading-list 2건 · todo-list 1건".
 3. **한 소스만 보고 "없습니다"라고 결론짓지 않는다.** 조용한 누락이 유일한 진짜 실패다.
 4. 사용자가 템플릿을 지목했을 때만 좁힌다.
-
-**쓰기는 다르다.** 일정·마감처럼 내장 calendar와 겹치는 것을 사용자가 "추가해줘"라고 하면
-한 곳만 골라야 한다. `notionmemory calendar add`가 후보 목록과 함께 exit 2를 내면 사용자에게
-묻고, 사용자가 앞으로도 이 템플릿에 넣겠다고 하면
-`notionmemory calendar target template:<slug>/<db-key>`로 굳힌다. 되돌리는 것은
-`notionmemory calendar target calendar`다.
 
 ## 한계 — 미리 알고 있어야 하는 것
 

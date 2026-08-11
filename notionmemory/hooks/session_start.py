@@ -142,7 +142,7 @@ def library_injection() -> str:
 
 
 def onboarding_injection() -> str:
-    """코어 설정(PAT/memory/calendar)이 하나라도 비어 있고 아직 온보딩을 제안하지
+    """코어 설정(PAT/memory)이 하나라도 비어 있고 아직 온보딩을 제안하지
     않았으면(config `onboarding.offered`) `onboard` 스킬을 **한 번** 제안하고 마커를
     set 한다. 이미 제안했거나 코어가 다 되어 있으면 "". library 미색인만으로는 제안하지
     않는다 — 그건 library_injection 의 steady-state 넛지 몫이다(돌아온 사용자에게 전체
@@ -163,8 +163,6 @@ def onboarding_injection() -> str:
             missing.append(_m("hook.onboard_item.notion"))
         if not st["memory"]["bound"]:
             missing.append(_m("hook.onboard_item.memory"))
-        if not st["calendar"]["bound"]:
-            missing.append(_m("hook.onboard_item.calendar"))
         if not missing:
             return ""
         cfg.save_onboarding_offered(path)

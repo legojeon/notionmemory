@@ -27,7 +27,7 @@ def test_probes_state_first():
 
 def test_states_the_full_sequence():
     text = _text().lower()
-    for step in ("language", "pat", "memory", "calendar", "library", "templates"):
+    for step in ("language", "pat", "memory", "library", "templates"):
         assert step in text, step
 
 

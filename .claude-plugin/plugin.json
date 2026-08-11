@@ -1,10 +1,10 @@
 {
   "name": "notionmemory",
-  "version": "1.2.5",
-  "description": "Notion second-brain skills for coding agents: calendar, memory, templates, library, and settings. Backed by the notionmemory Python CLI (pipx install notionmemory).",
+  "version": "1.3.0",
+  "description": "Notion second-brain skills for coding agents: memory, templates, library, and settings. Backed by the notionmemory Python CLI (pipx install notionmemory).",
   "author": { "name": "Jaewoo Jeon", "email": "learnsteam.kr@gmail.com" },
   "license": "MIT",
-  "keywords": ["notion", "second-brain", "memory", "calendar", "templates", "productivity"],
+  "keywords": ["notion", "second-brain", "memory", "templates", "productivity"],
   "skills": "./notionmemory/agent_skills/",
   "hooks": {
     "SessionStart": [ { "hooks": [ { "type": "command", "command": "command -v notionmemory >/dev/null 2>&1 && notionmemory hook session-start || true", "timeout": 20 } ] } ],

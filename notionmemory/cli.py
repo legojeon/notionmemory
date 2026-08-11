@@ -20,10 +20,6 @@ from notionmemory.core.notion_markdown import markdown_to_blocks
 from notionmemory.skills.git import hooks as gc_hooks
 from notionmemory.skills.git import queue as gc_queue
 from notionmemory.skills.git.flusher import flush as gc_flush
-from notionmemory.skills.calendar.notion_db import (
-    CalendarDB, SchemaConflictError, SETUP_STEPS as cal_setup_steps,
-    SOURCES as CAL_SOURCES, STATUSES as CAL_STATUSES, db_url as cal_db_url)
-from notionmemory.skills.calendar.store import CalendarStore, format_event_line
 from notionmemory.skills.library import crawl as library_crawl
 from notionmemory.skills.library import index as library_index
 from notionmemory.skills.library import retrieve as library_retrieve
@@ -274,7 +270,7 @@ def _cmd_git(args) -> int:
 def _binding_line(skill_id: str, b: dict, lang: str) -> str:
     """`status.probe()`의 한 스킬 바인딩(`{"bound","url"}`)을 사람이 읽는 한 줄로.
 
-    `notionmemory status`(`_format_status`)와 `notionmemory calendar/memory connection`이
+    `notionmemory status`(`_format_status`)와 `notionmemory memory connection`이
     이 하나만 공유한다 — 둘 다 같은 "bound/not bound" 개념이므로 문구를 두 벌로 두면
     `language: ko` 사용자가 `status`에서는 `연결됨`을 보고 `connection`에서는 하드코딩된
     영어 `bound`를 보는 드리프트가 난다(Fix round 1)."""
@@ -285,7 +281,7 @@ def _binding_line(skill_id: str, b: dict, lang: str) -> str:
 
 def _connect_db(db, config, skill_id: str, args, *, new_kwargs: dict, exc_types: tuple,
                 url_fn) -> int:
-    """calendar/memory 공용 connect 핸들러.
+    """memory 공용 connect 핸들러.
 
     `--new` → `ensure(parent, meta, **new_kwargs)`(생성+바인딩). `--url` → `extract_page_id`
     로 URL/ID 를 32-hex 로 파싱한 뒤 `adopt(dbid, meta)`(기존 DB 채택). argparse 가
@@ -320,92 +316,6 @@ def _connect_db(db, config, skill_id: str, args, *, new_kwargs: dict, exc_types:
     except exc_types as e:
         print(str(e))
         return 2
-
-
-def _cmd_calendar(args) -> int:
-    config = Config.load(args.config)
-    if args.action == "setup":
-        # 안내 전용 — Notion 세션을 만들지 않는다(미연결·오프라인에서도 볼 수 있어야 함)
-        database_id = str(config.skill_options("calendar").get("database_id") or "")
-        print("Notion Calendar 앱 연결 방법 (앱 설정은 API가 없어 수동입니다):")
-        for i, step in enumerate(cal_setup_steps, 1):
-            print(f"  {i}. {step}")
-        if database_id:
-            print(f"  · Calendar DB 바로가기: {cal_db_url(database_id)}")
-        else:
-            print("  · 아직 Calendar DB가 없습니다 — "
-                  "`notionmemory calendar add \"제목\" --start \"YYYY-MM-DD HH:MM\"` 로 "
-                  "첫 일정을 등록하면 DB가 자동 생성됩니다")
-        return 0
-    if args.action == "target":
-        from notionmemory.core.config import SkillMeta
-        from notionmemory.skills.calendar import routing
-        meta = SkillMeta(config, "calendar")
-        if args.value is None:
-            current = str(config.skill_options("calendar").get(routing.OPTION) or "")
-            print(current or "(미결정 — 겹치는 템플릿이 있으면 매번 되묻습니다)")
-            return 0
-        # 사실 #6: config 를 쓰는 범용 verb 가 없다. SkillMeta 가 이미 그 경로이므로
-        # 좁은 verb 하나만 열고 범용 `config set` 은 열지 않는다(범위가 커진다).
-        meta.set_meta(routing.OPTION, routing.validate_target(args.value))
-        print(f"calendar 쓰기 대상: {args.value or '(미결정)'}")
-        return 0
-    if args.action == "connection":
-        # probe() 만 부른다 — DB 를 만들지 않는 조회 불변식(core/status.py). NotionSession
-        # 조차 필요 없어(config 만 읽음) 미연결·오프라인에서도 answer가 나온다.
-        lang = i18n.language(config)
-        print(_binding_line("calendar", status_probe.probe(config, verify=False)["calendar"],
-                            lang))
-        return 0
-    if args.action == "connect":
-        return _connect_db(CalendarDB(NotionSession(), log=print), config, "calendar", args,
-                           new_kwargs={"create": True},
-                           exc_types=(SchemaConflictError, ValueError, RuntimeError),
-                           url_fn=cal_db_url)
-    store = CalendarStore(NotionSession(), config, log=print)
-    if args.action == "list":
-        if args.date_to and args.days:
-            print("--to와 --days는 동시에 지정할 수 없습니다")
-            return 2
-        if args.days < 0:
-            print(f"--days 는 0 이상이어야 합니다 (0=기본 7일): {args.days}")
-            return 2
-        events = store.list_events(date_from=args.date_from, date_to=args.date_to,
-                                   days=args.days or 7)
-        for s in events:
-            print(format_event_line(s))
-        if not events:
-            print("(일정 없음)")
-        return 0
-    if args.action == "add":
-        r = store.add(args.title, start=args.start, end=args.end,
-                      location=args.location, link=args.link, notes=args.notes,
-                      source=args.source, force_builtin=args.here)
-        print("Saved " + format_event_line(r))
-        if r["url"]:
-            print(r["url"])
-        return 0
-    if args.action == "update":
-        fields = {"title": args.title, "start": args.start, "end": args.end,
-                  "location": args.location, "link": args.link, "status": args.status}
-        if all(v is None for v in fields.values()):
-            print("변경할 항목이 없습니다 — --title/--start/--end/--location/--link/--status 중 하나 이상")
-            return 2
-        r = store.update(args.event_id, **fields)
-        if r is None:
-            print(f"일정 없음: {args.event_id}")
-            return 1
-        print(f"Updated: {args.event_id}")
-        if r["warning"]:
-            print(f"경고: {r['warning']}")
-        return 0
-    if args.action == "cancel":
-        if not store.cancel(args.event_id):
-            print(f"일정 없음: {args.event_id}")
-            return 1
-        print(f"Canceled: {args.event_id} (휴지통 이동 — Notion에서 30일 내 복원 가능)")
-        return 0
-    return 2
 
 
 def _cmd_memory(args) -> int:
@@ -864,7 +774,7 @@ def _format_status(p: dict, lang: str) -> list[str]:
     n_state = (tui(lang, "ui.status.notion.connected", "connected") if n["connected"]
               else tui(lang, "ui.status.notion.not_connected", "not connected"))
     lines.append(f"Notion: {n_state} ({n['detail']})" if n["detail"] else f"Notion: {n_state}")
-    for key in ("calendar", "memory"):
+    for key in ("memory",):
         lines.append(_binding_line(key, p[key], lang))
     lib = p["library"]
     lines.append(f"{tui(lang, 'ui.status.library.label', 'library scan')}: {lib['detail']}")
@@ -991,49 +901,6 @@ def main(argv=None) -> int:
     fl = gc_sub.add_parser("flush")
     fl.add_argument("--repo", default="")
     fl.add_argument("--config", default=DEFAULT_CONFIG)
-
-    cal = sub.add_parser("calendar")
-    cal_sub = cal.add_subparsers(dest="action", required=True)
-    cl = cal_sub.add_parser("list")
-    cl.add_argument("--from", dest="date_from", default="")
-    cl.add_argument("--to", dest="date_to", default="")
-    cl.add_argument("--days", type=int, default=0)
-    cl.add_argument("--config", default=DEFAULT_CONFIG)
-    ca = cal_sub.add_parser("add")
-    ca.add_argument("title")
-    ca.add_argument("--start", required=True)
-    ca.add_argument("--end", default="")
-    ca.add_argument("--location", default="")
-    ca.add_argument("--link", default="")
-    ca.add_argument("--notes", default="")
-    ca.add_argument("--source", default="manual", choices=list(CAL_SOURCES))
-    ca.add_argument("--here", action="store_true",
-                    help="이번만 내장 Calendar DB 에 저장 (되묻기 통과, config 는 그대로)")
-    ca.add_argument("--config", default=DEFAULT_CONFIG)
-    cu = cal_sub.add_parser("update")
-    cu.add_argument("event_id")
-    cu.add_argument("--title", default=None)
-    cu.add_argument("--start", default=None)
-    cu.add_argument("--end", default=None)
-    cu.add_argument("--location", default=None)
-    cu.add_argument("--link", default=None)
-    cu.add_argument("--status", default=None, choices=list(CAL_STATUSES))
-    cu.add_argument("--config", default=DEFAULT_CONFIG)
-    cc = cal_sub.add_parser("cancel")
-    cc.add_argument("event_id")
-    cc.add_argument("--config", default=DEFAULT_CONFIG)
-    cs = cal_sub.add_parser("setup")
-    cs.add_argument("--config", default=DEFAULT_CONFIG)
-    ct = cal_sub.add_parser("target")
-    ct.add_argument("value", nargs="?", default=None)
-    ct.add_argument("--config", default=DEFAULT_CONFIG)
-    ccn = cal_sub.add_parser("connect")
-    ccn_grp = ccn.add_mutually_exclusive_group(required=True)
-    ccn_grp.add_argument("--new", action="store_true", help="새 Calendar DB 를 만들어 바인딩")
-    ccn_grp.add_argument("--url", default="", help="기존 Notion DB URL/ID 를 채택")
-    ccn.add_argument("--config", default=DEFAULT_CONFIG)
-    ccon = cal_sub.add_parser("connection")
-    ccon.add_argument("--config", default=DEFAULT_CONFIG)
 
     mem = sub.add_parser("memory")
     mem_sub = mem.add_subparsers(dest="action", required=True)
@@ -1219,25 +1086,6 @@ def main(argv=None) -> int:
         try:
             return _cmd_git(args)
         except (RuntimeError, ValueError) as e:
-            print(str(e))
-            return 1
-        except requests.RequestException as e:
-            print(f"Notion API 요청 실패: {e}")
-            return 1
-    if args.cmd == "calendar":
-        from notionmemory.skills.calendar.routing import AmbiguousWrite, WriteBlocked
-        try:
-            return _cmd_calendar(args)
-        # `AmbiguousWrite`/`WriteBlocked` 는 `RuntimeError` 의 하위 클래스다 —
-        # templates register 의 되물음(exit 2)과 같은 규약이므로 일반 RuntimeError
-        # 보다 반드시 먼저 잡는다(순서가 바뀌면 이 분기가 죽은 코드가 된다).
-        except (AmbiguousWrite, WriteBlocked) as e:
-            print(str(e))
-            return 2
-        except ValueError as e:
-            print(str(e))
-            return 2
-        except RuntimeError as e:
             print(str(e))
             return 1
         except requests.RequestException as e:

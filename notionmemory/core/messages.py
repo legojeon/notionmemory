@@ -88,12 +88,11 @@ CATALOG = {
         "hook.watermark_unknown": "(unknown)",
         "hook.onboarding_offer": (
             "notionmemory isn't fully set up yet ({missing}). Offer the user guided "
-            "onboarding: invoke the `onboard` skill — it walks Notion (PAT), memory, and "
-            "calendar setup as structured choices (and offers a library scan), skipping "
+            "onboarding: invoke the `onboard` skill — it walks Notion (PAT) and memory "
+            "setup as structured choices (and offers a library scan), skipping "
             "whatever is already done. Not the dashboard — `onboard` drives it."),
         "hook.onboard_item.notion": "Notion not connected",
         "hook.onboard_item.memory": "memory not set up",
-        "hook.onboard_item.calendar": "calendar not set up",
         "hook.memory_brief": "project brief ({project}):\n{brief}",
         "hook.memory_top": "high-strength memories ({project}): {items}",
         "hook.memory_pending_consolidation": (
@@ -183,12 +182,11 @@ CATALOG = {
         "hook.watermark_unknown": "(미상)",
         "hook.onboarding_offer": (
             "notionmemory 설정이 아직 완료되지 않았습니다({missing}). 사용자에게 안내 "
-            "온보딩을 제안하세요: `onboard` 스킬을 호출하면 Notion(PAT)·memory·calendar "
+            "온보딩을 제안하세요: `onboard` 스킬을 호출하면 Notion(PAT)·memory "
             "설정을 구조화 선택지로 안내하고(라이브러리 스캔도 제안) 이미 된 단계는 "
             "건너뜁니다. settings 대시보드가 아니라 `onboard` 가 진행합니다."),
         "hook.onboard_item.notion": "Notion 미연결",
         "hook.onboard_item.memory": "memory 미설정",
-        "hook.onboard_item.calendar": "calendar 미설정",
         "hook.memory_brief": "프로젝트 브리프({project}):\n{brief}",
         "hook.memory_top": "고Strength 메모리({project}): {items}",
         "hook.memory_pending_consolidation": (
@@ -235,32 +233,14 @@ UI_KO: dict[str, str] = {
     "detect.timeout": "실행 시간 초과",
     # --- core/registry.py cards() (skill summary / run_label / setup_steps) ---
     "ui.card.memory.summary": "결정·패턴·선호를 Notion Second Brain 에 장기 저장하고 검색합니다.",
-    "ui.card.calendar.summary": "Notion Calendar 에서 일정을 조회·등록·변경·취소합니다.",
     "ui.card.library.summary": "내 Notion 전체를 내용으로 검색해 무엇을 어디에 정리했는지 찾습니다.",
     "ui.card.templates.summary": "등록한 Notion 템플릿·데이터베이스를 조회·추가·수정·작성합니다.",
     "ui.card.git.summary": "커밋을 자동 캡처해 기억 큐에 적재합니다 (post-commit 훅, 백그라운드).",
-    "ui.card.calendar.run_label": "실행",
-    "ui.card.calendar.setup.0": "앱 Settings → Add Notion workspace 로 워크스페이스를 연결합니다",
-    "ui.card.calendar.setup.1": (
-        "사이드바에서 워크스페이스 ••• → Add Notion database → 'Calendar' 를 추가합니다"),
-    "ui.card.calendar.setup.2": (
-        "'Calendar' 위에 마우스 → ••• → Make default calendar 로 기본 캘린더를 지정합니다 "
-        "(중요: 지정하지 않으면 앱에서 만든 일정이 Google 계정에 저장돼 에이전트가 읽지 못합니다)"),
-    "ui.card.calendar.setup.3": (
-        "색을 바꾸려면 'Calendar' 위에 마우스 → ••• → 원하는 색 선택 (색은 DB 단위입니다)"),
     "ui.card.git.run_label": "실행",
     "ui.card.library.run_label": "다시 훑기",
     "ui.card.memory.run_label": "실행",
     "ui.card.templates.run_label": "템플릿 등록",
     # --- skills/*/skill.py options_schema() label/help (overlaid in web/server.py GET options) ---
-    "ui.opt.calendar.parent_page_id.label": "부모 페이지 ID",
-    "ui.opt.calendar.parent_page_id.help": (
-        "Calendar DB를 만들 부모 페이지 ID. 비우면 워크스페이스 최상위에 직접 생성."),
-    "ui.opt.calendar.write_target.label": "일정 쓰기 대상",
-    "ui.opt.calendar.write_target.help": (
-        "비우면 등록된 템플릿과 겹칠 때 매번 되묻습니다. `calendar` = 내장 Calendar DB로 "
-        "고정. `template:<slug>/<db-key>` = 그 템플릿으로 안내 (calendar 가 대신 쓰지는 "
-        "않습니다)."),
     "ui.opt.git.install_policy.label": "훅 설치 정책",
     "ui.opt.git.install_policy.help": (
         "auto: 세션 시작 시 현재 git 리포에 post-commit 캡처 훅을 자동 설치(제외 목록 "

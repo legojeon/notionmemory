@@ -9,5 +9,5 @@
 - 순서: **언어(English/한국어 → `notionmemory language en|ko`; 대시보드·CLI·훅 문구 언어,
   에이전트 챗은 사용자 언어 그대로)** → PAT(대시보드→`status` 재확인 게이트, raw 토큰 챗 금지,
   토큰 생성 URL=`app.notion.com/developers/tokens`) → memory(새로/URL연결/건너뛰기,
-  `memory connect --new|--url`, strict) → calendar(동일, `calendar connect`, 타입충돌 거부) →
+  `memory connect --new|--url`, strict) →
   library(스캔 예/아니오, `library refresh`) → templates(사용법 한 줄, 설정 없음).

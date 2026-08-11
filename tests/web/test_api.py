@@ -242,8 +242,6 @@ def test_skills_endpoint_exposes_usage_and_setup_steps():
     reg = build_registry("config.yaml")
     resp = create_app(reg).test_client().get("/api/skills")
     cards = {c["id"]: c for c in json.loads(resp.data)}
-    assert cards["calendar"]["usage"] == "notionmemory calendar list/add/update/cancel"
-    assert any("default calendar" in s.lower() for s in cards["calendar"]["setup_steps"])
     assert cards["memory"]["usage"].startswith("notionmemory remember")
 
 
@@ -277,7 +275,6 @@ def test_cards_expose_function_kinds():
     resp = create_app(build_registry("config.yaml")).test_client().get("/api/skills")
     cards = {c["id"]: c for c in json.loads(resp.data)}
     assert cards["memory"]["kinds"] == ["capture", "recall"]
-    assert cards["calendar"]["kinds"] == ["recall", "action"]
     assert all("kind" not in c for c in cards.values())   # 단수 필드 잔존 금지
 
 
@@ -505,14 +502,7 @@ def _memory_client(cfg_dict):
     return create_app(reg).test_client()
 
 
-def _calendar_client(cfg_dict):
-    from notionmemory.skills.calendar.skill import CalendarSkill
-    cfg = Config(cfg_dict)
-    reg = Registry([CalendarSkill(cfg)], build_integrations(cfg), cfg)
-    return create_app(reg).test_client()
-
-
-# ── task-7: /api/skills 의 calendar·memory 연동 DB 링크(db_url) ──────
+# ── task-7: /api/skills 의 memory 연동 DB 링크(db_url) ──────
 
 def test_skills_endpoint_includes_db_url_when_memory_bound():
     # status.probe() 를 재사용 — DB 생성 0, config 의 database_id 만 읽는다.
@@ -522,27 +512,21 @@ def test_skills_endpoint_includes_db_url_when_memory_bound():
     assert card["db_url"] != "" and "abc123" in card["db_url"]
 
 
-def test_skills_endpoint_db_url_empty_when_calendar_unbound():
-    card = _calendar_client({}).get("/api/skills").get_json()[0]
-    assert card["id"] == "calendar"
-    assert card["db_url"] == ""
-
-
 def test_skills_endpoint_omits_db_url_for_other_skills():
-    # demo 는 calendar/memory 가 아니므로 db_url 필드 자체가 없어야 한다
+    # demo 는 memory 가 아니므로 db_url 필드 자체가 없어야 한다
     # (app.js 쪽은 이 필드의 부재를 견뎌야 하고, 서버는 관계없는 카드에 억지로 채우지 않는다).
     card = _client({}).get("/api/skills").get_json()[0]
     assert "db_url" not in card
 
 
 def test_option_label_is_korean_when_lang_ko():
-    schema = _calendar_client({"language": "ko"}).get("/api/skills/calendar/options").get_json()
-    assert schema["write_target"]["label"] == "일정 쓰기 대상"
+    schema = _memory_client({"language": "ko"}).get("/api/skills/memory/options").get_json()
+    assert schema["capture_mode"]["label"] == "캡처 모드"
 
 
 def test_option_label_is_english_by_default():
-    schema = _calendar_client({}).get("/api/skills/calendar/options").get_json()
-    assert schema["write_target"]["label"] == "event write target"
+    schema = _memory_client({}).get("/api/skills/memory/options").get_json()
+    assert schema["capture_mode"]["label"] == "Capture mode"
 
 
 def test_option_help_is_korean_when_lang_ko():

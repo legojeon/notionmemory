@@ -3,8 +3,8 @@
   "owner": { "name": "Jaewoo Jeon", "email": "learnsteam.kr@gmail.com" },
   "description": "notionmemory — Notion second-brain skills for coding agents",
   "plugins": [
-    { "name": "notionmemory", "source": "./", "version": "1.2.5",
-      "description": "Notion second-brain skills: calendar, memory, templates, library, settings",
+    { "name": "notionmemory", "source": "./", "version": "1.3.0",
+      "description": "Notion second-brain skills: memory, templates, library, settings",
       "author": { "name": "Jaewoo Jeon" } }
   ]
 }

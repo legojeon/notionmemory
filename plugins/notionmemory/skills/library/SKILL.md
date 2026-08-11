@@ -54,5 +54,5 @@ ask permission; just say you're doing a quick library cleanup.)
   `search` pointer until a `refresh --full`; but `read` is always live, so reading a dead pointer
   simply reports the page is gone (and self-heals that entry out of the scan). Never present a
   stale `search` hit as if it still exists — the live `read` is the source of truth.
-- **Date/status filters** ("tomorrow's schedule", "incomplete todos") belong to calendar/templates'
+- **Date/status filters** ("tomorrow's schedule", "incomplete todos") belong to templates'
   structured queries, not library. library only finds things by "what they're about" (text).

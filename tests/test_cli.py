@@ -329,10 +329,9 @@ def test_recall_says_so_when_the_file_list_is_truncated(fake_store, tmp_path, ca
 
 def test_status_cmd_prints_probe_and_exits_0(monkeypatch, tmp_path, capsys):
     """`_cmd_status`는 `status.probe()`(테스트로 이미 검증됨)를 그대로 사람이 읽는 줄로
-    찍는 얇은 층이다 — 여기서는 그 배선(exit 0, 4개 항목 모두 출력)만 확인한다."""
+    찍는 얇은 층이다 — 여기서는 그 배선(exit 0, 3개 항목 모두 출력)만 확인한다."""
     fake = {
         "notion": {"connected": True, "detail": "verified (Workspace)"},
-        "calendar": {"bound": False, "url": ""},
         "memory": {"bound": True, "url": "https://www.notion.so/abc123"},
         "library": {"indexed": True, "detail": "3 page(s), last refreshed x"},
     }

@@ -45,13 +45,13 @@ def create_app(registry: Registry) -> Flask:
     def skills():
         lang = i18n.language(registry.config)
         cards = [dict(c.__dict__) for c in registry.cards(lang)]
-        # calendar·memory 만 연동 DB 링크(db_url)를 붙인다 — status.probe() 의 바인딩
+        # memory 만 연동 DB 링크(db_url)를 붙인다 — status.probe() 의 바인딩
         # 로직을 재사용해 URL 형식이 한 곳(단일 진실 소스)에서만 나오게 한다.
         # verify=False: 대시보드 로드마다 도는 호출부라 live PAT 재검증(네트워크) 없이
         # config 의 database_id 만 읽는다 — DB 를 만들지 않는다(조회 불변식).
         p = status_probe.probe(registry.config, verify=False)
         for c in cards:
-            if c["id"] in ("calendar", "memory"):
+            if c["id"] in ("memory",):
                 c["db_url"] = p[c["id"]]["url"]
         return jsonify(cards)
 

@@ -1,4 +1,4 @@
-"""온보딩 상태 probe — PAT 연결(live verify)·calendar/memory 바인딩·library 색인 나이를
+"""온보딩 상태 probe — PAT 연결(live verify)·memory 바인딩·library 색인 나이를
 한 곳에서 집계한다. `notionmemory status` CLI, SessionStart 훅의 library 넛지, 에이전트의
 PAT 완료 재확인이 전부 `probe()` 하나를 공유한다(source of truth) —
 docs/superpowers/specs/2026-07-29-connection-onboarding-design.md §2.
@@ -26,7 +26,6 @@ from notionmemory.core import notion_auth  # noqa: F401 — 미사용처럼 보�
 from notionmemory.core.config import SkillMeta
 from notionmemory.core.i18n import language, tui
 from notionmemory.core.integrations import NotionIntegration
-from notionmemory.skills.calendar.notion_db import db_url as cal_url
 from notionmemory.skills.memory.notion_db import db_url as mem_url
 
 
@@ -71,7 +70,7 @@ def _library_index(config) -> tuple[bool, str]:
 
 
 def probe(config, *, verify: bool = True) -> dict:
-    """{"notion": {"connected", "detail"}, "calendar": {"bound", "url"},
+    """{"notion": {"connected", "detail"},
     "memory": {"bound", "url"}, "library": {"indexed", "detail"}}.
 
     `verify=True`(기본) — `NotionIntegration.test()`: PAT load + live `verify_token()`,
@@ -83,7 +82,6 @@ def probe(config, *, verify: bool = True) -> dict:
     indexed, detail = _library_index(config)
     return {
         "notion": {"connected": ns.connected, "detail": ns.detail},
-        "calendar": _binding(config, "calendar", cal_url),
         "memory": _binding(config, "memory", mem_url),
         "library": {"indexed": indexed, "detail": detail},
     }

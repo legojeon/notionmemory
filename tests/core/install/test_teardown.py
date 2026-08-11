@@ -216,9 +216,9 @@ def test_dry_run_also_warns_about_same_named_dir_without_marker(tmp_path, monkey
     """미리보기와 실제 실행이 같은 것을 서술해야 한다."""
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / ".config"))
-    # "notes" 는 이제 LEGACY_SKILL_NAMES 라 마커 없이도 제거 대상이 된다 —
-    # 이 테스트는 현재도 활성 스킬인 이름으로 "동명 무표시 디렉터리" 케이스를 본다.
-    orphan = tmp_path / ".claude" / "skills" / "calendar"
+    # 은퇴한 스킬 이름은 이제 LEGACY_SKILL_NAMES 라 마커 없이도 제거 대상이 된다 —
+    # 이 테스트는 현재도 활성 스킬인 이름(templates)으로 "동명 무표시 디렉터리" 케이스를 본다.
+    orphan = tmp_path / ".claude" / "skills" / "templates"
     orphan.mkdir(parents=True)
 
     lines = teardown.run(["claude"], dry_run=True)

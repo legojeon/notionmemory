@@ -130,7 +130,7 @@ Before a memory operation (especially the first one in a session), check the con
 `notionmemory status` (whole-picture) or `notionmemory memory connection` (this skill only).
 
 If several things are unset at once, the `onboard` skill runs the full guided sequence
-(PAT → memory → calendar → library → templates) as structured choices — invoke it
+(PAT → memory → library → templates) as structured choices — invoke it
 instead of walking each skill by hand. This section is the per-skill connect detail
 `onboard` (and you) rely on.
 
