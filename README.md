@@ -15,6 +15,7 @@
   <a href="#why-notionmemory">Why</a> ·
   <a href="#install">Install</a> ·
   <a href="#quick-start">Quick start</a> ·
+  <a href="#examples">Examples</a> ·
   <a href="#benchmarks">Benchmarks</a> ·
   <a href="#agents">Agents</a> ·
   <a href="#how-it-works">How it works</a> ·
@@ -142,6 +143,17 @@ commands. For example:
 
 You never see the CLI — and the memory keeps working between these moments, not just when
 you ask.
+
+## Examples
+
+The **templates** skill turns any Notion database or page you own into something the agent
+CRUDs and authors into by name — and an optional **attached prompt** tells it *how*. A few
+things built this way: a reading list that files papers by property, an idea bank that
+researches each idea before saving it, a portfolio that reads your actual repo, and a
+lecture-note blueprint that turns raw slides into structured notes. Each with its base
+template and the real prompt behind it:
+
+**→ [See the examples](docs/EXAMPLES.md)**
 
 ## Benchmarks
 

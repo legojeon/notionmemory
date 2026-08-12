@@ -15,6 +15,7 @@
   <a href="#why-notionmemory">Why</a> ·
   <a href="#install">Install</a> ·
   <a href="#quick-start">Quick start</a> ·
+  <a href="#examples">Examples</a> ·
   <a href="#benchmarks">Benchmarks</a> ·
   <a href="#agents">Agents</a> ·
   <a href="#how-it-works">How it works</a> ·
@@ -146,6 +147,16 @@ Notion 토큰을 붙여넣는 것 하나뿐입니다(비밀 값은 채팅으로 
 
 CLI는 볼 일이 없습니다 — 그리고 메모리는 이렇게 부르는 순간 사이사이에도 계속 일하고
 있습니다.
+
+## Examples
+
+**templates** 스킬은 여러분이 소유한 임의의 Notion 데이터베이스·페이지를 에이전트가 이름 그대로
+CRUD·저작할 수 있는 대상으로 바꿔줍니다 — 그리고 선택적 **attached prompt**가 *어떻게* 쓸지를
+알려줍니다. 이렇게 만든 것들: 논문을 속성으로 정리하는 읽을 자료 목록, 저장 전에 각 아이디어를
+조사하는 아이디어 뱅크, 실제 저장소를 읽는 포트폴리오, 슬라이드를 구조화된 노트로 바꾸는 강의 노트
+블루프린트. 각각의 base template과 실제 프롬프트까지 함께:
+
+**→ [예시 보기](EXAMPLES.ko.md)**
 
 ## Benchmarks
 
