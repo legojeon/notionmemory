@@ -101,6 +101,9 @@ CATALOG = {
         "hook.memory_index_empty": (
             "memory: local search index is empty — run `notionmemory memory reindex` "
             "to fill it (needed for per-message recall hints)"),
+        "hook.version_drift": (
+            "notionmemory: installed skills/hooks are from v{installed}, but the "
+            "package is now v{current} — run `{cli} install` to refresh them"),
         "notion.auth_invalid": (
             "Notion rejected the token (HTTP 401) — it may be expired, rotated, or "
             "revoked. Reconnect Notion in the settings dashboard (`notionmemory serve`, "
@@ -194,6 +197,9 @@ CATALOG = {
         "hook.memory_index_empty": (
             "memory 색인 없음 — `notionmemory memory reindex` 로 채우세요"
             "(메시지당 회수 힌트에 필요)"),
+        "hook.version_drift": (
+            "notionmemory: 설치된 스킬/훅은 v{installed} 기준인데 패키지는 v{current} "
+            "입니다 — `{cli} install` 로 갱신하세요"),
         "notion.auth_invalid": (
             "Notion 이 토큰을 거부했습니다(HTTP 401) — 만료·회전·폐기됐을 수 있습니다. "
             "settings 대시보드(`notionmemory serve`, 또는 `settings`/`onboard` 스킬)에서 "
@@ -207,6 +213,9 @@ CATALOG = {
 # 미번역 — 포맷 인자를 여기서 못 채우는 자리). 값은 ccf53f6(0.1.1 영어화 스윕) 직전의
 # 원본 한국어에서 그대로 가져왔다 — `git show ccf53f6^:<path>` 로 대조 가능.
 UI_KO: dict[str, str] = {
+    # --- cli.py status 버전 줄 ---
+    "ui.status.version.uptodate": "설치물 최신",
+    "ui.status.version.drift": "설치물 v{installed} — `notionmemory install` 필요",
     # --- core/integrations.py ---
     "ui.int.notion.pat_saved": "PAT 저장됨",
     "ui.int.notion.config_token": "config 토큰",

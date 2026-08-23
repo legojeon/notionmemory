@@ -249,6 +249,29 @@ def memory_index_injection() -> str:
         return ""
 
 
+def version_drift_injection() -> str:
+    """설치 미러/훅이 패키지보다 뒤처졌으면 `install` 재실행을 넛지. 로컬만 읽는다
+    (네트워크 0).
+
+    receipt 에 각인된 패키지 버전(마지막 `install` 시점)과 지금 실행 중인 패키지
+    버전을 비교한다 — `pipx upgrade` 만 하고 `install` 을 안 돌리면 `~/.claude/skills`
+    미러가 정적 copytree 라 조용히 구버전으로 남는데, 이걸 감지할 다른 채널이 없다.
+    receipt 부재/필드 없음(구 receipt·플러그인 채널)이면 "알 수 없음 → 침묵"으로
+    떨어진다 — 판단 근거가 없을 땐 닦달하지 않는다(다른 넛지들과 같은 규율)."""
+    try:
+        from notionmemory.core import version
+        from notionmemory.core.install import receipt
+        installed = receipt.package_version()
+        if not installed:
+            return ""
+        current = version.package_version()
+        if installed == current:
+            return ""
+        return _m("hook.version_drift", installed=installed, current=current, cli=CLI)
+    except Exception:
+        return ""
+
+
 def _memory_store(config):
     """실 Notion 세션으로 MemoryStore 를 만든다 — 별도 함수로 뽑은 이유는 오직 하나,
     테스트가 이 지점만 몽키패치해 PAT/네트워크 없이 memory_injection 을 시험할 수
@@ -333,6 +356,12 @@ def main(harness: str = "claude") -> int:
         # 스니핑하다 파싱 실패로 훅을 실패 처리한다 — CATALOG 문구는 전부 평문으로 시작한다.
         if note:
             print(note)
+    except Exception:
+        pass
+    try:
+        drift = version_drift_injection()
+        if drift:
+            print(drift)
     except Exception:
         pass
     try:

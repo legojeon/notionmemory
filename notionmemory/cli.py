@@ -10,6 +10,7 @@ from notionmemory.app import build_app, build_registry
 from notionmemory.core import i18n, paths, status as status_probe
 from notionmemory.core.config import Config
 from notionmemory.core.i18n import tui
+from notionmemory.core.version import package_version
 from notionmemory.core.notion_client import NotionSession
 from notionmemory.skills.memory import consolidate as mem_consolidate
 from notionmemory.skills.memory import reindex as mem_reindex
@@ -811,6 +812,23 @@ def _cmd_library(args) -> int:
     return 2
 
 
+def _version_status_line(lang: str) -> str:
+    """상단 한 줄: `notionmemory <ver>` + 설치물 상태. receipt 에 각인된 버전과 지금
+    패키지 버전을 비교해 드리프트를 알린다(SessionStart 넛지와 같은 판정, 여기선
+    사용자가 `status` 를 칠 때 눈으로 확인). receipt 미각인이면 상태 없이 버전만."""
+    from notionmemory.core import version
+    from notionmemory.core.install import receipt
+    current = version.package_version()
+    installed = receipt.package_version()
+    if not installed or installed == current:
+        if not installed:
+            return f"notionmemory {current}"
+        return f"notionmemory {current} ({tui(lang, 'ui.status.version.uptodate', 'artifacts up to date')})"
+    drift = tui(lang, "ui.status.version.drift",
+               "artifacts v{installed} — run `notionmemory install`", installed=installed)
+    return f"notionmemory {current} ({drift})"
+
+
 def _format_status(p: dict, lang: str) -> list[str]:
     """`status.probe()` 결과를 사람이 읽는 줄로 — CLI·에이전트가 그대로 눈으로 확인."""
     lines = []
@@ -834,6 +852,7 @@ def _cmd_status(args) -> int:
     try:
         cfg = Config.load(args.config)
         lang = i18n.language(cfg)
+        print(_version_status_line(lang))
         p = status_probe.probe(cfg)
         for line in _format_status(p, lang):
             print(line)
@@ -886,6 +905,8 @@ def _resolve_install_language(args) -> None:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="notionmemory")
+    parser.add_argument("--version", "-V", action="version",
+                        version=f"notionmemory {package_version()}")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     serve = sub.add_parser("serve")
