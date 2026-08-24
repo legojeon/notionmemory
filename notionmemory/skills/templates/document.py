@@ -207,6 +207,16 @@ class DocumentStore:
         self._markdown_patch(page_id, {
             "type": "replace_content", "replace_content": {"new_str": markdown}})
 
+    def edit(self, page_id: str, find: str, replace: str, all_matches: bool = False) -> None:
+        upd: dict = {"old_str": find, "new_str": replace}
+        if all_matches:
+            upd["replaceAllMatches"] = True
+        self._markdown_patch(page_id, {
+            "type": "update_content", "update_content": {"content_updates": [upd]}})
+
+    def delete(self, page_id: str, find: str, all_matches: bool = False) -> None:
+        self.edit(page_id, find, "", all_matches=all_matches)
+
     def upload_image(self, path) -> str | None:
         """Notion Direct Upload: (1) file_upload 생성 → (2) 바이트 전송. 성공 시 id.
 

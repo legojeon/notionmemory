@@ -85,3 +85,40 @@ def test_replace_refuses_when_truncated():
     # 변이 PATCH 는 절대 나가지 않는다 — GET 하나만.
     assert len(s.session.calls) == 1
     assert s.session.calls[0][0] == "GET"
+
+
+def test_edit_sends_update_content():
+    s = _store([FakeResp(200, {})])
+    s.edit("pid", "old text", "new text")
+    method, path, kw = s.session.calls[0]
+    assert (method, path) == ("PATCH", "/pages/pid/markdown")
+    assert kw["json"] == {"type": "update_content", "update_content":
+                          {"content_updates": [{"old_str": "old text", "new_str": "new text"}]}}
+
+
+def test_edit_all_sets_replace_all_matches():
+    s = _store([FakeResp(200, {})])
+    s.edit("pid", "x", "y", all_matches=True)
+    upd = s.session.calls[0][2]["json"]["update_content"]["content_updates"][0]
+    assert upd["replaceAllMatches"] is True
+
+
+def test_edit_no_match_raises_markdown_edit_error():
+    import pytest
+    s = _store([FakeResp(400, {"message": "No matches found for zzz."})])
+    with pytest.raises(D.MarkdownEditError):
+        s.edit("pid", "zzz", "y")
+
+
+def test_edit_multi_match_raises_markdown_edit_error():
+    import pytest
+    s = _store([FakeResp(400, {"message": 'Multiple matches found for "dup". Found 2 matches.'})])
+    with pytest.raises(D.MarkdownEditError):
+        s.edit("pid", "dup", "y")
+
+
+def test_delete_sends_empty_new_str():
+    s = _store([FakeResp(200, {})])
+    s.delete("pid", "remove me")
+    upd = s.session.calls[0][2]["json"]["update_content"]["content_updates"][0]
+    assert upd == {"old_str": "remove me", "new_str": ""}
