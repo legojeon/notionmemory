@@ -16,6 +16,11 @@ from pathlib import Path
 
 from notionmemory.core.notion_markdown import markdown_to_blocks
 
+TRUNCATION_MARKER = (
+    "[본문이 잘렸습니다 — 페이지가 커서 전체를 읽지 못했습니다. "
+    "replace(전체 재작성)는 거부됩니다. edit/append 로 부분 수정하세요.]"
+)
+
 # 마크다운 접두사가 있는 콘텐츠 블록 타입 → 접두사
 _PREFIX = {
     "heading_1": "# ", "heading_2": "## ", "heading_3": "### ",
@@ -113,52 +118,19 @@ class DocumentStore:
                 f"Notion {method} {path} 실패: {resp.status_code} {resp.text[:200]}")
         return resp
 
+    def _get_markdown(self, page_id: str) -> tuple[str, bool]:
+        data = self._req("GET", f"/pages/{page_id}/markdown").json()
+        return data.get("markdown", ""), bool(data.get("truncated"))
+
     def read(self, page_id: str) -> str:
-        """그 id 의 직속 children 을 라이브 조회 → 마크다운+block-id.
+        md, truncated = self._get_markdown(page_id)
+        if truncated:
+            md = (md + "\n\n" + TRUNCATION_MARKER) if md else TRUNCATION_MARKER
+        return md
 
-        페이지네이션 진행 불변식 가드: `has_more` 인데 이번 요청이 새 블록을 못
-        늘렸거나 커서가 없으면 멈춘다(store._fetch·walk_structure 와 같은 규율 —
-        서버가 진행을 못 시켜주는 모양에서 무한 루프하지 않는다).
-
-        캡 도달 판정은 `>=`(엄격한 `>` 아님) — DOC_PAGE_SIZE(100) 가 DOC_NODE_CAP(500)
-        을 나누어떨어지므로, 500 블록을 넘는 문서는 흔히 정확히 500 에서 착지하고
-        `has_more` 만 true 로 남는다. 그 모양에서도 잘렸다는 사실을 경고해야 한다 —
-        캡에 도달했지만 서버에 더 없다면(has_more=false) 경고하지 않는다(오탐 금지).
-        """
-        blocks: list = []
-        seen: set = set()
-        cursor = None
-        while len(blocks) < DOC_NODE_CAP:
-            params = {"page_size": DOC_PAGE_SIZE}
-            if cursor:
-                params["start_cursor"] = cursor
-            data = self._req("GET", f"/blocks/{page_id}/children", params=params).json()
-            page_blocks = data.get("results") or []
-            before = len(seen)
-            for b in page_blocks:
-                bid = b.get("id", "")
-                if bid and bid not in seen:
-                    seen.add(bid)
-                    blocks.append(b)
-            has_more = bool(data.get("has_more"))
-            if len(blocks) >= DOC_NODE_CAP:
-                # 하드 캡 도달. 이번 페이지가 상한을 넘겼거나(overshoot), 정확히 캡에
-                # 맞아떨어졌는데도 서버에 더 남아있으면(has_more) 진짜로 잘린 것이다 —
-                # 조용히 자르지 않고 눈에 보이게 경고한다. 캡=문서 끝(has_more=false)이면
-                # 잘린 게 아니므로 경고하지 않는다.
-                overshoot = len(blocks) > DOC_NODE_CAP
-                blocks = blocks[:DOC_NODE_CAP]
-                if overshoot or has_more:
-                    self.log(
-                        f"문서 본문이 {DOC_NODE_CAP}블록을 넘습니다 — read 는 처음 {DOC_NODE_CAP}개만"
-                        " 보여줍니다(전체가 아님).")
-                break
-            if not has_more or len(seen) == before:
-                break
-            cursor = data.get("next_cursor")
-            if not cursor or not page_blocks:
-                break
-        return render_blocks(blocks)
+    def current_markdown(self, page_id: str) -> str:
+        """미리보기용 — truncation 마커 없이 현재 본문만."""
+        return self._get_markdown(page_id)[0]
 
     def get_block(self, block_id: str) -> dict:
         return self._req("GET", f"/blocks/{block_id}").json()
