@@ -21,7 +21,9 @@ class FakeKeyring:
 
 
 @pytest.fixture(autouse=True)
-def fake_keyring(monkeypatch):
+def fake_keyring(monkeypatch, request):
+    if request.node.get_closest_marker("live_notion"):
+        return  # live smoke authenticates against the real keyring
     fake = FakeKeyring()
     monkeypatch.setitem(sys.modules, "keyring", fake)
     return fake
