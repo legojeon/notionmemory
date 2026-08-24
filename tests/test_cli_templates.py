@@ -350,26 +350,13 @@ class FakeDocStore:
     def __init__(self, session, log=None):
         FakeDocStore.instance = self
         self.calls = []
-        self.blocks = {"b1": {"id": "b1", "type": "paragraph",
-                              "paragraph": {"rich_text": [{"plain_text": "옛 내용"}]}}}
 
     def read(self, page_id):
         self.calls.append(("read", page_id))
         return "[b1] 옛 내용\n[db: d1] Papers"
 
-    def get_block(self, block_id):
-        self.calls.append(("get_block", block_id))
-        return self.blocks[block_id]
-
-    def add_blocks(self, page_id, markdown, after=None):
-        self.calls.append(("add_blocks", page_id, markdown, after))
-        return ["new1"]
-
-    def set_block(self, block_id, markdown):
-        self.calls.append(("set_block", block_id, markdown))
-
-    def remove_block(self, block_id):
-        self.calls.append(("remove_block", block_id))
+    def append(self, page_id, markdown):
+        self.calls.append(("append", page_id, markdown))
 
     def add_page(self, parent, title, markdown=""):
         self.calls.append(("add_page", parent, title, markdown))
@@ -384,9 +371,28 @@ def fake_doc(monkeypatch):
     return FakeDocStore
 
 
-def test_read_prints_the_live_markdown(capsys, fake_doc):
-    _saved()
-    assert cli.main(["templates", "read", "job-tracker", "pg_root"]) == 0
+def test_resolve_page_target_passthrough_id():
+    pid = "3b2cf80747f2811c9cbcccdbb63225e2"
+    assert cli._resolve_page_target(pid) == pid  # 32-hex → 그대로(dashless)
+
+
+def test_read_prints_markdown(monkeypatch, capsys):
+    class S:
+        def __init__(self, *a, **k): pass
+        def read(self, pid): return "# Doc\n\nhello"
+    monkeypatch.setattr(cli, "DocumentStore", lambda *a, **k: S())
+    monkeypatch.setattr(cli, "NotionSession", lambda *a, **k: object())
+    monkeypatch.setattr(cli, "_resolve_page_target", lambda t: "pid")
+    assert cli.main(["templates", "read", "pid"]) == 0
+    assert "# Doc" in capsys.readouterr().out
+
+
+def test_read_reads_a_raw_page_id_directly(capsys, fake_doc):
+    """slug 등록 없이 원시 page-id 를 직접 넘기면 그대로 읽는다(override 경로) —
+    `<slug|page-id>` 리졸버가 32-hex 를 slug 조회 없이 통과시킨다."""
+    pid = "3b2cf80747f2811c9cbcccdbb63225e2"
+    assert cli.main(["templates", "read", pid]) == 0
+    assert ("read", pid) in FakeDocStore.instance.calls
     assert "[b1] 옛 내용" in capsys.readouterr().out
 
 
@@ -397,13 +403,23 @@ def test_read_without_page_id_defaults_to_profile_root(fake_doc):
     assert ("read", "pg_root") in FakeDocStore.instance.calls
 
 
-def test_block_add_is_free_and_applies_immediately(capsys, fake_doc):
+def test_append_calls_store(monkeypatch, capsys):
+    calls = {}
+    class S:
+        def append(self, pid, md): calls["append"] = (pid, md)
+    monkeypatch.setattr(cli, "DocumentStore", lambda *a, **k: S())
+    monkeypatch.setattr(cli, "NotionSession", lambda *a, **k: object())
+    monkeypatch.setattr(cli, "_resolve_page_target", lambda t: "pid")
+    assert cli.main(["templates", "append", "slug", "--markdown", "more"]) == 0
+    assert calls["append"] == ("pid", "more")
+
+
+def test_append_is_free_and_applies_immediately(capsys, fake_doc):
     _saved()
-    assert cli.main(["templates", "block", "add", "pg_root",
+    assert cli.main(["templates", "append", "job-tracker",
                      "--markdown", "## 새 섹션"]) == 0
-    kinds = [c[0] for c in FakeDocStore.instance.calls]
-    assert "add_blocks" in kinds
-    assert "new1" in capsys.readouterr().out
+    assert ("append", "pg_root", "## 새 섹션") in FakeDocStore.instance.calls
+    assert "pg_root" in capsys.readouterr().out
 
 
 def test_page_add_is_free(capsys, fake_doc):
@@ -414,33 +430,33 @@ def test_page_add_is_free(capsys, fake_doc):
     assert "pgnew" in capsys.readouterr().out
 
 
-def test_block_add_reads_markdown_from_file(tmp_path, fake_doc):
+def test_append_reads_markdown_from_file(tmp_path, fake_doc):
     """백틱·따옴표가 든 마크다운을 셸 인용 없이 파일로 넘긴다(--markdown-file)."""
     _saved()
     body = "## 코드\n```c\nint *i = 0; `backtick` \"quote\" $(cmd)\n```"
     f = tmp_path / "body.md"
     f.write_text(body, encoding="utf-8")
-    assert cli.main(["templates", "block", "add", "pg_root",
+    assert cli.main(["templates", "append", "job-tracker",
                      "--markdown-file", str(f)]) == 0
-    call = [c for c in FakeDocStore.instance.calls if c[0] == "add_blocks"][0]
+    call = [c for c in FakeDocStore.instance.calls if c[0] == "append"][0]
     assert call[2] == body                       # 파일 내용이 그대로 전달됨
 
 
-def test_block_add_reads_markdown_from_stdin(monkeypatch, fake_doc):
+def test_append_reads_markdown_from_stdin(monkeypatch, fake_doc):
     """`--markdown-file -` 는 stdin 에서 읽는다."""
     import io
     _saved()
     monkeypatch.setattr(cli.sys, "stdin", io.StringIO("본문 `code`"))
-    assert cli.main(["templates", "block", "add", "pg_root",
+    assert cli.main(["templates", "append", "job-tracker",
                      "--markdown-file", "-"]) == 0
-    call = [c for c in FakeDocStore.instance.calls if c[0] == "add_blocks"][0]
+    call = [c for c in FakeDocStore.instance.calls if c[0] == "append"][0]
     assert call[2] == "본문 `code`"
 
 
-def test_block_add_without_any_markdown_exits_2(capsys, fake_doc):
+def test_append_without_any_markdown_exits_2(capsys, fake_doc):
     """--markdown 도 --markdown-file 도 없으면 명확히 막고 exit 2."""
     _saved()
-    assert cli.main(["templates", "block", "add", "pg_root"]) == 2
+    assert cli.main(["templates", "append", "job-tracker"]) == 2
     assert "필요합니다" in capsys.readouterr().out
 
 
@@ -451,57 +467,6 @@ def test_page_add_reads_markdown_from_file(tmp_path, fake_doc):
     assert cli.main(["templates", "page", "add", "pg_root",
                      "--title", "새 논문", "--markdown-file", str(f)]) == 0
     assert ("add_page", "pg_root", "새 논문", "## 요약 `x`") in FakeDocStore.instance.calls
-
-
-def test_block_set_without_yes_previews_and_exits_2_without_mutating(capsys, fake_doc):
-    _saved()
-    rc = cli.main(["templates", "block", "set", "b1", "--markdown", "새 내용"])
-    assert rc == 2
-    out = capsys.readouterr().out
-    assert "옛 내용" in out and "새 내용" in out          # old → new 미리보기
-    kinds = [c[0] for c in FakeDocStore.instance.calls]
-    assert "set_block" not in kinds                       # 변이 0건
-
-
-def test_block_set_with_yes_applies(fake_doc):
-    _saved()
-    assert cli.main(["templates", "block", "set", "b1", "--markdown", "새 내용", "--yes"]) == 0
-    assert ("set_block", "b1", "새 내용") in FakeDocStore.instance.calls
-
-
-def test_block_set_multi_block_markdown_warns_before_yes(capsys, fake_doc):
-    """set 은 블록 하나만 바꾼다 — 마크다운이 여러 블록으로 쪼개지면 미리보기가
-    (승인 전에) 그 사실과 remove+add 대안을 알려야 한다. --yes 없이 exit 2, 변이 0건."""
-    _saved()
-    rc = cli.main(["templates", "block", "set", "b1", "--markdown", "첫 줄\n\n둘째 문단"])
-    assert rc == 2
-    out = capsys.readouterr().out
-    assert "remove" in out and "add" in out
-    kinds = [c[0] for c in FakeDocStore.instance.calls]
-    assert "set_block" not in kinds                       # 변이 0건
-
-
-def test_block_set_single_block_preview_has_no_warning(capsys, fake_doc):
-    _saved()
-    rc = cli.main(["templates", "block", "set", "b1", "--markdown", "새 내용"])
-    assert rc == 2
-    out = capsys.readouterr().out
-    assert "remove" not in out and "add" not in out
-
-
-def test_block_remove_without_yes_previews_and_exits_2(capsys, fake_doc):
-    _saved()
-    rc = cli.main(["templates", "block", "remove", "b1"])
-    assert rc == 2
-    assert "옛 내용" in capsys.readouterr().out           # 무엇이 archive 되는지
-    assert "remove_block" not in [c[0] for c in FakeDocStore.instance.calls]
-
-
-def test_block_remove_with_yes_archives(capsys, fake_doc):
-    _saved()
-    assert cli.main(["templates", "block", "remove", "b1", "--yes"]) == 0
-    assert ("remove_block", "b1") in FakeDocStore.instance.calls
-    assert "복원" in capsys.readouterr().out               # 되돌릴 수 있음을 알린다
 
 
 def test_show_prints_the_pages_outline(capsys):

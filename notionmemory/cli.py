@@ -16,7 +16,6 @@ from notionmemory.skills.memory import reindex as mem_reindex
 from notionmemory.skills.memory.notion_db import (
     CAPTURE_TYPES, NotASecondBrainError, SecondBrainDB, db_url as mem_db_url)
 from notionmemory.skills.memory.store import MemoryStore
-from notionmemory.core.notion_markdown import markdown_to_blocks
 from notionmemory.skills.git import hooks as gc_hooks
 from notionmemory.skills.git import queue as gc_queue
 from notionmemory.skills.git.flusher import flush as gc_flush
@@ -28,7 +27,7 @@ from notionmemory.skills.templates import filters as templates_filters
 from notionmemory.skills.templates import introspect as templates_introspect
 from notionmemory.skills.templates import profile as templates_profile
 from notionmemory.skills.templates import render as templates_render
-from notionmemory.skills.templates.document import DocumentStore, PageNotFound, block_markdown
+from notionmemory.skills.templates.document import DocumentStore, PageNotFound
 from notionmemory.skills.templates.store import ProfileGone, TemplateStore
 
 DEFAULT_CONFIG = str(paths.config_path())
@@ -515,19 +514,37 @@ def _templates_write(args) -> int:
     return 0
 
 
+def _resolve_page_target(target: str) -> str:
+    """`<slug|page-id>` → page_id. URL/ID 면 그대로, 아니면 등록 slug 의 루트 페이지."""
+    pid = templates_introspect.extract_page_id(target)
+    if pid:
+        return pid
+    p = templates_profile.load(target)   # 미등록이면 ValueError → exit 2
+    if not p.page_id:
+        # 프롬프트 전용(청사진)은 읽거나 편집할 루트 페이지가 없다 — GET
+        # /blocks//children 으로 가서 혼란스러운 Notion 오류를 내는 대신 명확히
+        # 안내한다(최종 리뷰 Important).
+        raise ValueError(
+            f"'{target}' 은 프롬프트 전용 템플릿이라 연결 페이지가 없습니다 — "
+            "읽거나 편집할 page-id 를 직접 지정하세요.")
+    return p.page_id
+
+
 def _templates_read(args) -> int:
-    p = templates_profile.load(args.slug)     # 등록 여부 확인(없으면 ValueError→exit 2)
-    target = args.page_id or p.page_id
-    if not target:
-        # 프롬프트 전용(청사진)은 읽을 루트 페이지가 없다 — GET /blocks//children 로 가서
-        # 혼란스러운 Notion 오류를 내는 대신 명확히 안내한다(최종 리뷰 Important).
-        print(f"'{p.slug}' 은 프롬프트 전용 템플릿이라 읽을 연결 페이지가 없습니다 "
-              "— 읽을 페이지 id 를 직접 지정하거나(`templates read <slug> <page-id>`), "
-              "구조 있는 인스턴스 템플릿을 쓰세요.")
-        return 2
+    target = _resolve_page_target(args.target)
     store = DocumentStore(NotionSession(), log=print)
-    # page_id 생략 시 프로필의 루트 페이지 본문을 읽는다(스펙 §4 `read <slug> [<page-id>]`)
     print(store.read(target))
+    return 0
+
+
+def _templates_append(args) -> int:
+    md = _text_or_file(args.markdown, args.markdown_file)
+    if md is None:
+        print("--markdown 또는 --markdown-file 이 필요합니다")
+        return 2
+    target = _resolve_page_target(args.target)
+    DocumentStore(NotionSession(), log=print).append(target, md)
+    print(f"추가됨: {target}")
     return 0
 
 
@@ -548,55 +565,6 @@ def _text_or_file(inline, file_path):
             # 경로는 예상된 실패이므로 traceback 이 아니라 되물음(exit 2)이어야 한다.
             raise ValueError(f"파일을 읽을 수 없습니다: {file_path} ({e.strerror or e})")
     return inline
-
-
-def _templates_block(args) -> int:
-    store = DocumentStore(NotionSession(), log=print)
-    if args.block_action == "add":
-        md = _text_or_file(args.markdown, args.markdown_file)
-        if md is None:
-            print("--markdown 또는 --markdown-file 이 필요합니다")
-            return 2
-        ids = store.add_blocks(args.page_id, md, after=args.after or None)
-        print("추가됨: " + (", ".join(ids) if ids else "(0개)"))
-        return 0
-    # set / remove — 파괴적. --yes 없으면 미리보기 + exit 2(변이 호출 0건).
-    cur = store.get_block(args.block_id)
-    old = block_markdown(cur)
-    if args.block_action == "set":
-        md = _text_or_file(args.markdown, args.markdown_file)
-        if md is None:
-            print("--markdown 또는 --markdown-file 이 필요합니다")
-            return 2
-        if not args.yes:
-            preview = (f"이 블록을 바꿉니다:\n  이전: {old}\n  이후: {md}\n"
-                       "확인하면 --yes 를 붙여 다시 실행하세요.")
-            # set 은 블록 하나의 rich_text 만 바꾼다 — 마크다운이 여러 블록으로
-            # 쪼개지면 첫 블록만 반영되고 나머지는 조용히 버려진다. --yes 로
-            # 승인하기 *전에* 이 사실을 미리보기에서 알린다(승인 후에야 아는 건
-            # 게이트의 의미가 없다). store.set_block 의 경고는 변이 이후에만
-            # 찍히므로 여기서 별도로 판단해야 한다.
-            new_blocks = markdown_to_blocks(md)
-            if len(new_blocks) > 1:
-                preview += (
-                    f"\n경고: set 은 블록 하나의 내용만 바꿉니다 — 이 마크다운은"
-                    f" {len(new_blocks)}개 블록으로 나뉘어 첫 블록만 반영되고 나머지는"
-                    " 버려집니다. 여러 블록을 바꾸려면 remove 로 지우고 add 로 새로"
-                    " 넣으세요.")
-            print(preview)
-            return 2
-        store.set_block(args.block_id, md)
-        print(f"수정됨: {args.block_id}")
-        return 0
-    if args.block_action == "remove":
-        if not args.yes:
-            print(f"이 블록을 삭제(휴지통)합니다:\n  {old}\n"
-                  "확인하면 --yes 를 붙여 다시 실행하세요.")
-            return 2
-        store.remove_block(args.block_id)
-        print(f"삭제됨(휴지통): {args.block_id} — Notion 히스토리로 복원할 수 있습니다")
-        return 0
-    return 2
 
 
 def _templates_page(args) -> int:
@@ -676,8 +644,8 @@ def _cmd_templates(args) -> int:
         return 0
     if args.action == "read":
         return _templates_read(args)
-    if args.action == "block":
-        return _templates_block(args)
+    if args.action == "append":
+        return _templates_append(args)
     if args.action == "page":
         return _templates_page(args)
     if args.action == "image":
@@ -975,25 +943,12 @@ def main(argv=None) -> int:
                     help="사용 노트(본문)까지 다시 생성 — agent 호출이 껴서 수십 초 걸린다")
     tf.add_argument("--config", default=DEFAULT_CONFIG)
     trd = tpl_sub.add_parser("read")
-    trd.add_argument("slug")
-    trd.add_argument("page_id", nargs="?", default="")   # 생략 시 프로필 루트 페이지
-    tb = tpl_sub.add_parser("block")
-    tb_sub = tb.add_subparsers(dest="block_action", required=True)
-    tba = tb_sub.add_parser("add")
-    tba.add_argument("page_id")
-    tba.add_argument("--markdown", default=None)
-    tba.add_argument("--markdown-file", default="",
-                     help="마크다운을 파일에서 읽는다(`-`=stdin) — 백틱·따옴표 든 본문용")
-    tba.add_argument("--after", default="")
-    tbs = tb_sub.add_parser("set")
-    tbs.add_argument("block_id")
-    tbs.add_argument("--markdown", default=None)
-    tbs.add_argument("--markdown-file", default="",
+    trd.add_argument("target")            # <slug|page-id>
+    tap = tpl_sub.add_parser("append")
+    tap.add_argument("target")
+    tap.add_argument("--markdown", default=None)
+    tap.add_argument("--markdown-file", default="",
                      help="마크다운을 파일에서 읽는다(`-`=stdin)")
-    tbs.add_argument("--yes", action="store_true")
-    tbr = tb_sub.add_parser("remove")
-    tbr.add_argument("block_id")
-    tbr.add_argument("--yes", action="store_true")
     tp = tpl_sub.add_parser("page")
     tp_sub = tp.add_subparsers(dest="page_action", required=True)
     tpa = tp_sub.add_parser("add")
