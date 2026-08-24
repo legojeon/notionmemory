@@ -47,4 +47,5 @@ notionmemory = ["agent_skills/**/*"]
 testpaths = ["tests"]
 markers = [
     "harness: 실제 Claude Code / Codex 세션이 필요하다 (구독 소모, 기본 제외)",
+    "live_notion: 실제 Notion 워크스페이스 왕복이 필요하다 (PAT 소모, 기본 제외)",
 ]
