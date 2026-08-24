@@ -1,95 +1,20 @@
-"""문서 편집 — Notion 블록 트리를 마크다운으로 읽고, 마크다운으로 쓰기.
+"""문서 편집 — Notion 페이지 본문을 마크다운으로 읽고, 마크다운으로 쓰기.
 
-`read` 출력은 각 블록을 `[<block-id>] <마크다운>` 으로 주석 달아 에이전트가 어느
-블록을 고칠지 정확히 지목하게 한다 — 본문은 API 로 검색이 안 되고, 편집엔 살아있는
-block-id 가 필요하기 때문이다.
-
-렌더러는 **총체적**이다: 모르는 블록 타입도 `[type: xxx]` 라벨로 내보내고 절대
-크래시하거나 JSON 구조를 누출하지 않는다(`render.plain` 과 같은 규율). Notion 이 새
-블록 타입을 추가해도, 우리가 못 그리는 블록이 빈 칸이나 traceback 이 아니라 눈에
-보이는 라벨로 남는다.
+Notion Markdown Content API(`GET/PATCH /pages/:id/markdown`)를 그대로 감싼다:
+`read`/`current_markdown` 은 페이지 전체를 마크다운 한 덩어리로 받고,
+`append`/`replace`/`edit`/`delete` 는 find/replace 또는 전체 재작성으로 쓴다.
+블록-id 를 다루지 않으므로 렌더러도, 살아있는 block-id 도 필요 없다 — API 가
+본문을 통째로 마크다운 문자열로 주고받는다.
 """
 from __future__ import annotations
 
 import mimetypes
 from pathlib import Path
 
-from notionmemory.core.notion_markdown import markdown_to_blocks
-
 TRUNCATION_MARKER = (
     "[본문이 잘렸습니다 — 페이지가 커서 전체를 읽지 못했습니다. "
     "replace(전체 재작성)는 거부됩니다. edit/append 로 부분 수정하세요.]"
 )
-
-# 마크다운 접두사가 있는 콘텐츠 블록 타입 → 접두사
-_PREFIX = {
-    "heading_1": "# ", "heading_2": "## ", "heading_3": "### ",
-    "bulleted_list_item": "- ", "numbered_list_item": "1. ",
-    "quote": "> ", "callout": "> ",
-    "paragraph": "", "toggle": "",
-}
-
-
-def _plain(rich) -> str:
-    """rich_text 배열 → 평문. 비-dict 원소는 건너뛴다(총체적)."""
-    return "".join(r.get("plain_text", "") for r in (rich or []) if isinstance(r, dict))
-
-
-def block_markdown(block: dict) -> str:
-    """콘텐츠 블록 하나 → 마크다운 한 줄(들). id 는 붙이지 않는다.
-
-    모르는 타입은 `[type: <t>]` 라벨. 절대 크래시·구조 누출 없음.
-    """
-    btype = (block or {}).get("type", "")
-    body = (block or {}).get(btype) or {}
-    rich = body.get("rich_text") if isinstance(body, dict) else None
-    text = _plain(rich)
-
-    if btype == "to_do":
-        mark = "x" if body.get("checked") else " "
-        return f"- [{mark}] {text}"
-    if btype == "code":
-        lang = body.get("language", "") or "plain text"
-        return f"```{lang}\n{text}\n```"
-    if btype == "divider":
-        return "---"
-    if btype in _PREFIX:
-        return _PREFIX[btype] + text
-    # 콘텐츠로 그릴 수 없는(또는 모르는) 타입 — 눈에 보이는 라벨로만 남긴다
-    return f"[type: {btype}]"
-
-
-def render_blocks(blocks: list) -> str:
-    """블록 리스트 → `[<id>] <md>` 주석 다중 줄.
-
-    `child_database`/`child_page` 는 참조 줄(에이전트가 query/read 로 따로 다뤄라),
-    하위 블록이 있는 블록은 그 id 로 read 하라고 안내한다.
-    """
-    if not blocks:
-        return "(빈 페이지)"
-    lines: list[str] = []
-    for block in blocks:
-        if not isinstance(block, dict):  # 비-dict 원소는 건너뛴다(총체적)
-            continue
-        bid = block.get("id", "")
-        btype = block.get("type", "")
-        if btype == "child_database":
-            title = (block.get("child_database") or {}).get("title", "")
-            lines.append(f"[db: {bid}] {title}")
-            continue
-        if btype == "child_page":
-            title = (block.get("child_page") or {}).get("title", "")
-            lines.append(f"[page: {bid}] {title}")
-            continue
-        line = f"[{bid}] {block_markdown(block)}"
-        if block.get("has_children"):
-            line += f"  (하위 블록 있음 — read {bid} 로 열람)"
-        lines.append(line)
-    return "\n".join(lines)
-
-
-DOC_PAGE_SIZE = 100
-DOC_NODE_CAP = 500     # read 한 번이 읽는 블록 총량 상한 — 거대한 페이지 방어
 
 
 class PageNotFound(RuntimeError):
@@ -104,10 +29,9 @@ class MarkdownEditError(RuntimeError):
 
 
 class DocumentStore:
-    """등록된 페이지의 본문 블록 I/O. 게이트(미리보기·확인)는 CLI 책임 — 여기선 원시 동작만.
-
-    삭제는 하드 딜리트가 아니라 archive 다(`DELETE /blocks/{id}` 는 Notion 에서
-    휴지통 이동이며 히스토리로 복원된다) — DB 쪽이 하드 딜리트를 안 쓰는 것과 같은 규율.
+    """등록된 페이지의 본문 I/O(Markdown Content API). 게이트(미리보기·확인)는 CLI
+    책임 — 여기선 원시 동작만. `delete` 도 하드 딜리트가 아니라 `edit` 로 대상 텍스트를
+    빈 문자열로 바꾸는 것(update_content) — DB 쪽이 하드 딜리트를 안 쓰는 것과 같은 규율.
     """
 
     def __init__(self, session, log=None):
@@ -136,38 +60,6 @@ class DocumentStore:
     def current_markdown(self, page_id: str) -> str:
         """미리보기용 — truncation 마커 없이 현재 본문만."""
         return self._get_markdown(page_id)[0]
-
-    def get_block(self, block_id: str) -> dict:
-        return self._req("GET", f"/blocks/{block_id}").json()
-
-    def add_blocks(self, page_id: str, markdown: str, after: str | None = None) -> list:
-        body: dict = {"children": markdown_to_blocks(markdown)}
-        if after:
-            body["after"] = after
-        data = self._req("PATCH", f"/blocks/{page_id}/children", json=body).json()
-        return [b.get("id", "") for b in (data.get("results") or [])]
-
-    def set_block(self, block_id: str, markdown: str) -> None:
-        """블록 내용 교체. Notion 은 블록 타입 제자리 변경을 지원하지 않으므로,
-        그 블록의 현재 타입 아래 rich_text 만 새 내용으로 바꾼다(마크다운의 첫
-        블록에서 rich_text 를 취한다 — 타입까지 바꾸려면 remove + add)."""
-        cur = self.get_block(block_id)
-        btype = cur.get("type", "paragraph")
-        new_blocks = markdown_to_blocks(markdown) or [
-            {"type": "paragraph", "paragraph": {"rich_text": []}}]
-        if len(new_blocks) > 1:
-            # 침묵 데이터 손실 금지 — 첫 블록만 반영되고 나머지는 버려짐을 알린다.
-            self.log(
-                f"set 은 블록 하나의 내용만 바꿉니다 — 마크다운이 {len(new_blocks)}개 블록으로"
-                " 변환돼 첫 블록만 반영되고 나머지는 버려집니다. 여러 블록을 바꾸려면"
-                " remove + add 를 쓰세요.")
-        first = new_blocks[0]
-        new_rich = (first.get(first.get("type", ""), {}) or {}).get("rich_text", [])
-        self._req("PATCH", f"/blocks/{block_id}",
-                  json={btype: {"rich_text": new_rich}})
-
-    def remove_block(self, block_id: str) -> None:
-        self._req("DELETE", f"/blocks/{block_id}")     # archive(휴지통), 하드 딜리트 아님
 
     def add_page(self, parent_page_id: str, title: str, markdown: str = "") -> dict:
         body = {"parent": {"page_id": parent_page_id},

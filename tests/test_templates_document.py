@@ -122,3 +122,16 @@ def test_delete_sends_empty_new_str():
     s.delete("pid", "remove me")
     upd = s.session.calls[0][2]["json"]["update_content"]["content_updates"][0]
     assert upd == {"old_str": "remove me", "new_str": ""}
+
+
+def test_dead_block_helpers_removed():
+    # 블록-id 렌더/편집 표면은 제거됐다(마크다운 API 로 대체).
+    assert not hasattr(D, "render_blocks")
+    assert not hasattr(D, "block_markdown")
+    for gone in ("get_block", "add_blocks", "set_block", "remove_block"):
+        assert not hasattr(D.DocumentStore, gone)
+
+
+def test_image_ops_retained():
+    assert hasattr(D.DocumentStore, "upload_image")
+    assert hasattr(D.DocumentStore, "add_image")
