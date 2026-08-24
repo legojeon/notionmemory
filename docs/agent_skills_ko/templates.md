@@ -92,36 +92,51 @@ NotionSession().request("POST", "/databases", json={
 알려준다.
 
 ```
-templates read <slug> <page-id>                       # 라이브 본문 → 마크다운 + block-id
-templates block add <page-id> [--after <block-id>] --markdown "..."   # 추가 (자유)
-templates page add <parent-page-id> --title "..." [--markdown "..."] # 하위 페이지 생성 (자유)
-templates block set <block-id> --markdown "..." [--yes]   # 내용 교체 (확인 필요)
-templates block remove <block-id> [--yes]                 # 삭제=휴지통 (확인 필요)
+templates read <slug|page-id>                                          # 라이브 본문 → 순수 마크다운 (block-id 없음)
+templates append <slug|page-id> --markdown "..." | --markdown-file <경로|-> # 끝에 추가 (자유)
+templates page add <parent-page-id> --title "..." [--markdown "..."]   # 하위 페이지 생성 (자유)
+templates edit <slug|page-id> --find "..." --replace "..." [--all] --yes  # 찾아 바꾸기 (확인 필요)
+templates delete <slug|page-id> --find "..." [--all] --yes                # 매치된 텍스트 삭제 (확인 필요)
+templates replace <slug|page-id> --markdown "..." | --markdown-file <경로|-> --yes  # 본문 전체 재작성 (확인 필요)
 ```
+
+block-id가 아니라 **텍스트로 주소를 지정한다** — 이 워크플로우 어디에도 block-id는 없다.
+`read`는 본문을 순수 마크다운으로 출력하고, id 참조가 아니라 텍스트 매치로 내용을 찾아
+편집한다.
 
 본문에 **백틱(코드펜스)·따옴표·`$()`** 가 들면 `--markdown "..."` 로 셸에 직접 넘기지 말고
 `--markdown-file <경로>`(또는 `--markdown-file -` 로 stdin)를 써라 — 셸이 backtick 을 명령
-치환으로 오인하는 것을 피한다. `prompt --set-file`·`new-prompt --prompt-file` 도 동일(프롬프트에
-백틱이 흔하다). 마크다운을 파일로 쓴 뒤 그 경로를 넘기는 게 안전하다.
+치환으로 오인하는 것을 피한다. `--find`/`--replace`, `prompt --set-file`,
+`new-prompt --prompt-file` 도 동일(프롬프트에 백틱이 흔하다). 마크다운을 파일로 쓴 뒤 그
+경로를 넘기는 게 안전하다.
 
-`read` 출력은 `[<block-id>] <마크다운>` 이고, `[db: id]`는 박힌 DB(→ `query`로 다뤄라),
-`[page: id]`는 하위 페이지(→ 따로 `read`).
+`read` 출력은 순수 마크다운이고, `[db: id]`는 박힌 DB(→ `query`로 다뤄라), `[page: id]`는
+하위 페이지(→ 따로 `read`).
 
 **행 본문도 문서다.** DB의 각 행은 그 자체가 페이지다. "논문 추가하고 요약 써줘"는
-`add`로 행을 만들어 **행 id**를 받고, 그 id에 `block add`로 본문을 채운다 —
+`add`로 행을 만들어 **행 id**를 받고, 그 id에 `append`로 본문을 채운다 —
 CRUD(행) + 문서 편집(본문)의 조합이다.
 
 ### 세 가지 규칙
 
-1. **`read` 없이 block-id를 추측하지 마라.** 수정·삭제 전 반드시 그 페이지를 `read`해
-   살아있는 block-id를 얻는다. 캐시된 개요(`show`)는 구조만 알려줄 뿐, 편집엔 라이브 id가 필요하다.
-2. **`--yes`는 지름길이 아니다.** `block set`/`remove`는 `--yes` 없이 부르면 미리보기(이전→이후)와
-   함께 exit 2를 낸다. **사용자에게 그 미리보기를 보여주고 승인받은 뒤에만** `--yes`로 다시
-   실행한다. 임의로 `--yes`를 붙여 확인을 건너뛰지 않는다. 추가·생성은 자유.
+1. **`edit`/`delete`는 위치가 아니라 텍스트로 매치한다.** `--find`에 유일하게 특정될
+   만큼 충분한 주변 텍스트를 준다. 매치 0건, 또는 `--all` 없이 다중 매치면 **변경 없이**
+   그대로 안내된다 — 현재 본문을 다시 읽어 좁히거나(`--all`로 전체 치환) 재시도한다.
+2. **`--yes`는 지름길이 아니다.** `edit`/`delete`/`replace`를 `--yes` 없이 부르면 미리보기
+   (무엇이 몇 건 바뀌는지)와 함께 exit 2를 낸다. **사용자에게 그 미리보기를 보여주고
+   승인받은 뒤에만** `--yes`로 다시 실행한다. 임의로 `--yes`를 붙여 확인을 건너뛰지 않는다.
+   `append`/`page add`는 자유. `replace`는 페이지가 커서 `read`가 본문 전체를 돌려주지
+   못할 때는 `--yes`를 붙여도 그대로 거부된다 — 그런 페이지는 `edit`/`append`를 쓴다.
 3. **새 항목은 기존 형제를 모방하라.** 새 하위 페이지나 행 본문을 만들 땐, 먼저 기존 형제 하나를
    `read`해 그 섹션 구조를 보고 같은 형태로 작성한다(Notion 데이터베이스 템플릿은 API로 발동할 수 없다).
 
 편집할 그 페이지 하나만 `read`한다(전체 트리 아님). 섹션 구조는 `show`의 캐시된 개요로 이미 안다.
+
+**Notion 방언 마크다운** — 몇몇 구문은 독립된 줄/태그가 필요하다: 블록 수식은 `$$` 를
+텍스트와 섞지 않고 독립된 줄에 둔다. toggle 은 `<details><summary>제목</summary>` …
+`</details>` 를 각각 독립된 줄에 쓴다. callout 은 `<callout>...</callout>`. columns 는
+`<columns><column>...</column><column>...</column></columns>`. 목차는
+`<table_of_contents/>`.
 
 ## 콘텐츠 저작 — 템플릿에 채우기
 
@@ -130,8 +145,9 @@ CRUD(행) + 문서 편집(본문)의 조합이다.
 
 - 새 구조가 필요하면 `templates create-page --parent <id> --title <t> --slug <s>` 로 페이지를
   만들어 등록하고, `templates prompt <s> --set "<지시·톤>"` 으로 프롬프트를 붙인다.
-- 본문은 `templates block`/`templates page`(문서 편집)로, **이미지는 `templates image
-  <page-id> <로컬이미지> [--caption ...]`** 로 삽입한다(Notion 업로드는 이 명령이 처리).
+- 본문은 `templates append`/`templates edit`/`templates page`(문서 편집)로, **이미지는
+  `templates image <page-id> <로컬이미지> [--caption ...]`** 로 삽입한다(Notion 업로드는
+  이 명령이 처리).
 - 파일(PDF·코드·HTML)·그림 크롭은 **네 도구로 직접 읽고 만든다** — notionmemory 는 읽지
   않는다. 만든 이미지 파일 경로를 `templates image` 에 넘기면 된다.
 
@@ -139,7 +155,7 @@ CRUD(행) + 문서 편집(본문)의 조합이다.
 "이 강의자료 폴더 정리해줘": (1) 폴더의 PDF/이미지를 네가 읽고(읽기·figure crop 은 네 도구 몫
 — PyMuPDF·poppler 등이 없으면 설치하거나 사용자에게 요청한다. notionmemory 는 Notion 쓰기만
 담당), (2) `templates page add <부모>` 로 노트 페이지를 만든 뒤, (3) 그 템플릿 프롬프트를 따라
-`templates block` 으로 본문을, `templates image` 로 크롭한 그림을 채운다. 논문 정리도 동일 —
+`templates append` 으로 본문을, `templates image` 로 크롭한 그림을 채운다. 논문 정리도 동일 —
 구조·톤은 템플릿·프롬프트가, 읽기·크롭은 네가.
 
 `templates create-page` 는 만든 페이지를 **템플릿으로 등록**하는 명령이다 — 하나의 편집 대상
@@ -153,7 +169,7 @@ CRUD(행) + 문서 편집(본문)의 조합이다.
 
 - 만들기: `templates new-prompt <slug> --name "강의노트" --prompt "<지시·톤>"` (위치 안 정함).
 - **쓰기**: "이 강의자료 정리해줘 (강의노트로)" → 그 템플릿의 프롬프트를 읽고, **사용자와 위치를
-  정해** `templates page add <부모>` 로 새 페이지를 만든 뒤 그 프롬프트대로 `templates block`/`image`
+  정해** `templates page add <부모>` 로 새 페이지를 만든 뒤 그 프롬프트대로 `templates append`/`image`
   로 채운다(등록하지 않는다). 과목마다 반복 — 만든 노트는 독립적으로 존재하고, 나중에 찾는 건 `library`.
 - **승격**: "이 노트들을 한 DB에 모으자" 가 되면 그 DB를 **같은 슬러그로 `templates register`**
   하면 인스턴스-DB가 되고(프롬프트 보존), 이후엔 과목마다 그 DB에 행 하나씩 추가한다.

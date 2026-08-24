@@ -34,7 +34,7 @@ open http://localhost:8765
 ## 4. 사용자에게 안내
 
 - 접속 주소: `http://localhost:8765`
-- 이 화면은 **설정 전용**이다 — 연결(Notion PAT 등), 스킬 옵션 기본값, 그리고 **템플릿별 프롬프트**(각 템플릿에 채울 방식·톤)를 저장한다. 자료를 읽어 Notion에 정리·저작하는 실제 작업은 `templates` 스킬(`templates create-page`로 구조 생성 → `templates block`/`templates image`로 저작)로 한다.
+- 이 화면은 **설정 전용**이다 — 연결(Notion PAT 등), 스킬 옵션 기본값, 그리고 **템플릿별 프롬프트**(각 템플릿에 채울 방식·톤)를 저장한다. 자료를 읽어 Notion에 정리·저작하는 실제 작업은 `templates` 스킬(`templates create-page`로 구조 생성 → `templates append`/`templates edit`/`templates image`로 저작)로 한다.
 - 종료하려면: `pkill -f "notionmemory serve"`
 
 ## 주의

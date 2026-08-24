@@ -58,9 +58,9 @@ stash it quickly," fill only the properties and skip the body research.)
 
 ## Procedure
 1. Create the row with `add`, filling the properties, and get back the **row id**.
-2. Attach the four body sections below to that row id with `block add --markdown-file <path>`
-   (or `-` = stdin). The body contains links and code fences, so never pass it to the shell via
-   `--markdown "..."` directly — always use a file/stdin.
+2. Attach the four body sections below to that row id with `templates append --markdown-file
+   <path>` (or `-` = stdin). The body contains links and code fences, so never pass it to the
+   shell via `--markdown "..."` directly — always use a file/stdin.
 3. Adjust the evaluation properties (Feasibility · Potential Impact · Effort · Priority) to match
    what the research turned up.
 

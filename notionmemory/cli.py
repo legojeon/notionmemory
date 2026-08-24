@@ -743,7 +743,8 @@ def _cmd_templates(args) -> int:
         p = templates_introspect.register(NotionSession(), target,
                                           slug=args.slug, log=print)
         print(f"페이지 생성·등록됨: {p.slug} — {p.name}\n"
-              f"이제 `templates block`/`templates image` 로 저작하고 "
+              f"이제 `templates append`/`templates edit`/`templates replace`/"
+              f"`templates image` 로 저작하고 "
               f"`templates prompt {p.slug} --set ...` 로 프롬프트를 붙이세요.")
         return 0
     return 2

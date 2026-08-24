@@ -117,24 +117,24 @@ def test_old_templates_crossref_section_is_gone():
 
 def test_templates_skill_documents_document_editing():
     text = (CANONICAL / "templates" / "SKILL.md").read_text(encoding="utf-8")
-    # 명명한 명령이 실재해야 한다(Task 4 가 만든 것과 일치)
-    for cmd in ("templates read", "templates block add", "templates block set",
-                "templates block remove", "templates page add"):
+    # 명명한 명령이 실재해야 한다(text-addressed markdown API 표면과 일치)
+    for cmd in ("templates read", "templates append", "templates edit",
+                "templates delete", "templates replace", "templates page add"):
         assert cmd in text, cmd
 
 
 def test_templates_skill_states_the_three_document_rules():
     text = (CANONICAL / "templates" / "SKILL.md").read_text(encoding="utf-8")
     section = text.split("Document editing", 1)[1]
-    assert "read" in section and "guess" in section         # read 없이 block-id 추측 금지
-    assert "--yes" in section                               # --yes 는 지름길이 아니다
-    assert "sibling" in section or "existing" in section    # 새 항목은 형제 모방
+    assert "find" in section and "match" in section          # find/replace 는 텍스트 매치
+    assert "--yes" in section                                # --yes 는 지름길이 아니다
+    assert "sibling" in section or "existing" in section     # 새 항목은 형제 모방
 
 
 def test_templates_skill_notes_row_body_is_a_page():
     text = (CANONICAL / "templates" / "SKILL.md").read_text(encoding="utf-8")
-    # 행 본문 = 페이지: add 로 행 id 얻어 block add
-    assert "row" in text and "block add" in text
+    # 행 본문 = 페이지: add 로 행 id 얻어 append
+    assert "row" in text and "templates append" in text
 
 
 def test_templates_skill_documents_prompt_and_authoring():

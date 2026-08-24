@@ -54,8 +54,8 @@ config에 사는 notionmemory 레이어)입니다. 아래 프롬프트는 작성
 
 ## 절차
 1. `add`로 행을 만들며 속성을 채우고 **행 id**를 받는다.
-2. 그 행 id에 `block add --markdown-file <경로>`(또는 `-`=stdin)로 아래 4개 섹션 본문을 붙인다.
-   본문에는 링크·코드펜스가 들어가므로 셸에 `--markdown "..."` 직접 전달 금지 — 반드시 파일/stdin.
+2. 그 행 id에 `templates append --markdown-file <경로>`(또는 `-`=stdin)로 아래 4개 섹션 본문을
+   붙인다. 본문에는 링크·코드펜스가 들어가므로 셸에 `--markdown "..."` 직접 전달 금지 — 반드시 파일/stdin.
 3. 조사로 알게 된 것에 맞춰 평가 속성(Feasibility·Potential Impact·Effort·Priority)을 다시 정리한다.
 
 ## 속성 채우기

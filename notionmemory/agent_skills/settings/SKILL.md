@@ -34,7 +34,7 @@ open http://localhost:8765
 ## 4. Tell the user
 
 - URL: `http://localhost:8765`
-- This screen is **settings-only** — it stores connections (Notion PAT, etc.), skill option defaults, and **per-template prompts** (how and in what tone to fill each template). The actual work of reading material and authoring/organizing it into Notion is done by the `templates` skill (`templates create-page` to create the structure → `templates block`/`templates image` to author content).
+- This screen is **settings-only** — it stores connections (Notion PAT, etc.), skill option defaults, and **per-template prompts** (how and in what tone to fill each template). The actual work of reading material and authoring/organizing it into Notion is done by the `templates` skill (`templates create-page` to create the structure → `templates append`/`templates edit`/`templates image` to author content).
 - To stop the server: `pkill -f "notionmemory serve"`
 
 ## Notes

@@ -98,42 +98,57 @@ sections)** — CVs, portfolios, paper notes — get registered too. The `Struct
 `show <slug>` gives each page's heading outline and page-id.
 
 ```
-templates read <slug> <page-id>                       # live body → markdown + block-id
-templates block add <page-id> [--after <block-id>] --markdown "..."   # append (free)
-templates page add <parent-page-id> --title "..." [--markdown "..."] # create subpage (free)
-templates block set <block-id> --markdown "..." [--yes]   # replace content (needs confirmation)
-templates block remove <block-id> [--yes]                 # delete = trash (needs confirmation)
+templates read <slug|page-id>                                          # live body → plain markdown (no block ids)
+templates append <slug|page-id> --markdown "..." | --markdown-file <path|-> # add to the end (free)
+templates page add <parent-page-id> --title "..." [--markdown "..."]   # create subpage (free)
+templates edit <slug|page-id> --find "..." --replace "..." [--all] --yes  # find/replace (needs confirmation)
+templates delete <slug|page-id> --find "..." [--all] --yes                # delete matched text (needs confirmation)
+templates replace <slug|page-id> --markdown "..." | --markdown-file <path|-> --yes  # rewrite the whole body (needs confirmation)
 ```
+
+This is text-addressed, not block-addressed — there are no block ids anywhere in this
+workflow. `read` prints the body as plain markdown; you find and edit content by matching
+its text, not by referencing an id.
 
 If body content contains **backticks (code fences), quotes, or `$()`**, don't pass it via
 `--markdown "..."` straight to the shell — use `--markdown-file <path>` (or
 `--markdown-file -` for stdin) instead, to avoid the shell mistaking backticks for command
-substitution. The same applies to `prompt --set-file` and `new-prompt --prompt-file`
-(prompts commonly contain backticks). Writing the markdown to a file first and passing that
-path is the safe route.
+substitution. The same applies to `--find`/`--replace`, `prompt --set-file`, and
+`new-prompt --prompt-file` (prompts commonly contain backticks). Writing the markdown to a
+file first and passing that path is the safe route.
 
-`read` output is `[<block-id>] <markdown>`; `[db: id]` is an embedded DB (→ handle it with
-`query`), `[page: id]` is a subpage (→ `read` it separately).
+`read` output is plain markdown; `[db: id]` marks an embedded DB (→ handle it with `query`),
+`[page: id]` marks a subpage (→ `read` it separately).
 
 **A row body is also a document.** Each row in a DB is itself a page. "Add a paper and write
-a summary" means: use `add` to create the row and get **the row id**, then use `block add`
-on that id to fill in the body — a combination of CRUD (row) + document editing (body).
+a summary" means: use `add` to create the row and get **the row id**, then use `append` on
+that id to fill in the body — a combination of CRUD (row) + document editing (body).
 
 ### Three rules
 
-1. **Never guess a block-id without `read`.** Before editing or deleting, always `read` the
-   page first to get live block-ids. The cached outline (`show`) only tells you the
-   structure — editing needs a live id.
-2. **`--yes` is not a shortcut.** Calling `block set`/`remove` without `--yes` returns a
-   preview (before → after) and exits 2. **Show that preview to the user and only re-run
-   with `--yes` after getting their approval.** Don't attach `--yes` on your own to skip
-   confirmation. Adds/creates are free to do without asking.
+1. **`edit`/`delete` match on text, not position.** Give `--find` enough surrounding text to
+   be unique. Zero matches, or more than one match without `--all`, is reported back with
+   **no change made** — read the current body again and narrow (or add `--all` to replace
+   every match) before retrying.
+2. **`--yes` is not a shortcut.** Calling `edit`/`delete`/`replace` without `--yes` returns a
+   preview (what will change, and how many matches) and exits 2. **Show that preview to the
+   user and only re-run with `--yes` after getting their approval.** Don't attach `--yes` on
+   your own to skip confirmation. `append`/`page add` are free to do without asking.
+   `replace` is also refused outright, even with `--yes`, when the page is too large for
+   `read` to return in full — use `edit`/`append` on those pages instead.
 3. **New items should imitate an existing sibling.** When creating a new subpage or row
    body, first `read` an existing sibling to see its section structure, then write in the
    same shape (Notion database templates can't be triggered via the API).
 
 `read` only the one page you're editing (not the whole tree). You already know the section
 structure from `show`'s cached outline.
+
+**Notion-flavored markdown dialect** — a few constructs need their own line or tag to render
+correctly: block equations need `$$` delimiters on their own line (not inline with text);
+toggles are written as `<details><summary>title</summary>` … `</details>`, each tag on its
+own line; callouts are `<callout>...</callout>`; columns are
+`<columns><column>...</column><column>...</column></columns>`; a table of contents is
+`<table_of_contents/>`.
 
 ## Content authoring — filling in a template
 
@@ -143,9 +158,9 @@ Each template can have an **attached prompt** (`templates show` displays it if p
 - If you need a new structure, create and register a page with `templates create-page
   --parent <id> --title <t> --slug <s>`, then attach a prompt with `templates prompt <s>
   --set "<instructions/tone>"`.
-- Fill in the body with `templates block`/`templates page` (document editing);
-  **insert images with `templates image <page-id> <local-image> [--caption ...]`** (this
-  command handles the Notion upload).
+- Fill in the body with `templates append`/`templates edit`/`templates page` (document
+  editing); **insert images with `templates image <page-id> <local-image> [--caption ...]`**
+  (this command handles the Notion upload).
 - Read files (PDF/code/HTML) and crop figures **with your own tools** — notionmemory does
   not read. Just pass the path of the image file you produced to `templates image`.
 
@@ -154,7 +169,7 @@ Each template can have an **attached prompt** (`templates show` displays it if p
 folder yourself (reading and figure-cropping are your own tools' job — install PyMuPDF/
 poppler etc., or ask the user if missing; notionmemory only handles writing to Notion),
 (2) create a notes page with `templates page add <parent>`, (3) following that template's
-prompt, fill the body with `templates block` and insert cropped figures with `templates
+prompt, fill the body with `templates append` and insert cropped figures with `templates
 image`. Paper notes work the same way — structure/tone come from the template/prompt,
 reading/cropping is on you.
 
@@ -173,7 +188,7 @@ new page each time**.
   (no location fixed yet).
 - **Using it**: "organize this lecture material (as lecture notes)" → read that template's
   prompt, **agree with the user on a location**, create a new page with `templates page add
-  <parent>`, then fill it per the prompt using `templates block`/`image` (don't register
+  <parent>`, then fill it per the prompt using `templates append`/`image` (don't register
   it). Repeat per subject — each note you make exists independently, and finding it later
   is `library`'s job.
 - **Promoting it**: once it becomes "let's collect these notes into one DB," `templates
