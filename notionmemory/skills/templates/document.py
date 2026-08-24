@@ -98,6 +98,11 @@ class PageNotFound(RuntimeError):
     하위라 이를 따로 잡지 않는 호출부(templates)는 기존처럼 메시지를 출력한다."""
 
 
+class MarkdownEditError(RuntimeError):
+    """Markdown API 편집이 대상 텍스트를 못 찾음(0건) 또는 모호함(다중). API 400
+    메시지를 그대로 담아 CLI 가 exit 2 + 사람이 읽는 안내로 변환한다."""
+
+
 class DocumentStore:
     """등록된 페이지의 본문 블록 I/O. 게이트(미리보기·확인)는 CLI 책임 — 여기선 원시 동작만.
 
@@ -167,9 +172,40 @@ class DocumentStore:
     def add_page(self, parent_page_id: str, title: str, markdown: str = "") -> dict:
         body = {"parent": {"page_id": parent_page_id},
                 "properties": {"title": {"title": [{"text": {"content": title}}]}},
-                "children": markdown_to_blocks(markdown) if markdown else []}
+                "markdown": markdown}
         data = self._req("POST", "/pages", json=body).json()
         return {"id": data.get("id", ""), "url": data.get("url", "")}
+
+    def _markdown_patch(self, page_id: str, body: dict) -> None:
+        resp = self.session.request("PATCH", f"/pages/{page_id}/markdown", json=body)
+        if resp.status_code == 404:
+            raise PageNotFound(
+                f"Notion PATCH /pages/{page_id}/markdown 실패: 404 (페이지 없음/공유 안 됨)")
+        if resp.status_code == 400:
+            try:
+                msg = resp.json().get("message", "") or resp.text[:200]
+            except Exception:
+                msg = resp.text[:200]
+            if "match" in msg.lower():
+                raise MarkdownEditError(msg)
+            raise RuntimeError(f"Notion PATCH 실패: 400 {msg}")
+        if resp.status_code >= 300:
+            raise RuntimeError(
+                f"Notion PATCH /pages/{page_id}/markdown 실패: {resp.status_code} {resp.text[:200]}")
+
+    def append(self, page_id: str, markdown: str) -> None:
+        self._markdown_patch(page_id, {
+            "type": "insert_content",
+            "insert_content": {"content": markdown, "position": {"type": "end"}}})
+
+    def replace(self, page_id: str, markdown: str) -> None:
+        _, truncated = self._get_markdown(page_id)
+        if truncated:
+            raise RuntimeError(
+                "이 페이지는 read 가 잘립니다(본문이 큼) — 전체 재작성(replace)은 잘린 "
+                "꼬리를 잃을 위험이라 거부합니다. edit/append 로 부분 수정하세요.")
+        self._markdown_patch(page_id, {
+            "type": "replace_content", "replace_content": {"new_str": markdown}})
 
     def upload_image(self, path) -> str | None:
         """Notion Direct Upload: (1) file_upload 생성 → (2) 바이트 전송. 성공 시 id.

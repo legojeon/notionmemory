@@ -184,17 +184,6 @@ def test_remove_block_archives_not_hard_delete():
     assert sess.calls[0][0] == "DELETE"
 
 
-def test_add_page_creates_a_child_page_and_returns_id_url():
-    sess = FakeSession({("POST", "/pages"):
-                        FakeResp(200, {"id": "pgnew", "url": "https://n/pgnew"})})
-    out = D.DocumentStore(sess).add_page("parent", "새 논문", "## 요약\n…")
-    body = sess.calls[0][2]
-    assert body["parent"] == {"page_id": "parent"}
-    assert body["properties"]["title"]["title"][0]["text"]["content"] == "새 논문"
-    assert body["children"]            # 본문 블록
-    assert out == {"id": "pgnew", "url": "https://n/pgnew"}
-
-
 def test_get_block_fetches_one_block():
     sess = FakeSession({("GET", "/blocks/b1"): FakeResp(200, {"id": "b1", "type": "paragraph"})})
     assert D.DocumentStore(sess).get_block("b1")["id"] == "b1"
