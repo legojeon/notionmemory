@@ -117,8 +117,11 @@ substitution. The same applies to `--find`/`--replace`, `prompt --set-file`, and
 `new-prompt --prompt-file` (prompts commonly contain backticks). Writing the markdown to a
 file first and passing that path is the safe route.
 
-`read` output is plain markdown; `[db: id]` marks an embedded DB (→ handle it with `query`),
-`[page: id]` marks a subpage (→ `read` it separately).
+`read` returns Notion-flavored markdown (GET `/pages/:id/markdown`). A subpage appears inline
+as `<page url="https://…">Title</page>`; an embedded database appears as `<database
+url="https://…">Title</database>`. Both are just references — to read or write a database's
+rows use the templates DB verbs (`query`/`add`/`update`), not body editing; to read a subpage's
+own body, `read` it separately by its id/slug.
 
 **A row body is also a document.** Each row in a DB is itself a page. "Add a paper and write
 a summary" means: use `add` to create the row and get **the row id**, then use `append` on

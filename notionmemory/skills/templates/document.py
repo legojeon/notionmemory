@@ -61,6 +61,11 @@ class DocumentStore:
         """미리보기용 — truncation 마커 없이 현재 본문만."""
         return self._get_markdown(page_id)[0]
 
+    def is_truncated(self, page_id: str) -> bool:
+        """CLI 미리보기 단계(replace --yes 없이)에서 잘림 여부를 미리 알기 위함 —
+        `replace()`의 서버측 거부와 같은 판정을 왕복 낭비 없이 exit 2로 먼저 알린다."""
+        return self._get_markdown(page_id)[1]
+
     def add_page(self, parent_page_id: str, title: str, markdown: str = "") -> dict:
         body = {"parent": {"page_id": parent_page_id},
                 "properties": {"title": {"title": [{"text": {"content": title}}]}},

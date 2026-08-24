@@ -555,6 +555,10 @@ def _templates_replace(args) -> int:
         return 2
     target = _resolve_page_target(args.target)
     store = DocumentStore(NotionSession(), log=print)
+    if store.is_truncated(target):
+        print("이 페이지는 read 가 잘립니다(본문이 큼) — 전체 재작성(replace)은 잘린 "
+              "꼬리를 잃을 위험이라 거부합니다. edit/append 로 부분 수정하세요.")
+        return 2
     if not args.yes:
         cur = store.current_markdown(target)
         print(f"이 페이지 본문 전체를 교체합니다({len(cur)}자 → {len(md)}자).\n"

@@ -110,8 +110,10 @@ block-id가 아니라 **텍스트로 주소를 지정한다** — 이 워크플�
 `new-prompt --prompt-file` 도 동일(프롬프트에 백틱이 흔하다). 마크다운을 파일로 쓴 뒤 그
 경로를 넘기는 게 안전하다.
 
-`read` 출력은 순수 마크다운이고, `[db: id]`는 박힌 DB(→ `query`로 다뤄라), `[page: id]`는
-하위 페이지(→ 따로 `read`).
+`read`는 Notion 방언 마크다운을 돌려준다(GET `/pages/:id/markdown`). 하위 페이지는 인라인으로
+`<page url="https://…">제목</page>`, 박힌 DB는 `<database url="https://…">제목</database>`으로
+나타난다. 둘 다 참조일 뿐이다 — DB의 행을 읽고/쓰려면 본문 편집이 아니라 templates DB 명령
+(`query`/`add`/`update`)을 쓴다. 하위 페이지 자체 본문을 읽으려면 그 id/slug로 따로 `read`한다.
 
 **행 본문도 문서다.** DB의 각 행은 그 자체가 페이지다. "논문 추가하고 요약 써줘"는
 `add`로 행을 만들어 **행 id**를 받고, 그 id에 `append`로 본문을 채운다 —

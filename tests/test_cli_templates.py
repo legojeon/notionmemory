@@ -666,6 +666,7 @@ def test_new_prompt_slugifies_slug(monkeypatch, tmp_path):
 def _fake_store(monkeypatch, **methods):
     class S:
         def current_markdown(self, pid): return methods.get("current", "alpha beta alpha")
+        def is_truncated(self, pid): return methods.get("truncated", False)
         def replace(self, pid, md): methods.setdefault("calls", []).append(("replace", pid, md))
         def edit(self, pid, f, r, all_matches=False):
             methods.setdefault("calls", []).append(("edit", pid, f, r, all_matches))
@@ -789,3 +790,19 @@ def test_replace_without_any_markdown_exits_2(capsys, monkeypatch):
     rc = cli.main(["templates", "replace", "slug"])
     assert rc == 2
     assert "필요합니다" in capsys.readouterr().out
+
+
+def test_replace_refuses_at_preview_when_truncated(monkeypatch, capsys):
+    m = _fake_store(monkeypatch, current="old body", truncated=True)
+    rc = cli.main(["templates", "replace", "slug", "--markdown", "new body", "--yes"])
+    assert rc == 2
+    assert "calls" not in m                        # replace 호출 없음
+    out = capsys.readouterr().out
+    assert "잘립니다" in out or "거부" in out
+
+
+def test_replace_with_yes_still_mutates_when_not_truncated(monkeypatch, capsys):
+    m = _fake_store(monkeypatch, current="old body", truncated=False)
+    rc = cli.main(["templates", "replace", "slug", "--markdown", "new body", "--yes"])
+    assert rc == 0
+    assert ("replace", "pid", "new body") in m["calls"]
