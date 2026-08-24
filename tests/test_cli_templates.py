@@ -6,6 +6,7 @@ import pytest
 from notionmemory import cli
 from notionmemory.skills.templates import introspect as I
 from notionmemory.skills.templates import profile as P
+from notionmemory.skills.templates.document import MarkdownEditError
 
 
 @pytest.fixture(autouse=True)
@@ -658,3 +659,133 @@ def test_new_prompt_slugifies_slug(monkeypatch, tmp_path):
     assert cli.main(["templates", "new-prompt", "My Notes", "--name", "메모"]) == 0
     slugs = [x.slug for x in P.load_all()]
     assert "my-notes" in slugs and "My Notes" not in slugs   # 안전한 파일명
+
+
+# --- replace / edit / delete — 파괴적 verb 는 --yes 프리뷰 게이트 ---
+
+def _fake_store(monkeypatch, **methods):
+    class S:
+        def current_markdown(self, pid): return methods.get("current", "alpha beta alpha")
+        def replace(self, pid, md): methods.setdefault("calls", []).append(("replace", pid, md))
+        def edit(self, pid, f, r, all_matches=False):
+            methods.setdefault("calls", []).append(("edit", pid, f, r, all_matches))
+            if "edit_raises" in methods:
+                raise methods["edit_raises"]
+        def delete(self, pid, f, all_matches=False):
+            methods.setdefault("calls", []).append(("delete", pid, f, all_matches))
+            if "delete_raises" in methods:
+                raise methods["delete_raises"]
+    monkeypatch.setattr(cli, "DocumentStore", lambda *a, **k: S())
+    monkeypatch.setattr(cli, "NotionSession", lambda *a, **k: object())
+    monkeypatch.setattr(cli, "_resolve_page_target", lambda t: "pid")
+    return methods
+
+
+def test_edit_without_yes_previews_and_does_not_mutate(monkeypatch, capsys):
+    m = _fake_store(monkeypatch, current="alpha only once")
+    rc = cli.main(["templates", "edit", "slug", "--find", "alpha", "--replace", "ALPHA"])
+    assert rc == 2
+    assert "calls" not in m                       # 변이 0건
+    out = capsys.readouterr().out
+    assert "alpha" in out and "ALPHA" in out       # 미리보기
+
+
+def test_edit_no_match_is_reported_before_mutation(monkeypatch, capsys):
+    m = _fake_store(monkeypatch, current="nothing here")
+    rc = cli.main(["templates", "edit", "slug", "--find", "zzz", "--replace", "y"])
+    assert rc == 2
+    assert "calls" not in m
+    assert "찾" in capsys.readouterr().out          # "매치를 찾지 못" 안내
+
+
+def test_edit_multi_match_requires_all(monkeypatch, capsys):
+    m = _fake_store(monkeypatch, current="dup and dup")
+    rc = cli.main(["templates", "edit", "slug", "--find", "dup", "--replace", "y"])
+    assert rc == 2
+    assert "calls" not in m
+    assert "2" in capsys.readouterr().out           # N=2 개 매치 안내
+
+
+def test_edit_with_yes_mutates(monkeypatch, capsys):
+    m = _fake_store(monkeypatch, current="alpha only once")
+    rc = cli.main(["templates", "edit", "slug", "--find", "alpha", "--replace", "A", "--yes"])
+    assert rc == 0
+    assert ("edit", "pid", "alpha", "A", False) in m["calls"]
+
+
+def test_edit_maps_markdown_edit_error_to_exit_2(monkeypatch, capsys):
+    m = _fake_store(monkeypatch, current="alpha", edit_raises=MarkdownEditError("No matches found"))
+    rc = cli.main(["templates", "edit", "slug", "--find", "alpha", "--replace", "A", "--yes"])
+    assert rc == 2
+    assert "No matches" in capsys.readouterr().out
+
+
+def test_edit_multi_match_with_all_mutates_all(monkeypatch):
+    m = _fake_store(monkeypatch, current="dup and dup")
+    rc = cli.main(["templates", "edit", "slug", "--find", "dup", "--replace", "y",
+                   "--all", "--yes"])
+    assert rc == 0
+    assert ("edit", "pid", "dup", "y", True) in m["calls"]
+
+
+def test_delete_without_yes_previews_and_does_not_mutate(monkeypatch, capsys):
+    m = _fake_store(monkeypatch, current="alpha only once")
+    rc = cli.main(["templates", "delete", "slug", "--find", "alpha"])
+    assert rc == 2
+    assert "calls" not in m
+    assert "alpha" in capsys.readouterr().out
+
+
+def test_delete_no_match_is_reported_before_mutation(monkeypatch, capsys):
+    m = _fake_store(monkeypatch, current="nothing here")
+    rc = cli.main(["templates", "delete", "slug", "--find", "zzz"])
+    assert rc == 2
+    assert "calls" not in m
+    assert "찾" in capsys.readouterr().out
+
+
+def test_delete_multi_match_requires_all(monkeypatch, capsys):
+    m = _fake_store(monkeypatch, current="dup and dup")
+    rc = cli.main(["templates", "delete", "slug", "--find", "dup"])
+    assert rc == 2
+    assert "calls" not in m
+    assert "2" in capsys.readouterr().out
+
+
+def test_delete_with_yes_mutates(monkeypatch):
+    m = _fake_store(monkeypatch, current="alpha only once")
+    rc = cli.main(["templates", "delete", "slug", "--find", "alpha", "--yes"])
+    assert rc == 0
+    assert ("delete", "pid", "alpha", False) in m["calls"]
+
+
+def test_delete_maps_markdown_edit_error_to_exit_2(monkeypatch, capsys):
+    m = _fake_store(monkeypatch, current="alpha",
+                    delete_raises=MarkdownEditError("No matches found"))
+    rc = cli.main(["templates", "delete", "slug", "--find", "alpha", "--yes"])
+    assert rc == 2
+    assert "No matches" in capsys.readouterr().out
+
+
+def test_replace_without_yes_previews_and_does_not_mutate(monkeypatch, capsys):
+    m = _fake_store(monkeypatch, current="old body")
+    rc = cli.main(["templates", "replace", "slug", "--markdown", "new body"])
+    assert rc == 2
+    assert "calls" not in m
+    out = capsys.readouterr().out
+    assert "교체" in out
+
+
+def test_replace_with_yes_mutates(monkeypatch, capsys):
+    m = _fake_store(monkeypatch, current="old body")
+    rc = cli.main(["templates", "replace", "slug", "--markdown", "new body", "--yes"])
+    assert rc == 0
+    assert ("replace", "pid", "new body") in m["calls"]
+    assert "pid" in capsys.readouterr().out
+
+
+def test_replace_without_any_markdown_exits_2(capsys, monkeypatch):
+    _fake_store(monkeypatch)
+    rc = cli.main(["templates", "replace", "slug"])
+    assert rc == 2
+    assert "필요합니다" in capsys.readouterr().out

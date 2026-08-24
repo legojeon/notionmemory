@@ -27,7 +27,7 @@ from notionmemory.skills.templates import filters as templates_filters
 from notionmemory.skills.templates import introspect as templates_introspect
 from notionmemory.skills.templates import profile as templates_profile
 from notionmemory.skills.templates import render as templates_render
-from notionmemory.skills.templates.document import DocumentStore, PageNotFound
+from notionmemory.skills.templates.document import DocumentStore, PageNotFound, MarkdownEditError
 from notionmemory.skills.templates.store import ProfileGone, TemplateStore
 
 DEFAULT_CONFIG = str(paths.config_path())
@@ -548,6 +548,71 @@ def _templates_append(args) -> int:
     return 0
 
 
+def _templates_replace(args) -> int:
+    md = _text_or_file(args.markdown, args.markdown_file)
+    if md is None:
+        print("--markdown 또는 --markdown-file 이 필요합니다")
+        return 2
+    target = _resolve_page_target(args.target)
+    store = DocumentStore(NotionSession(), log=print)
+    if not args.yes:
+        cur = store.current_markdown(target)
+        print(f"이 페이지 본문 전체를 교체합니다({len(cur)}자 → {len(md)}자).\n"
+              "확인하면 --yes 를 붙여 다시 실행하세요.")
+        return 2
+    store.replace(target, md)
+    print(f"교체됨: {target}")
+    return 0
+
+
+def _templates_edit(args) -> int:
+    target = _resolve_page_target(args.target)
+    store = DocumentStore(NotionSession(), log=print)
+    n = store.current_markdown(target).count(args.find)   # 로컬 매치 수(지표)
+    if n == 0:
+        print(f"'{args.find}' 매치를 찾지 못했습니다 — 편집을 취소합니다(변경 없음).")
+        return 2
+    if n > 1 and not args.all:
+        print(f"'{args.find}' 이(가) {n}개 위치에서 매치됩니다 — 검색어를 더 구체적으로 "
+              "하거나 --all 로 전체 치환하세요(변경 없음).")
+        return 2
+    if not args.yes:
+        print(f"이 편집을 적용합니다({n}개 매치):\n  찾기: {args.find}\n  바꾸기: {args.replace}\n"
+              "확인하면 --yes 를 붙여 다시 실행하세요.")
+        return 2
+    try:
+        store.edit(target, args.find, args.replace, all_matches=args.all)
+    except MarkdownEditError as e:
+        print(f"편집 실패: {e}")
+        return 2
+    print(f"편집됨: {target}")
+    return 0
+
+
+def _templates_delete(args) -> int:
+    target = _resolve_page_target(args.target)
+    store = DocumentStore(NotionSession(), log=print)
+    n = store.current_markdown(target).count(args.find)
+    if n == 0:
+        print(f"'{args.find}' 매치를 찾지 못했습니다 — 삭제를 취소합니다(변경 없음).")
+        return 2
+    if n > 1 and not args.all:
+        print(f"'{args.find}' 이(가) {n}개 위치에서 매치됩니다 — 더 구체적으로 하거나 "
+              "--all 로 전체 삭제하세요(변경 없음).")
+        return 2
+    if not args.yes:
+        print(f"이 내용을 삭제합니다({n}개 매치):\n  {args.find}\n"
+              "확인하면 --yes 를 붙여 다시 실행하세요.")
+        return 2
+    try:
+        store.delete(target, args.find, all_matches=args.all)
+    except MarkdownEditError as e:
+        print(f"삭제 실패: {e}")
+        return 2
+    print(f"삭제됨: {target}")
+    return 0
+
+
 def _text_or_file(inline, file_path):
     """인라인 문자열 또는 파일에서 텍스트를 읽는다(`-` = stdin).
 
@@ -646,6 +711,12 @@ def _cmd_templates(args) -> int:
         return _templates_read(args)
     if args.action == "append":
         return _templates_append(args)
+    if args.action == "replace":
+        return _templates_replace(args)
+    if args.action == "edit":
+        return _templates_edit(args)
+    if args.action == "delete":
+        return _templates_delete(args)
     if args.action == "page":
         return _templates_page(args)
     if args.action == "image":
@@ -949,6 +1020,22 @@ def main(argv=None) -> int:
     tap.add_argument("--markdown", default=None)
     tap.add_argument("--markdown-file", default="",
                      help="마크다운을 파일에서 읽는다(`-`=stdin)")
+    trp = tpl_sub.add_parser("replace")
+    trp.add_argument("target")
+    trp.add_argument("--markdown", default=None)
+    trp.add_argument("--markdown-file", default="", help="`-`=stdin")
+    trp.add_argument("--yes", action="store_true")
+    ted = tpl_sub.add_parser("edit")
+    ted.add_argument("target")
+    ted.add_argument("--find", required=True)
+    ted.add_argument("--replace", required=True)
+    ted.add_argument("--all", action="store_true", help="모든 매치 치환(replaceAllMatches)")
+    ted.add_argument("--yes", action="store_true")
+    tde = tpl_sub.add_parser("delete")
+    tde.add_argument("target")
+    tde.add_argument("--find", required=True)
+    tde.add_argument("--all", action="store_true")
+    tde.add_argument("--yes", action="store_true")
     tp = tpl_sub.add_parser("page")
     tp_sub = tp.add_subparsers(dest="page_action", required=True)
     tpa = tp_sub.add_parser("add")
