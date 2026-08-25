@@ -41,7 +41,7 @@ _CONTROL_CHARS = frozenset(chr(c) for c in range(0x20)) | {chr(0x7f)}
 # 않으면 우리가 방금 심은 codex.hooks 자체를 우리 것으로 인식하지 못해 teardown 이
 # 지우지 못하고 재설치도 중복 병합해버린다.
 _CLI_HOOK_COMMAND_RE = re.compile(
-    r'(?:^|[\\/])notionmemory(?:\.exe)? hook \S+(?: --harness (?:claude|codex))?$')
+    r'(?:^|[\\/])notionmemory(?:\.exe)? hook \S+(?: --harness (?:claude|codex|kimi))?$')
 _LEGACY_HOOK_SCRIPT_RE = re.compile(
     r'(?:^|[\\/])memory_hooks[\\/](?:session_start|save_reminder)\.py(?:$|\s)')
 
@@ -395,6 +395,94 @@ class CodexTrust:
         return changed
 
 
+class TomlHookBlock:
+    """Kimi config.toml [[hooks]] block — idempotent, non-destructive, marker-owned.
+
+    Line-based like CodexTrust (no TOML library): our [[hooks]] tables are those whose
+    `command` is one of ours (hook_command_is_ours). We strip ours and append fresh,
+    preserving all other TOML content (user keys and user-authored [[hooks]]).
+    """
+
+    def _read(self, path: Path) -> str:
+        return path.read_text(encoding="utf-8") if path.exists() else ""
+
+    def _blocks(self, text: str) -> list[tuple[int, int, str]]:
+        """(start, end-exclusive, command-value) for each [[hooks]] table."""
+        lines = text.splitlines()
+        out = []
+        for i, line in enumerate(lines):
+            if line.strip() != "[[hooks]]":
+                continue
+            j, command = i + 1, ""
+            while j < len(lines) and not lines[j].strip().startswith("["):
+                m = re.match(r'\s*command\s*=\s*"(.*)"\s*$', lines[j])
+                if m:
+                    command = m.group(1)
+                j += 1
+            out.append((i, j, command))
+        return out
+
+    def _ours_blocks(self, text: str, markers: tuple[str, ...]) -> list[tuple[int, int, str]]:
+        return [b for b in self._blocks(text) if hook_command_is_ours(b[2], markers)]
+
+    def _entries(self, payload: dict) -> list[tuple[str, str, int]]:
+        rows = []
+        for event, entries in payload["events"].items():
+            for entry in entries:
+                for h in entry.get("hooks", []):
+                    rows.append((event, h["command"], int(h.get("timeout", 30))))
+        return rows
+
+    def _render(self, rows: list[tuple[str, str, int]]) -> str:
+        # command values are our own CLI strings (no quotes/backslashes) — safe as-is.
+        out = []
+        for event, command, timeout in rows:
+            out.append("[[hooks]]")
+            out.append(f'event = "{event}"')
+            out.append(f'command = "{command}"')
+            out.append(f"timeout = {timeout}")
+            out.append("")
+        return "\n".join(out)
+
+    def _strip(self, text: str, markers: tuple[str, ...]) -> tuple[str, bool]:
+        lines = text.splitlines()
+        drop: set[int] = set()
+        for start, end, _ in self._ours_blocks(text, markers):
+            drop.update(range(start, end))
+        if not drop:
+            return text, False
+        kept = [ln for i, ln in enumerate(lines) if i not in drop]
+        return "\n".join(kept).rstrip("\n"), True
+
+    def install(self, spec: ArtifactSpec) -> bool:
+        path = Path(spec.path)
+        text = self._read(path)
+        stripped, _ = self._strip(text, spec.markers)
+        body = self._render(self._entries(spec.payload))
+        new = (stripped.rstrip("\n") + "\n\n" + body).lstrip("\n")
+        new = new.rstrip("\n") + "\n"
+        if path.exists() and self._read(path) == new:
+            return False
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(new, encoding="utf-8")
+        return True
+
+    def detect(self, spec: ArtifactSpec) -> bool:
+        return bool(self._ours_blocks(self._read(Path(spec.path)), spec.markers))
+
+    def remove(self, spec: ArtifactSpec) -> bool:
+        path = Path(spec.path)
+        if not path.exists():
+            return False
+        new, changed = self._strip(self._read(path), spec.markers)
+        if not changed:
+            return False
+        # Kimi config.toml is user-owned (not hook-dedicated) — never delete the file,
+        # even if empty after stripping (a user may re-add keys). Leave a trimmed file.
+        path.write_text((new.rstrip("\n") + "\n") if new.strip() else "", encoding="utf-8")
+        return True
+
+
 class LaunchAgent:
     """A notionmemory-owned macOS LaunchAgent plist.
 
@@ -457,6 +545,7 @@ class LaunchAgent:
 HANDLERS: dict[str, object] = {
     "skill_mirror": SkillMirror(),
     "json_hook_block": JsonHookBlock(),
+    "toml_hook_block": TomlHookBlock(),
     "git_hooks": GitHooks(),
     "codex_trust": CodexTrust(),
     "launch_agent": LaunchAgent(),
