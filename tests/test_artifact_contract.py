@@ -79,3 +79,22 @@ def test_trust_spec_is_not_rebuilt_by_teardown_sweep(tmp_path, monkeypatch):
                  if s.id == "codex.trust")
     swept = next(s for s in teardown._sweep(["codex"]) if s.id == "codex.trust")
     assert swept == built
+
+
+# ---------------------------------------------------------------------------
+# Kimi Code harness — 새 provider 도 훅·스킬 미러 설치물이 매니페스트를
+# 통해서만 teardown 에 잡혀야 한다(규칙 1). config.toml 훅 블록은 codex.trust
+# 와 같은 파일을 공유하지 않지만 같은 마커 계약(HOOK_MARKERS)을 쓴다.
+# ---------------------------------------------------------------------------
+
+def test_kimi_artifacts_are_manifest_reachable():
+    from notionmemory.core.install import manifest
+    from notionmemory import providers
+    assert "kimi" in providers.names()
+    specs = {s.id: s for s in manifest.build(["kimi"], "notionmemory")}
+    hooks = specs["kimi.hooks"]
+    assert hooks.handler == "toml_hook_block"
+    assert str(hooks.path).endswith("config.toml")
+    assert hooks.markers == manifest.HOOK_MARKERS   # teardown finds ours by marker
+    # a kimi skill mirror is registered too (teardown-reachable)
+    assert any(i.startswith("kimi.skills.") for i in specs)
