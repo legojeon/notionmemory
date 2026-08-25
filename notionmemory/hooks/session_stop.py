@@ -49,6 +49,8 @@ def main(harness: str = "claude") -> int:
         path = str(payload.get("transcript_path") or "")
         if sid and not path and harness == "codex":
             path = transcripts.find_codex_rollout(sid)
+        elif sid and not path and harness == "kimi":
+            path = transcripts.find_kimi_wire(sid, cwd)
         if sid and path:
             session = {"session_id": sid, "transcript_path": path,
                        "harness": harness, "ts": ts}
