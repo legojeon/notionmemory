@@ -43,6 +43,10 @@ def _sweep(targets: list[str]) -> list[ArtifactSpec]:
     """영수증과 무관하게 알려진 위치를 훑는다."""
     # 심는 곳과 같은 함수로 위치를 정한다 — 스윕이 자체 경로 계산을 갖고 있으면
     # CODEX_HOME 같은 오버라이드 환경에서 심은 것을 못 찾는다.
+    # 지연 임포트: manifest.build() 와 같은 이유(모듈 최상단에 두면 providers 쪽
+    # 순환 임포트 위험 — manifest._home_env() 주석 참고).
+    from notionmemory import providers
+
     roots = {t: manifest.skills_root(t) for t in targets}
     hook_files = {t: manifest.hook_file(t) for t in targets}
     names = list(skill_assets.skill_names()) + list(LEGACY_SKILL_NAMES)
@@ -53,8 +57,13 @@ def _sweep(targets: list[str]) -> list[ArtifactSpec]:
             out.append(ArtifactSpec(
                 id=f"{target}.skills.{name}", owner=name, handler="skill_mirror",
                 target=target, path=roots[target] / name, payload={}, markers=(name,)))
+        # 핸들러는 manifest.build() 와 동일하게 provider.hook_format 으로 정한다 —
+        # 여기서 json_hook_block 을 하드코딩하면 toml 포맷 provider(kimi)의 훅 블록이
+        # 영수증 없는 스윕 경로에서 detect() 실패로 조용히 안 지워진다(리뷰 Important).
+        handler = ("toml_hook_block" if target in providers.names()
+                   and providers.get(target).hook_format == "toml" else "json_hook_block")
         out.append(ArtifactSpec(
-            id=f"{target}.hooks", owner="_core", handler="json_hook_block",
+            id=f"{target}.hooks", owner="_core", handler=handler,
             target=target, path=hook_files[target], payload={},
             markers=manifest.HOOK_MARKERS))
     if "codex" in targets:

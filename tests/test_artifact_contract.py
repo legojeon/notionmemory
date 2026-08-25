@@ -98,3 +98,17 @@ def test_kimi_artifacts_are_manifest_reachable():
     assert hooks.markers == manifest.HOOK_MARKERS   # teardown finds ours by marker
     # a kimi skill mirror is registered too (teardown-reachable)
     assert any(i.startswith("kimi.skills.") for i in specs)
+
+
+def test_kimi_hooks_sweep_uses_toml_handler():
+    """리뷰 Important — _sweep 이 handler="json_hook_block" 을 모든 target 에
+    하드코딩하면, receipt 없는 teardown 경로에서 JsonHookBlock.detect() 가
+    config.toml 에 json.loads() 를 시도해 ValueError → {} 로 삼켜 detect() 가
+    False 가 되고, discover() 가 kimi.hooks 를 걸러낸다 — kimi 의 [[hooks]]
+    블록이 teardown 으로 절대 지워지지 않는다(CLAUDE.md 규칙 1 위반).
+    _sweep 은 manifest.build 와 같은 provider.hook_format 기준으로 handler 를
+    골라야 한다."""
+    from notionmemory.core.install import teardown
+
+    swept = next(s for s in teardown._sweep(["kimi"]) if s.id == "kimi.hooks")
+    assert swept.handler == "toml_hook_block"
