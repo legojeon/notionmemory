@@ -3,8 +3,9 @@ from __future__ import annotations
 from notionmemory.providers.base import ProviderSpec
 from notionmemory.providers.claude import SPEC as _claude
 from notionmemory.providers.codex import SPEC as _codex
+from notionmemory.providers.kimi import SPEC as _kimi
 
-_REGISTRY: dict[str, ProviderSpec] = {p.name: p for p in (_claude, _codex)}
+_REGISTRY: dict[str, ProviderSpec] = {p.name: p for p in (_claude, _codex, _kimi)}
 
 
 def get(name: str) -> ProviderSpec:

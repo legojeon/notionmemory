@@ -111,6 +111,20 @@ def HOOK_EVENTS(cli_path: str, harness: str = "claude") -> dict:
             "SessionEnd": [entry("session-end", timeout=3 if harness == "codex" else 20)]}
 
 
+def KIMI_HOOK_EVENTS(cli_path: str) -> dict:
+    """Kimi capture pipeline: UserPromptSubmit injects recall; Stop enqueues the
+    session (session_stop resolves wire.jsonl); SessionEnd spawns consolidation
+    (observation-only, timeout 3). SessionStart/PreCompact are omitted — Kimi
+    discards their stdout, so recall/reminder injection there has no effect."""
+    def entry(hook_name: str, timeout: int) -> dict:
+        return {"hooks": [{"type": "command",
+                           "command": f"{cli_path} hook {hook_name} --harness kimi",
+                           "timeout": timeout}]}
+    return {"UserPromptSubmit": [entry("user-prompt", 20)],
+            "Stop": [entry("session-stop", 20)],
+            "SessionEnd": [entry("session-end", 3)]}
+
+
 def codex_trust_spec() -> ArtifactSpec:
     """`~/.codex/config.toml` 의 우리 `[hooks.state.*]` 블록.
 
