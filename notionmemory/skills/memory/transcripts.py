@@ -139,6 +139,57 @@ def parse_codex(path: str, since_bytes: int = 0, expect_cwd: str = "") -> tuple[
     return "\n".join(lines_out)[:PER_SESSION_CAP], consumed
 
 
+def _kimi_home() -> Path:
+    override = os.environ.get("KIMI_CODE_HOME")
+    return Path(override).expanduser() if override else Path.home() / ".kimi-code"
+
+
+def parse_kimi(path: str, since_bytes: int = 0) -> tuple[str, int]:
+    lines_out: list[str] = []
+    with open(path, "rb") as f:
+        f.seek(since_bytes)
+        data = f.read()
+        consumed = since_bytes + len(data)
+    for raw in data.decode("utf-8", errors="replace").splitlines():
+        try:
+            e = json.loads(raw)
+        except ValueError:
+            continue
+        if not isinstance(e, dict):
+            continue
+        kind = e.get("type")
+        if kind == "turn.prompt" and (e.get("origin") or {}).get("kind") == "user":
+            for t in _text_blocks(e.get("input"), PER_MSG_USER_CAP):
+                lines_out.append(f"[USER] {t}")
+        elif kind == "context.append_message":
+            msg = e.get("message") or {}
+            if msg.get("role") == "assistant":
+                for t in _text_blocks(msg.get("content"), PER_MSG_ASSISTANT_CAP):
+                    lines_out.append(f"[ASSISTANT] {t}")
+    return "\n".join(lines_out)[:PER_SESSION_CAP], consumed
+
+
+def find_kimi_wire(session_id: str, cwd: str = "") -> str:
+    if not session_id:
+        return ""
+    index = _kimi_home() / "session_index.jsonl"
+    try:
+        text = index.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    # Guard against the known missing-newline bug (issue #1925): split on "}{" too.
+    for raw in text.replace("}{", "}\n{").splitlines():
+        try:
+            rec = json.loads(raw)
+        except ValueError:
+            continue
+        if isinstance(rec, dict) and rec.get("sessionId") == session_id \
+                and not rec.get("deleted"):
+            wire = Path(str(rec.get("sessionDir", ""))) / "agents" / "main" / "wire.jsonl"
+            return str(wire) if wire.is_file() else ""
+    return ""
+
+
 def find_codex_rollout(session_id: str) -> str:
     root = Path.home() / ".codex" / "sessions"
     if not session_id or not root.is_dir():
@@ -195,6 +246,8 @@ def collect_excerpts(sessions: list[dict], ledger: dict,
                     notes.append(f"session skipped (subagent/cwd): {sid}")
                     continue
             parsed = parse_codex(path, since_bytes=since)
+        elif s.get("harness") == "kimi":
+            parsed = parse_kimi(path, since_bytes=since)
         else:
             parsed = parse_claude(path, since_bytes=since)
         if parsed is None:
