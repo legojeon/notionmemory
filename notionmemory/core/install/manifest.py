@@ -15,8 +15,16 @@ HOOK_MARKERS: tuple[str, ...] = ("notionmemory hook", "memory_hooks")
 # "설치물이 없음을 확인했다"는 명시적 선언이다. tests/test_artifact_contract.py 참조.
 OWNS_NOTHING: frozenset[str] = frozenset()
 
-# 하네스 홈을 옮기는 환경변수. 두 하네스 모두 공식 지원한다.
-HOME_ENV = {"claude": "CLAUDE_CONFIG_DIR", "codex": "CODEX_HOME"}
+
+def _home_env(target: str) -> str:
+    # 지연 임포트: notionmemory.providers 의 provider 모듈들이 이 모듈(manifest)을
+    # 되임포트하며 codex_trust_spec 등을 module-level 에서 참조한다(providers/codex.py).
+    # manifest 가 먼저 임포트되는 경로(예: 이 테스트 파일이 `from ... import manifest`
+    # 로 시작)에서 최상단에 `from notionmemory import providers` 를 두면, providers 패키지가
+    # codex_trust_spec 정의 이전에 부분 실행 중인 manifest 모듈을 참조해 AttributeError 로
+    # 깨진다. 함수 안에서 임포트해 항상 manifest 가 완전히 로드된 뒤 providers 를 당긴다.
+    from notionmemory import providers
+    return providers.get(target).config_home_env if target in providers.names() else ""
 
 
 def harness_home(target: str) -> Path:
@@ -28,13 +36,16 @@ def harness_home(target: str) -> Path:
     읽는 곳은 같은 함수로 결정돼야 한다 — teardown 스윕도 이 함수를 쓴다(안 그러면
     오버라이드 환경에서 심은 것이 영원히 안 지워진다).
     """
-    override = os.environ.get(HOME_ENV.get(target, ""))
+    from notionmemory import providers
+
+    override = os.environ.get(_home_env(target))
     if override:
         return Path(override).expanduser()
     # HOME 은 paths 에게 묻는다 — 예전에는 `paths.state_dir().parents[2]` 로 상태
     # 디렉터리에서 거꾸로 걸어 올라갔는데, state_dir() 이 XDG_STATE_HOME 을
     # 존중하게 되는 날 harness_home() 이 조용히 엉뚱한 루트에 심기 시작한다.
-    return paths.home() / f".{target}"
+    dirname = providers.get(target).home_dirname if target in providers.names() else f".{target}"
+    return paths.home() / dirname
 
 
 def skills_root(target: str) -> Path:
@@ -42,7 +53,8 @@ def skills_root(target: str) -> Path:
 
 
 def hook_file(target: str) -> Path:
-    return harness_home(target) / ("hooks.json" if target == "codex" else "settings.json")
+    from notionmemory import providers
+    return harness_home(target) / providers.get(target).hook_file_name
 
 
 def hook_file_is_dedicated(target: str) -> bool:
@@ -52,7 +64,8 @@ def hook_file_is_dedicated(target: str) -> bool:
     teardown 뒤 `{"hooks": {}}` 껍데기가 남아 계약을 어긴다(실환경 검증에서 발견).
     Claude 의 settings.json 은 하네스·사용자 소유라 비어도 남긴다.
     """
-    return target == "codex"
+    from notionmemory import providers
+    return target in providers.names() and providers.get(target).hook_file_dedicated
 
 
 def broker_agent_path() -> Path:
@@ -115,10 +128,16 @@ def codex_trust_spec() -> ArtifactSpec:
 
 
 def build(targets: list[str], cli_path: str) -> list[ArtifactSpec]:
+    from notionmemory import providers
+
     specs: list[ArtifactSpec] = []
     roots = {t: skills_root(t) for t in targets}
     hook_files = {t: hook_file(t) for t in targets}
 
+    # post-install 명세(예: codex.trust)는 루프 도중 모아 루프가 끝난 뒤 append 한다 —
+    # 신뢰 등록은 hooks.json 을 쓴 뒤에만 의미가 있으므로(예전 코드의 순서 그대로
+    # 훅 명세들 다음 위치를 유지) 방출 순서가 바뀌면 안 된다.
+    post_specs: list[ArtifactSpec] = []
     for target in targets:
         for name in skill_assets.skill_names():
             specs.append(ArtifactSpec(
@@ -126,16 +145,16 @@ def build(targets: list[str], cli_path: str) -> list[ArtifactSpec]:
                 target=target, path=roots[target] / name,
                 payload={"source": str(skill_assets.skills_root() / name)},
                 markers=(name,)))
-        harness = target if target in ("claude", "codex") else "claude"
+        provider = providers.get(target)
+        handler = "toml_hook_block" if provider.hook_format == "toml" else "json_hook_block"
         specs.append(ArtifactSpec(
-            id=f"{target}.hooks", owner="_core", handler="json_hook_block",
+            id=f"{target}.hooks", owner="_core", handler=handler,
             target=target, path=hook_files[target],
-            payload={"events": HOOK_EVENTS(cli_path, harness=harness)},
+            payload={"events": provider.events(cli_path)},
             markers=HOOK_MARKERS))
-
-    # 신뢰 등록은 hooks.json 을 쓴 뒤에만 의미가 있으므로 훅 명세들 다음에 온다.
-    if "codex" in targets:
-        specs.append(codex_trust_spec())
+        if provider.post_install_spec is not None:
+            post_specs.append(provider.post_install_spec())
+    specs.extend(post_specs)
 
     # git 은 하네스와 무관하게 리포별 post-commit 훅을 소유한다 — target="shared" 로 한 번만.
     # notionmemory install 이 심지는 않지만(GitHooks.install 은 no-op), 매니페스트에
