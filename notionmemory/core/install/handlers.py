@@ -118,6 +118,42 @@ class SkillMirror:
         return True
 
 
+class BundleMirror:
+    """Copy a packaged bundle dir into a harness's extension dir. Same ownership /
+    teardown discipline as SkillMirror (owner sidecar, no symlink follow), plus a
+    generated notionmemory.json carrying the install-time-resolved CLI path so the
+    shim can invoke the right binary without trusting the harness runtime's PATH.
+    """
+
+    def install(self, spec: ArtifactSpec) -> bool:
+        src = Path(spec.payload["source"])
+        dest = Path(spec.path)
+        if dest.is_symlink():
+            raise OwnershipConflict(dest)
+        if dest.exists():
+            if not self.detect(spec):
+                raise OwnershipConflict(dest)
+            shutil.rmtree(dest)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(src, dest)
+        (dest / OWNED_MARKER_FILE).write_text("notionmemory\n", encoding="utf-8")
+        cli = spec.payload.get("cli_path")
+        if cli:
+            (dest / "notionmemory.json").write_text(
+                json.dumps({"cli": cli}) + "\n", encoding="utf-8")
+        return True
+
+    def detect(self, spec: ArtifactSpec) -> bool:
+        return (Path(spec.path) / OWNED_MARKER_FILE).is_file()
+
+    def remove(self, spec: ArtifactSpec) -> bool:
+        dest = Path(spec.path)
+        if not self.detect(spec):
+            return False
+        shutil.rmtree(dest)
+        return True
+
+
 class JsonHookBlock:
     """세션 훅 블록을 JSON 설정 파일에 멱등 병합/제거. 기존 사용자 항목은 보존."""
 
@@ -544,6 +580,7 @@ class LaunchAgent:
 
 HANDLERS: dict[str, object] = {
     "skill_mirror": SkillMirror(),
+    "bundle_mirror": BundleMirror(),
     "json_hook_block": JsonHookBlock(),
     "toml_hook_block": TomlHookBlock(),
     "git_hooks": GitHooks(),
