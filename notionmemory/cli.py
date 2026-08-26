@@ -1109,6 +1109,10 @@ def main(argv=None) -> int:
     hook.add_argument("--harness", choices=providers.names(), default="claude",
                       help="호출한 하네스 — 훅 stdout 형태가 이벤트별로 달라서 필요"
                            "(기본값 claude, 안 주면 지금까지 동작 그대로)")
+    hook.add_argument("--input-file",
+                      help="stdin 대신 이 파일에서 훅 페이로드(JSON)를 읽는다. "
+                           "pi 확장 런타임은 자식 프로세스에 stdin 을 못 넘겨서(execCommand "
+                           "에 stdin 채널 없음) pi 심이 페이로드를 임시파일로 넘긴다.")
 
     inst = sub.add_parser("install")
     inst.add_argument("--claude", action="store_true")
@@ -1211,6 +1215,15 @@ def main(argv=None) -> int:
     if args.cmd == "hook":
         from notionmemory.hooks import (save_reminder, session_end, session_start,
                                         session_stop, user_prompt)
+        # pi 심은 stdin 대신 --input-file 로 페이로드를 넘긴다(execCommand 에 stdin
+        # 채널이 없음). 훅 main 들은 모두 sys.stdin.read() 로 읽으므로, 여기서 stdin 을
+        # 그 파일로 바꿔주면 훅 코드는 그대로 둔 채 투명하게 파일에서 읽는다. 훅 프로세스는
+        # 한 번 돌고 종료하므로 프로세스 전역 stdin 재지정의 부작용이 없다.
+        if getattr(args, "input_file", None):
+            try:
+                sys.stdin = open(args.input_file, encoding="utf-8")
+            except OSError:
+                pass
         return {"session-start": session_start.main,
                 "save-reminder": save_reminder.main,
                 "session-stop": session_stop.main,
