@@ -40,7 +40,7 @@ namespaces = false
 # 설치(`pip install -e .`)는 소스 트리를 그대로 읽어서 이게 틀려도 안 터지므로,
 # 빠뜨리면 `uv tool install .` / `pip install .` 사용자에게서만 조용히 깨진다.
 # tests/test_packaging.py 와 scripts/verify_clean_clone.sh 가 함께 강제한다.
-notionmemory = ["agent_skills/**/*"]
+notionmemory = ["agent_skills/**/*", "providers/*/bundle/**/*"]
 "notionmemory.web" = ["assets/*"]                 # web/server.py 가 정적 서빙
 
 [tool.pytest.ini_options]
