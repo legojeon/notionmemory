@@ -1114,6 +1114,7 @@ def main(argv=None) -> int:
     inst.add_argument("--claude", action="store_true")
     inst.add_argument("--codex", action="store_true")
     inst.add_argument("--kimi", action="store_true")
+    inst.add_argument("--pi", action="store_true")
     inst.add_argument("--trust-codex-hooks", action="store_true",
                       help="Codex config.toml 에 우리 훅의 trusted_hash 를 기록한다")
     inst.add_argument("--skip-skills", action="store_true",
@@ -1127,6 +1128,7 @@ def main(argv=None) -> int:
     td.add_argument("--claude", action="store_true")
     td.add_argument("--codex", action="store_true")
     td.add_argument("--kimi", action="store_true")
+    td.add_argument("--pi", action="store_true")
     td.add_argument("--purge-config", action="store_true")
     td.add_argument("--purge-secrets", action="store_true")
     td.add_argument("--yes", action="store_true")
@@ -1218,9 +1220,9 @@ def main(argv=None) -> int:
         from notionmemory.core.install import runner
         _resolve_install_language(args)
         targets = [t for t, on in (("claude", args.claude), ("codex", args.codex),
-                                   ("kimi", args.kimi)) if on]
+                                   ("kimi", args.kimi), ("pi", args.pi)) if on]
         if not targets:
-            targets = ["claude", "codex"]     # 무플래그 = 가능한 전부(kimi 는 opt-in)
+            targets = ["claude", "codex"]     # 무플래그 = 가능한 전부(kimi/pi 는 opt-in)
         if "codex" in targets and args.trust_codex_hooks:
             print("주의: Codex 는 승인되지 않은 훅을 실행하지 않습니다. "
                   "--trust-codex-hooks 는 이 승인을 대신 기록합니다 "
@@ -1236,9 +1238,9 @@ def main(argv=None) -> int:
     if args.cmd == "teardown":
         from notionmemory.core.install import teardown
         targets = [t for t, on in (("claude", args.claude), ("codex", args.codex),
-                                   ("kimi", args.kimi)) if on]
+                                   ("kimi", args.kimi), ("pi", args.pi)) if on]
         if not targets:
-            targets = ["claude", "codex"]     # kimi 는 opt-in
+            targets = ["claude", "codex"]     # kimi/pi 는 opt-in
         # 미리보기와 실제 실행이 같은 결과를 서술해야 확인 게이트를 신뢰할 수
         # 있다 — purge 플래그를 두 미리보기 호출 모두에 반드시 넘긴다(리뷰 Important).
         if args.dry_run:
