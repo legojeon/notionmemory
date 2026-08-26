@@ -145,25 +145,31 @@ def build(targets: list[str], cli_path: str) -> list[ArtifactSpec]:
     from notionmemory import providers
 
     specs: list[ArtifactSpec] = []
-    roots = {t: skills_root(t) for t in targets}
-    hook_files = {t: hook_file(t) for t in targets}
 
     # post-install 명세(예: codex.trust)는 루프 도중 모아 루프가 끝난 뒤 append 한다 —
     # 신뢰 등록은 hooks.json 을 쓴 뒤에만 의미가 있으므로(예전 코드의 순서 그대로
     # 훅 명세들 다음 위치를 유지) 방출 순서가 바뀌면 안 된다.
     post_specs: list[ArtifactSpec] = []
     for target in targets:
+        provider = providers.get(target)
+        if provider.install_kind == "bundle":
+            specs.append(ArtifactSpec(
+                id=f"{target}.bundle", owner="_core", handler="bundle_mirror",
+                target=target,
+                path=harness_home(target) / provider.bundle_install_subpath,
+                payload={"source": provider.bundle_source, "cli_path": cli_path},
+                markers=(f"notionmemory {target} bundle",)))
+            continue
         for name in skill_assets.skill_names():
             specs.append(ArtifactSpec(
                 id=f"{target}.skills.{name}", owner=name, handler="skill_mirror",
-                target=target, path=roots[target] / name,
+                target=target, path=skills_root(target) / name,
                 payload={"source": str(skill_assets.skills_root() / name)},
                 markers=(name,)))
-        provider = providers.get(target)
         handler = "toml_hook_block" if provider.hook_format == "toml" else "json_hook_block"
         specs.append(ArtifactSpec(
             id=f"{target}.hooks", owner="_core", handler=handler,
-            target=target, path=hook_files[target],
+            target=target, path=hook_file(target),
             payload={"events": provider.events(cli_path)},
             markers=HOOK_MARKERS))
         if provider.post_install_spec is not None:

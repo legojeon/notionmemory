@@ -112,3 +112,17 @@ def test_kimi_hooks_sweep_uses_toml_handler():
 
     swept = next(s for s in teardown._sweep(["kimi"]) if s.id == "kimi.hooks")
     assert swept.handler == "toml_hook_block"
+
+
+# ---------------------------------------------------------------------------
+# pi harness — bundle-kind provider. install_kind="bundle" 은 스킬 미러·훅
+# 블록을 전혀 안 심고 bundle_mirror 하나로 통짜 디렉터리를 심는다. build()
+# 와 _sweep() 이 이 분기를 갈라 타면(하나만 continue) teardown 이 못 지운다.
+# ---------------------------------------------------------------------------
+
+def test_pi_bundle_is_manifest_reachable():
+    from notionmemory.core.install import manifest
+    from notionmemory import providers
+    assert "pi" in providers.names()
+    specs = {s.id: s for s in manifest.build(["pi"], "notionmemory")}
+    assert specs["pi.bundle"].handler == "bundle_mirror"

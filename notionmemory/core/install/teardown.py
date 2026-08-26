@@ -53,6 +53,14 @@ def _sweep(targets: list[str]) -> list[ArtifactSpec]:
 
     out = []
     for target in targets:
+        provider = providers.get(target) if target in providers.names() else None
+        if provider is not None and provider.install_kind == "bundle":
+            out.append(ArtifactSpec(
+                id=f"{target}.bundle", owner="_core", handler="bundle_mirror",
+                target=target,
+                path=manifest.harness_home(target) / provider.bundle_install_subpath,
+                payload={}, markers=(f"notionmemory {target} bundle",)))
+            continue
         for name in names:
             out.append(ArtifactSpec(
                 id=f"{target}.skills.{name}", owner=name, handler="skill_mirror",
