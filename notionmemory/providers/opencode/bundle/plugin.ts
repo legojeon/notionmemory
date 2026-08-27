@@ -13,6 +13,7 @@ import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
+import { execFileSync } from "node:child_process";
 
 const TOOL_GUIDANCE =
   "notionmemory (Notion second brain) is available via CLI: " +
@@ -51,8 +52,18 @@ function marshal(items: any[]): string {
   return lines.join("\n") + "\n";
 }
 
-export const Plugin: Plugin = async ({ client, $ }) => {
+export const Plugin: Plugin = async ({ client }) => {
   const cli = cliPath();
+  // Relay to the notionmemory CLI. Bun's `$` shell mis-handled an interpolated command
+  // path in this plugin context (live e2e: payload written but the call never ran), so we
+  // use execFileSync — the deterministic, proven approach (also used by agentmemory's
+  // opencode plugin). Each call is a fast enqueue/spawn; failures never break the session.
+  function runHook(name: string, payload: string): void {
+    try {
+      execFileSync(cli, ["hook", name, "--harness", "opencode", "--input-file", payload],
+                   { stdio: "ignore" });
+    } catch { /* best-effort */ }
+  }
   return {
     // Recall (guidance-only, option A): push the usage guidance onto the system prompt.
     "experimental.chat.system.transform": async (_input, output) => {
@@ -71,8 +82,8 @@ export const Plugin: Plugin = async ({ client, $ }) => {
         writeFileSync(transcript, marshal(items), "utf-8");
         const payload = join(dir, "payload.json");
         writeFileSync(payload, JSON.stringify({ session_id: sid, transcript_path: transcript, cwd: process.cwd() }), "utf-8");
-        await $`${cli} hook session-stop --harness opencode --input-file ${payload}`.quiet().nothrow();
-        await $`${cli} hook session-end --harness opencode --input-file ${payload}`.quiet().nothrow();
+        runHook("session-stop", payload);
+        runHook("session-end", payload);
       } catch { /* capture must never break the session */ }
     },
   };
