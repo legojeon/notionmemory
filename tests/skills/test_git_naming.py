@@ -4,7 +4,7 @@ from notionmemory.skills.memory.notion_db import SOURCES
 
 
 def test_sources_use_skill_names():
-    assert SOURCES == ("manual", "claude", "codex", "pi", "kimi", "notes", "git")
+    assert SOURCES == ("manual", "claude", "codex", "pi", "opencode", "kimi", "notes", "git")
 
 
 def test_remember_accepts_git_source(tmp_path, monkeypatch):

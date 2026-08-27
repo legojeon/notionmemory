@@ -20,7 +20,7 @@ ALL_TYPES = ("pattern", "preference", "architecture", "bug", "workflow", "fact",
 # consolidation 전용 예약 Type이라 일반 캡처 경로에서 골라지면 안 된다.
 CAPTURE_TYPES = tuple(t for t in ALL_TYPES if t != "brief")
 STATUSES = ("Active", "Superseded", "Forgotten", "Stale", "Draft")
-SOURCES = ("manual", "claude", "codex", "pi", "kimi", "notes", "git")
+SOURCES = ("manual", "claude", "codex", "pi", "opencode", "kimi", "notes", "git")
 
 SELECT_OPTION_SOURCES = {"Type": ALL_TYPES, "Source": SOURCES, "Status": STATUSES}
 
