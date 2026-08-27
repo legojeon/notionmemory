@@ -272,30 +272,37 @@ class OpencodeConfigEntry:
         plugin = raw.setdefault("plugin", [])
         if not isinstance(plugin, list):
             return False           # 사용자 데이터 형태가 다르다 — 손대지 않는다
-        if entry in plugin:
+        # 마커에 해당하는 옛 항목(rename 전 값 포함)을 먼저 걷어내고 현재 entry 를
+        # 새로 붙인다 — JsonHookBlock 과 같은 rename-safety(CLAUDE.md 4항).
+        stripped = [e for e in plugin if e not in spec.markers]
+        new_plugin = stripped + [entry]
+        if new_plugin == plugin:
             return False
-        plugin.append(entry)
+        raw["plugin"] = new_plugin
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(raw, ensure_ascii=False, indent=2) + "\n",
                         encoding="utf-8")
         return True
 
     def detect(self, spec: ArtifactSpec) -> bool:
-        entry = spec.payload["entry"]
         raw = self._load(Path(spec.path))
         plugin = raw.get("plugin") if isinstance(raw, dict) else None
-        return isinstance(plugin, list) and entry in plugin
+        if not isinstance(plugin, list):
+            return False
+        return any(m in plugin for m in spec.markers)
 
     def remove(self, spec: ArtifactSpec) -> bool:
-        entry = spec.payload["entry"]
         path = Path(spec.path)
         raw = self._load(path)
         if not isinstance(raw, dict):
             return False
         plugin = raw.get("plugin")
-        if not isinstance(plugin, list) or entry not in plugin:
+        if not isinstance(plugin, list):
             return False
-        raw["plugin"] = [e for e in plugin if e != entry]
+        kept = [e for e in plugin if e not in spec.markers]
+        if kept == plugin:
+            return False
+        raw["plugin"] = kept
         path.write_text(json.dumps(raw, ensure_ascii=False, indent=2) + "\n",
                         encoding="utf-8")
         return True
