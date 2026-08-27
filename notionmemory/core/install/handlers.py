@@ -248,6 +248,59 @@ class JsonHookBlock:
         return not (raw.get("hooks") or {}) and set(raw) <= {"hooks"}
 
 
+class OpencodeConfigEntry:
+    """단일 문자열 항목을 JSON 설정 파일의 최상위 `plugin` 배열에 멱등 병합/제거.
+
+    OpenCode 는 플러그인 디렉터리를 자동 발견하지 않고 `<config>/opencode.json` 의
+    `plugin` 배열에 등록된 항목만 로드한다(2026-08-27 실측). JsonHookBlock 과 같은
+    비파괴 원칙을 따른다 — 소유권 마커는 우리 항목 문자열 자체이고, 파일의 다른 키·
+    다른 항목은 손대지 않는다.
+    """
+
+    def _load(self, path: Path) -> dict:
+        try:
+            return json.loads(path.read_text(encoding="utf-8") or "{}")
+        except (OSError, ValueError):
+            return {}
+
+    def install(self, spec: ArtifactSpec) -> bool:
+        entry = spec.payload["entry"]
+        path = Path(spec.path)
+        raw = self._load(path)
+        if not isinstance(raw, dict):
+            return False
+        plugin = raw.setdefault("plugin", [])
+        if not isinstance(plugin, list):
+            return False           # 사용자 데이터 형태가 다르다 — 손대지 않는다
+        if entry in plugin:
+            return False
+        plugin.append(entry)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(raw, ensure_ascii=False, indent=2) + "\n",
+                        encoding="utf-8")
+        return True
+
+    def detect(self, spec: ArtifactSpec) -> bool:
+        entry = spec.payload["entry"]
+        raw = self._load(Path(spec.path))
+        plugin = raw.get("plugin") if isinstance(raw, dict) else None
+        return isinstance(plugin, list) and entry in plugin
+
+    def remove(self, spec: ArtifactSpec) -> bool:
+        entry = spec.payload["entry"]
+        path = Path(spec.path)
+        raw = self._load(path)
+        if not isinstance(raw, dict):
+            return False
+        plugin = raw.get("plugin")
+        if not isinstance(plugin, list) or entry not in plugin:
+            return False
+        raw["plugin"] = [e for e in plugin if e != entry]
+        path.write_text(json.dumps(raw, ensure_ascii=False, indent=2) + "\n",
+                        encoding="utf-8")
+        return True
+
+
 class GitHooks:
     """레포별 post-commit 훅.
 
@@ -583,6 +636,7 @@ HANDLERS: dict[str, object] = {
     "bundle_mirror": BundleMirror(),
     "json_hook_block": JsonHookBlock(),
     "toml_hook_block": TomlHookBlock(),
+    "opencode_config_entry": OpencodeConfigEntry(),
     "git_hooks": GitHooks(),
     "codex_trust": CodexTrust(),
     "launch_agent": LaunchAgent(),
