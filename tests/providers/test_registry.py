@@ -2,7 +2,7 @@ from notionmemory import providers
 
 
 def test_names_are_claude_and_codex():
-    assert providers.names() == ["claude", "codex", "kimi", "pi"]
+    assert providers.names() == ["claude", "codex", "kimi", "pi", "opencode"]
 
 
 def test_claude_spec_fields():

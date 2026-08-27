@@ -2,7 +2,7 @@ from notionmemory import providers
 
 
 def test_kimi_registered_last():
-    assert providers.names() == ["claude", "codex", "kimi", "pi"]
+    assert providers.names() == ["claude", "codex", "kimi", "pi", "opencode"]
 
 
 def test_kimi_spec_fields():

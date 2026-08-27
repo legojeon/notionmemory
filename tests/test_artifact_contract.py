@@ -126,3 +126,16 @@ def test_pi_bundle_is_manifest_reachable():
     assert "pi" in providers.names()
     specs = {s.id: s for s in manifest.build(["pi"], "notionmemory")}
     assert specs["pi.bundle"].handler == "bundle_mirror"
+
+
+# ---------------------------------------------------------------------------
+# opencode harness — bundle-kind provider, same generic branch as pi. Proves
+# the branch handles opencode with no manifest/teardown edit.
+# ---------------------------------------------------------------------------
+
+def test_opencode_bundle_is_manifest_reachable():
+    from notionmemory.core.install import manifest
+    from notionmemory import providers
+    assert "opencode" in providers.names()
+    specs = {s.id: s for s in manifest.build(["opencode"], "notionmemory")}
+    assert specs["opencode.bundle"].handler == "bundle_mirror"

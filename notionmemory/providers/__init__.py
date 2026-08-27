@@ -5,8 +5,9 @@ from notionmemory.providers.claude import SPEC as _claude
 from notionmemory.providers.codex import SPEC as _codex
 from notionmemory.providers.kimi import SPEC as _kimi
 from notionmemory.providers.pi import SPEC as _pi
+from notionmemory.providers.opencode import SPEC as _opencode
 
-_REGISTRY: dict[str, ProviderSpec] = {p.name: p for p in (_claude, _codex, _kimi, _pi)}
+_REGISTRY: dict[str, ProviderSpec] = {p.name: p for p in (_claude, _codex, _kimi, _pi, _opencode)}
 
 
 def get(name: str) -> ProviderSpec:
