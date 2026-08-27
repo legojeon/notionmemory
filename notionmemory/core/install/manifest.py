@@ -159,6 +159,8 @@ def build(targets: list[str], cli_path: str) -> list[ArtifactSpec]:
                 path=harness_home(target) / provider.bundle_install_subpath,
                 payload={"source": provider.bundle_source, "cli_path": cli_path},
                 markers=(f"notionmemory {target} bundle",)))
+            if provider.post_install_spec is not None:
+                post_specs.append(provider.post_install_spec())
             continue
         for name in skill_assets.skill_names():
             specs.append(ArtifactSpec(

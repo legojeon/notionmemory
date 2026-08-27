@@ -139,3 +139,12 @@ def test_opencode_bundle_is_manifest_reachable():
     assert "opencode" in providers.names()
     specs = {s.id: s for s in manifest.build(["opencode"], "notionmemory")}
     assert specs["opencode.bundle"].handler == "bundle_mirror"
+
+
+def test_opencode_config_entry_is_manifest_reachable():
+    """opencode does not auto-discover plugin dirs — it must be registered in
+    opencode.json's `plugin` array too, and that registration must be teardown-reachable
+    via the manifest (CLAUDE.md rule 1)."""
+    from notionmemory.core.install import manifest
+    specs = {s.id: s for s in manifest.build(["opencode"], "notionmemory")}
+    assert specs["opencode.config"].handler == "opencode_config_entry"

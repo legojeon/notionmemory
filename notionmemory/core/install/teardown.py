@@ -60,6 +60,8 @@ def _sweep(targets: list[str]) -> list[ArtifactSpec]:
                 target=target,
                 path=manifest.harness_home(target) / provider.bundle_install_subpath,
                 payload={}, markers=(f"notionmemory {target} bundle",)))
+            if provider is not None and provider.post_install_spec is not None:
+                out.append(provider.post_install_spec())
             continue
         for name in names:
             out.append(ArtifactSpec(
