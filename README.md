@@ -24,11 +24,11 @@
 
 **notionmemory** turns your own Notion workspace into a shared, long-term brain for coding
 agents (Claude Code, Codex). It ships a set of installable **skills** — long-term memory,
-templates, and content search — plus session hooks that surface the right context
-automatically. Everything lives in **your** Notion; there's no separate database or server.
+your own page-types (templates), and content search — plus session hooks that surface the
+right context automatically. Everything lives in **your** Notion; there's no separate database or server.
 
 You don't run its commands by hand. **You talk to your agent in plain language** — "remember
-that", "where did I file this?", "register this page as a template"
+that", "where did I file this?", "make more pages like the ones I build"
 — and the agent runs notionmemory for you under the hood.
 
 <p align="center">
@@ -137,9 +137,9 @@ commands. For example:
 > *"Where did I write the deployment runbook?"*
 > *"Find my notes on the Postgres migration."*
 
-**Templates**
-> *"Register this Notion page as my weekly-report template."* (paste the URL)
-> *"Draft this week's report from what we did."*
+**Your page-types**
+> *"This is how I build my weekly reports — remember it."* (paste a page you made)
+> *"Draft this week's report in that shape from what we did."*
 
 You never see the CLI — and the memory keeps working between these moments, not just when
 you ask.
@@ -214,7 +214,7 @@ in natural language; the agent picks the right skill and runs it.
 
 - **onboard** — first-time guided setup (Notion + memory + search)
 - **memory** — save/recall long-term decisions & patterns in a Notion Second Brain
-- **templates** — register Notion pages/DBs and author content into them
+- **templates** — remember the page-types *you* build (point it at a Notion page/DB you made) so the agent authors new entries in that same shape
 - **library** — content search across your Notion pages
 - **settings** — a local web dashboard for connections & configuration
 - **git** — optional post-commit capture of your commits into memory
