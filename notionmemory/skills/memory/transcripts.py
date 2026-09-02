@@ -146,6 +146,21 @@ def _kimi_home() -> Path:
 
 def parse_kimi(path: str, since_bytes: int = 0) -> tuple[str, int]:
     lines_out: list[str] = []
+    # Assistant output in a real kimi-code (verified 0.40.1) wire.jsonl is NOT a
+    # `context.append_message` with role=assistant — that shape never appears for
+    # the model's reply. It streams as `context.append_loop_event` events of type
+    # "content.part" whose `part` is {type:"text"|"think", ...}. We buffer a step's
+    # consecutive text parts and flush them as one [ASSISTANT] line at the step/turn
+    # boundary (think parts are dropped, like _text_blocks does for content). The
+    # append_message role=assistant branch is kept as a defensive fallback.
+    asst_buf: list[str] = []
+
+    def _flush_assistant() -> None:
+        joined = "".join(asst_buf).strip()
+        asst_buf.clear()
+        if joined:
+            lines_out.append(f"[ASSISTANT] {joined[:PER_MSG_ASSISTANT_CAP]}")
+
     with open(path, "rb") as f:
         f.seek(since_bytes)
         data = f.read()
@@ -159,13 +174,25 @@ def parse_kimi(path: str, since_bytes: int = 0) -> tuple[str, int]:
             continue
         kind = e.get("type")
         if kind == "turn.prompt" and (e.get("origin") or {}).get("kind") == "user":
+            _flush_assistant()
             for t in _text_blocks(e.get("input"), PER_MSG_USER_CAP):
                 lines_out.append(f"[USER] {t}")
         elif kind == "context.append_message":
             msg = e.get("message") or {}
             if msg.get("role") == "assistant":
+                _flush_assistant()
                 for t in _text_blocks(msg.get("content"), PER_MSG_ASSISTANT_CAP):
                     lines_out.append(f"[ASSISTANT] {t}")
+        elif kind == "context.append_loop_event":
+            ev = e.get("event") or {}
+            et = ev.get("type")
+            if et == "content.part":
+                part = ev.get("part") or {}
+                if part.get("type") == "text" and str(part.get("text", "")).strip():
+                    asst_buf.append(str(part["text"]))
+            elif et in ("step.begin", "step.end", "turn.ended"):
+                _flush_assistant()
+    _flush_assistant()
     return "\n".join(lines_out)[:PER_SESSION_CAP], consumed
 
 
