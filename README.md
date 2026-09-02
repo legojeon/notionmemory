@@ -23,9 +23,10 @@
 </p>
 
 **notionmemory** turns your own Notion workspace into a shared, long-term brain for coding
-agents (Claude Code, Codex). It ships a set of installable **skills** — long-term memory,
-your own page-types (templates), and content search — plus session hooks that surface the
-right context automatically. Everything lives in **your** Notion; there's no separate database or server.
+agents (Claude Code, Codex, Kimi Code, pi, opencode). It ships a set of installable **skills** — long-term memory,
+**your own page-types** (you show the agent how you build a page, and it authors new ones that
+way), and content search — plus session hooks that surface the right context automatically.
+Everything lives in **your** Notion; there's no separate database or server.
 
 You don't run its commands by hand. **You talk to your agent in plain language** — "remember
 that", "where did I file this?", "make more pages like the ones I build"
@@ -102,6 +103,17 @@ pipx install notionmemory && notionmemory install
 > Codex users still need `notionmemory install --codex --trust-codex-hooks` before Codex
 > hooks fire.
 
+**Kimi Code / pi / opencode (one command each)**
+
+```bash
+pipx install notionmemory
+notionmemory install --kimi        # or: --pi   /   --opencode
+```
+
+> No marketplace step for these three — one command installs the skills plus each agent's
+> integration (pi & opencode get a small plugin bundle; Kimi Code gets `config.toml` hooks).
+> `notionmemory teardown` removes all of it.
+
 ### 3. Run onboarding
 
 Once installed, **just ask your agent to onboard you** — it runs the `notionmemory:onboard`
@@ -129,17 +141,15 @@ On top of that, you just talk — the agent runs the right skill, and you never 
 commands. For example:
 
 **Remember & recall**
-> *"Remember that we moved auth to JWT refresh-token rotation."*
-> *"Did we ever decide how to handle rate limiting?"*
-> *"What do you already know about this project?"*
+> *"Remember we moved auth to JWT refresh-token rotation."*
+> *"Did we decide how to handle rate limiting?"*
 
 **Search your Notion**
-> *"Where did I write the deployment runbook?"*
-> *"Find my notes on the Postgres migration."*
+> *"Where's my deployment runbook?"*
 
-**Your page-types**
-> *"This is how I build my weekly reports — remember it."* (paste a page you made)
-> *"Draft this week's report in that shape from what we did."*
+**Author in your Notion**
+> *"Remember how I build my weekly reports — keep the tone brief."* (paste a page you made)
+> *"Draft this week's in that shape, and drop in figure 3 from this PDF."*
 
 You never see the CLI — and the memory keeps working between these moments, not just when
 you ask.
@@ -203,18 +213,27 @@ and the LoCoMo rows aren't even the same benchmark. Ballpark, not a leaderboard.
 ## Agents
 
 notionmemory is **agent-driven** — the CLI is only the mechanism the agent calls. You interact
-in natural language; the agent picks the right skill and runs it.
+in natural language; the agent picks the right skill and runs it. It works with any agent that
+runs shell hooks and a CLI — five are supported today:
 
-| Agent | How it's installed | How you use it |
-| --- | --- | --- |
-| **Claude Code** | plugin (or `notionmemory install`) | Ask it: *"remember this decision", "did we discuss X before?"* |
-| **Codex** | plugin + `install --codex --trust-codex-hooks` | Same — talk to it; it runs notionmemory for you |
+<table>
+<tr>
+<td align="center"><strong>Claude Code</strong><br/><sub>plugin · skills + hooks</sub></td>
+<td align="center"><strong>Codex</strong><br/><sub>plugin + trusted hooks</sub></td>
+<td align="center"><strong>Kimi Code</strong><br/><sub>config.toml hooks</sub></td>
+<td align="center"><strong>pi</strong><br/><sub>bundle plugin</sub></td>
+<td align="center"><strong>opencode</strong><br/><sub>bundle plugin</sub></td>
+</tr>
+</table>
+
+However it's installed, you use them the same — **talk in natural language** and the agent runs
+notionmemory for you. See [Install](#install) for each agent's one-time setup.
 
 **Skills** the agent can reach:
 
 - **onboard** — first-time guided setup (Notion + memory + search)
 - **memory** — save/recall long-term decisions & patterns in a Notion Second Brain
-- **templates** — remember the page-types *you* build (point it at a Notion page/DB you made) so the agent authors new entries in that same shape
+- **templates** — teach the agent *how you build a page*. Point it at a Notion page/DB you made and attach a prompt — the structure, the tone, which sections to research and fill, even just a memo to yourself — and it authors new entries in Notion that follow **your** workflow, not a canned template
 - **library** — content search across your Notion pages
 - **settings** — a local web dashboard for connections & configuration
 - **git** — optional post-commit capture of your commits into memory
@@ -238,23 +257,17 @@ then recall the *important* things at the right moment:
   a **Draft** — recallable, but not yet promoted.
 - Every memory carries a **Strength (1–10)** — an importance score used to rank recall and to
   decide what's worth surfacing at session start.
-- A later **consolidation** pass (`notionmemory memory consolidate`, which you run in your own
-  terminal) has an agent review the Drafts: summarize and refine them, assign a real Strength,
-  drop noise (→ *Forgotten*), merge duplicates (→ *Superseded*), and maintain a rolled-up
-  per-project **brief**. So the database stays curated instead of a raw dump.
-- That pass also runs **on its own** — a session-end/session-start hook spawns it in the
-  background — and mines new memories straight out of your session transcripts, landing
-  them as Active with a real Strength. The transcript is re-read locally, and the excerpt
-  is sent to your **configured agent runtime** (`integrations.agent.backend` — claude
-  preferred over codex by default; pin that key if you want a specific CLI/account, since
-  it can differ from the harness that actually ran the session). Notion only ever receives
-  the distilled memory. Set `skills.memory.consolidate_mode: nudge` in config to turn the
-  automatic pass off and go back to manual/cron-only runs. Background passes default to
-  a **sonnet-class model** on the claude backend (plenty for judge-and-summarize work;
-  codex keeps its CLI default) — override either way with `integrations.agent.model`.
-  All of these knobs live in `~/.config/notionmemory/config.yaml` — edit the file
-  directly, or ask your agent to change it. `notionmemory teardown` keeps this file
-  (settings survive a reinstall) unless you add `--purge-config`.
+- A **consolidation** pass reviews the Drafts: summarize and refine them, assign a real Strength,
+  drop noise (→ *Forgotten*), merge duplicates (→ *Superseded*), and keep a rolled-up per-project
+  **brief** — so the database stays curated instead of a raw dump. It also mines new memories
+  straight out of your session transcripts. This runs **automatically** in the background
+  (a session-end/start hook), or you can run `notionmemory memory consolidate` yourself.
+- To do the summarizing, the pass sends session excerpts to **your configured agent CLI** — so it
+  **spends that account's usage** in the background, and **Notion only ever receives the distilled
+  memory**. Set `skills.memory.consolidate_mode: nudge` in `~/.config/notionmemory/config.yaml`
+  to turn the automatic pass off (manual/cron only); the backend and model
+  (`integrations.agent.backend` / `.model`) live in the same file — edit it directly or ask your
+  agent.
 
 ### When it reads
 
@@ -296,14 +309,27 @@ stale.
 
 ### Why a CLI + API, not an MCP server
 
+Two reasons: *where* it runs, and *what* it can do.
+
 - The session hooks (SessionStart / Stop / UserPromptSubmit) run as **plain shell commands** —
   they need a CLI, not a live MCP connection held open inside an agent session.
 - The same CLI runs **headless and in cron** (e.g. consolidation), not only inside an
   MCP-capable chat.
-- One skill set + CLI behaves **identically across Claude Code and Codex**; MCP support and
+- One skill set + CLI behaves **identically across every supported agent**; MCP support and
   semantics vary by agent.
 - **Fewer moving parts:** no server process to run, your token stays in the OS keyring, and the
   only local state is a thin search index.
+- **It writes real content, not just text.** Going straight to the REST API lets notionmemory
+  turn markdown into Notion blocks, create and edit pages and databases, and **upload images
+  into a page via Notion's Direct Upload** — so the agent can drop a figure it cropped from a
+  PDF right into your notes. The reading and cropping are the agent's own tools; notionmemory
+  owns the Notion write, which a read-oriented MCP flow doesn't cover.
+
+**When MCP is the better fit:** to reach a client with no shell — Claude Desktop, Gemini, a web
+or mobile chat — or from any device with nothing installed, that's MCP's turf, and one server
+works across every MCP client with no per-agent code. notionmemory trades that reach for what a
+CLI does best: automatic capture at session boundaries, headless consolidation, and writing real
+content into your pages. Different tools for different jobs.
 
 The **settings dashboard** stores your Notion connection and skill options — just ask your agent
 to *"open notionmemory settings"* (the `settings` skill), or run `notionmemory serve` yourself.
