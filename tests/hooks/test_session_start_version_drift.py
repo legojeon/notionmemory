@@ -47,6 +47,7 @@ def test_main_prints_drift_line(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr(session_start, "maybe_install_git_hook", lambda top: "")
     monkeypatch.setattr(session_start, "templates_injection", lambda: "")
     monkeypatch.setattr(session_start, "onboarding_injection", lambda: "")
+    monkeypatch.setattr(session_start, "harness_wiring_injection", lambda: "")
     monkeypatch.setattr(session_start, "library_full_refresh_injection", lambda: "")
     monkeypatch.setattr(session_start, "library_injection", lambda: "")
     monkeypatch.setattr(session_start, "memory_index_injection", lambda: "")

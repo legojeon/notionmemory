@@ -91,6 +91,10 @@ CATALOG = {
             "onboarding: invoke the `onboard` skill — it walks Notion (PAT) and memory "
             "setup as structured choices (and offers a library scan), skipping "
             "whatever is already done. Not the dashboard — `onboard` drives it."),
+        "hook.harness_wiring": (
+            "notionmemory: other agents are installed here but not wired into it yet "
+            "({names}). Offer to wire them — invoke the `onboard` skill, which detects "
+            "and wires them as a multi-select; wire only what the user picks."),
         "hook.onboard_item.notion": "Notion not connected",
         "hook.onboard_item.memory": "memory not set up",
         "hook.memory_brief": "project brief ({project}):\n{brief}",
@@ -188,6 +192,10 @@ CATALOG = {
             "온보딩을 제안하세요: `onboard` 스킬을 호출하면 Notion(PAT)·memory "
             "설정을 구조화 선택지로 안내하고(라이브러리 스캔도 제안) 이미 된 단계는 "
             "건너뜁니다. settings 대시보드가 아니라 `onboard` 가 진행합니다."),
+        "hook.harness_wiring": (
+            "notionmemory: 이 기기에 다른 에이전트가 설치돼 있지만 아직 연결되지 "
+            "않았습니다({names}). 연결을 제안하세요 — `onboard` 스킬이 감지해 복수 "
+            "선택으로 연결합니다. 사용자가 고른 것만 연결하세요."),
         "hook.onboard_item.notion": "Notion 미연결",
         "hook.onboard_item.memory": "memory 미설정",
         "hook.memory_brief": "프로젝트 브리프({project}):\n{brief}",
@@ -289,6 +297,8 @@ UI_KO: dict[str, str] = {
     "ui.status.library.empty": "0건 훑어봄 (integration 에 공유된 페이지가 아직 없습니다)",
     "ui.status.library.watermark_unknown": "(미상)",
     "ui.status.library.count": "{n}건, 마지막 갱신 {watermark}",
+    "ui.harnesses.none": "연결할 다른 하네스가 감지되지 않았습니다.",
+    "ui.harnesses.header": "이 기기에 다른 에이전트가 설치돼 있지만 아직 notionmemory 가 연결되지 않았습니다:",
     "ui.status.notion.connected": "연결됨",
     "ui.status.notion.not_connected": "미연결",
     "ui.status.bound": "연결됨",

@@ -115,6 +115,29 @@ content into one ("register this page as a template", "fill in the weekly report
 run it for them; the settings dashboard is where per-template prompts are managed. Frame it
 as talking to you, not as commands to type. Then finish — don't force any setup.
 
+## 6. Other agents on this machine (offer if any detected)
+
+Onboarding runs inside the agent you're already using; this step wires notionmemory into the
+**other** agents the user also has installed. The Notion connection and memory just set up are
+**shared** — wiring another agent only adds its skills and hooks.
+
+```bash
+notionmemory harnesses
+```
+
+- If it reports **nothing to wire**, skip this step silently.
+- Otherwise it lists each detected agent that isn't wired yet, with the exact command to wire
+  it. Present those as a **multi-select** structured choice (Claude Code: `AskUserQuestion`
+  with multiple selection; Codex or any harness without it: a numbered menu where the user can
+  pick several, e.g. `1,3`). Let them choose any subset — or none.
+- For each chosen agent, run the command `notionmemory harnesses` printed for it **verbatim**
+  (e.g. `notionmemory install --opencode`, or `notionmemory install --codex
+  --trust-codex-hooks`). Report success or failure per agent.
+- One line: for **Claude Code / Codex** the marketplace plugin is an alternative to this CLI
+  install — mention it's available, but the shown command works too.
+
+Never wire an agent the user didn't pick, and never re-offer one that's already wired.
+
 ## Done
 
 Briefly summarize what's now set up and what was skipped, and mention they can re-run

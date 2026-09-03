@@ -36,6 +36,11 @@ class Config:
         ob = self.data.get("onboarding")
         return bool(ob.get("offered")) if isinstance(ob, dict) else False
 
+    def harness_nudges_seen(self) -> list[str]:
+        ob = self.data.get("onboarding")
+        seen = ob.get("harness_nudges_seen") if isinstance(ob, dict) else None
+        return list(seen) if isinstance(seen, list) else []
+
 
 def _load_raw(config_path: str) -> dict:
     if os.path.exists(config_path):
@@ -74,6 +79,22 @@ def save_onboarding_offered(config_path: str) -> None:
     ob = raw.get("onboarding")
     ob = ob if isinstance(ob, dict) else {}
     ob["offered"] = True
+    raw["onboarding"] = ob
+    _write_raw(config_path, raw)
+
+
+def save_harness_nudges_seen(config_path: str, names: list[str]) -> None:
+    """Record which harnesses SessionStart has already nudged to wire, so each fires
+    once. Merges into onboarding.harness_nudges_seen. Other keys preserved (atomic)."""
+    raw = _load_raw(config_path)
+    ob = raw.get("onboarding")
+    ob = ob if isinstance(ob, dict) else {}
+    seen = ob.get("harness_nudges_seen")
+    seen = list(seen) if isinstance(seen, list) else []
+    for n in names:
+        if n not in seen:
+            seen.append(n)
+    ob["harness_nudges_seen"] = seen
     raw["onboarding"] = ob
     _write_raw(config_path, raw)
 

@@ -863,6 +863,27 @@ def _cmd_status(args) -> int:
         return 1
 
 
+def _cmd_harnesses(args) -> int:
+    """List other supported harnesses present on this machine that notionmemory is
+    not yet wired into, with the command that would wire each. Read-only — installs
+    nothing. Registry-driven, so new providers appear here automatically."""
+    lang = "en"
+    try:
+        lang = i18n.language(Config.load(args.config))
+    except Exception:  # noqa: BLE001 — detection must not depend on a loadable config
+        pass
+    from notionmemory.core.install import harnesses
+    pending = harnesses.pending()
+    if not pending:
+        print(tui(lang, "ui.harnesses.none", "No other harnesses detected to wire."))
+        return 0
+    print(tui(lang, "ui.harnesses.header",
+              "Other agents are installed here but notionmemory is not wired into them yet:"))
+    for h in pending:
+        print(f"  {h.display_name} ({h.name})  →  {h.install_cmd}")
+    return 0
+
+
 def _cmd_language(args) -> int:
     """`language <en|ko|zh|ja>` 로 저장 언어를 기록, 인자 없으면 현재값 출력.
 
@@ -1099,6 +1120,9 @@ def main(argv=None) -> int:
     stc = sub.add_parser("status")
     stc.add_argument("--config", default=DEFAULT_CONFIG)
 
+    hc = sub.add_parser("harnesses")
+    hc.add_argument("--config", default=DEFAULT_CONFIG)
+
     lang_p = sub.add_parser("language")
     lang_p.add_argument("lang", nargs="?", choices=list(i18n.OUTPUT_LANGS))
     lang_p.add_argument("--config", default=DEFAULT_CONFIG)
@@ -1212,6 +1236,8 @@ def main(argv=None) -> int:
             return 1
     if args.cmd == "status":
         return _cmd_status(args)
+    if args.cmd == "harnesses":
+        return _cmd_harnesses(args)
     if args.cmd == "language":
         return _cmd_language(args)
     if args.cmd == "hook":

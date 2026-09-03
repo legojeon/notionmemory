@@ -171,6 +171,30 @@ def onboarding_injection() -> str:
         return ""
 
 
+def harness_wiring_injection() -> str:
+    """다른 하네스가 이 기기에 설치돼 있는데 notionmemory 가 아직 연결 안 됐으면
+    연결을 제안하도록 에이전트에게 한 줄 안내. 새 하네스당 **한 번**만
+    (config `onboarding.harness_nudges_seen` 게이트) — 거절하면 게이트에 남아 다시
+    안 뜨고, 연결하면 pending 에서 빠져 자연히 멈춘다. 명시 요청은 `onboard` 스킬이
+    게이트와 무관하게 처리한다. 감지는 `harnesses.pending()`(레지스트리 구동, 네트워크
+    0, 읽기 전용) — 새 provider 를 추가하면 여기 코드 변경 없이 편입된다."""
+    try:
+        from notionmemory.core import config as cfg
+        from notionmemory.core.config import Config
+        from notionmemory.core.install import harnesses
+        path = str(paths.config_path())
+        config = Config.load(path)
+        seen = set(config.harness_nudges_seen())
+        new = [h for h in harnesses.pending() if h.name not in seen]
+        if not new:
+            return ""
+        cfg.save_harness_nudges_seen(path, [h.name for h in new])
+        names = ", ".join(f"{h.display_name} ({h.name})" for h in new)
+        return _m("hook.harness_wiring", names=names)
+    except Exception:
+        return ""
+
+
 LIBRARY_FULL_FLOOR_DAYS = 7      # 드리프트 관측 시: 이 간격 지나야 --full 넛지(과빈도 바닥)
 LIBRARY_FULL_BACKSTOP_DAYS = 30  # 관측 없어도 이만큼 오래되면 한 번(안 건드린 유령 정리)
 
@@ -390,6 +414,9 @@ def main(harness: str = "claude") -> int:
             mem_idx_note = memory_index_injection()
             if mem_idx_note:
                 print(mem_idx_note)
+            wiring = harness_wiring_injection()
+            if wiring:
+                print(wiring)
     except Exception:
         pass
     try:

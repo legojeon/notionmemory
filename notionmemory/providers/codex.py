@@ -9,4 +9,5 @@ SPEC = ProviderSpec(
     hook_file_name="hooks.json", hook_format="json",
     hook_file_dedicated=True, harness_token="codex",
     events=lambda cli: manifest.HOOK_EVENTS(cli, "codex"),
-    post_install_spec=manifest.codex_trust_spec)
+    post_install_spec=manifest.codex_trust_spec,
+    install_extra_flags=("--trust-codex-hooks",))

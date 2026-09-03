@@ -20,6 +20,7 @@ def isolated(tmp_path, monkeypatch):
                         lambda *a, **k: type("R", (), {"returncode": 1, "stdout": ""})())
     monkeypatch.setattr(session_start, "library_injection", lambda: "")
     monkeypatch.setattr(session_start, "onboarding_injection", lambda: "")
+    monkeypatch.setattr(session_start, "harness_wiring_injection", lambda: "")
     monkeypatch.setattr(session_start, "memory_index_injection", lambda: "")
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"cwd": str(tmp_path)})))
     return tmp_path

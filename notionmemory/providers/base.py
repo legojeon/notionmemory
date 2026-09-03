@@ -21,3 +21,5 @@ class ProviderSpec:
     # bundle-kind fields (unused for hooks):
     bundle_source: str = ""                     # absolute path to the packaged bundle dir
     bundle_install_subpath: str = ""            # relative to home_dirname, e.g. "agent/extensions/notionmemory"
+    # extra flags onboarding/detection appends to `install --<name>` (e.g. codex trust):
+    install_extra_flags: tuple[str, ...] = ()

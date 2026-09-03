@@ -33,6 +33,7 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setattr(session_start, "templates_injection", lambda: "")
     monkeypatch.setattr(session_start, "library_injection", lambda: "")
     monkeypatch.setattr(session_start, "onboarding_injection", lambda: "")
+    monkeypatch.setattr(session_start, "harness_wiring_injection", lambda: "")
     monkeypatch.setattr(session_start.subprocess, "run",
                         lambda *a, **k: type("R", (), {"returncode": 1, "stdout": ""})())
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"cwd": str(tmp_path)})))
