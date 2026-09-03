@@ -1,6 +1,6 @@
 {
   "name": "notionmemory",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Notion second-brain skills for Codex: memory, templates, library, and settings. Backed by the notionmemory Python CLI.",
   "author": { "name": "Jaewoo Jeon", "email": "learnsteam.kr@gmail.com" },
   "license": "MIT",
