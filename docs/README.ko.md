@@ -219,6 +219,7 @@ notionmemory는 **에이전트가 주도**합니다. CLI는 에이전트가 호�
 자연어로 말하면 에이전트가 알맞은 스킬을 골라 실행합니다. 셸 훅과 CLI를 돌리는 에이전트면
 어디서든 동작하며, 현재 다섯 개를 지원합니다:
 
+<div align="center">
 <table>
 <tr>
 <td align="center" width="20%">
@@ -238,6 +239,7 @@ notionmemory는 **에이전트가 주도**합니다. CLI는 에이전트가 호�
 <strong>opencode</strong><br/><sub>번들 플러그인</sub></td>
 </tr>
 </table>
+</div>
 
 어떻게 설치하든 사용법은 같습니다 — **자연어로 말하면** 에이전트가 notionmemory를 대신 실행합니다.
 각 에이전트의 최초 설정은 아래 **설치** 항목을 보세요.

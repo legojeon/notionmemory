@@ -216,6 +216,7 @@ notionmemory is **agent-driven** — the CLI is only the mechanism the agent cal
 in natural language; the agent picks the right skill and runs it. It works with any agent that
 runs shell hooks and a CLI — five are supported today:
 
+<div align="center">
 <table>
 <tr>
 <td align="center" width="20%">
@@ -235,6 +236,7 @@ runs shell hooks and a CLI — five are supported today:
 <strong>opencode</strong><br/><sub>bundle plugin</sub></td>
 </tr>
 </table>
+</div>
 
 However it's installed, you use them the same — **talk in natural language** and the agent runs
 notionmemory for you. See [Install](#install) for each agent's one-time setup.
