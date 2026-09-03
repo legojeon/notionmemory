@@ -135,6 +135,9 @@ notionmemory harnesses
   --trust-codex-hooks`). Report success or failure per agent.
 - One line: for **Claude Code / Codex** the marketplace plugin is an alternative to this CLI
   install — mention it's available, but the shown command works too.
+- If the agent you're **currently running in** appears in the list, it can be there because it
+  was set up via its marketplace plugin (whose hooks aren't detected as CLI-installed ones) —
+  it's already working here, so it's not an error; just don't offer to re-wire it.
 
 Never wire an agent the user didn't pick, and never re-offer one that's already wired.
 

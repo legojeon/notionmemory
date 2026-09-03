@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from notionmemory import providers
@@ -30,9 +32,11 @@ def test_wired_harness_is_installed_and_not_pending(tmp_path):
     kimi = tmp_path / ".kimi-code"
     kimi.mkdir()
     (kimi / "config.toml").write_text(manifest.HOOK_MARKERS[0] + "\n", encoding="utf-8")
-    # bundle-kind: opencode's bundle dir exists
+    # bundle-kind: opencode's bundle dir AND its opencode.json plugin entry exist
     oc = providers.get("opencode")
     (tmp_path / ".config" / "opencode" / oc.bundle_install_subpath).mkdir(parents=True)
+    art = oc.post_install_spec()
+    Path(art.path).write_text(art.markers[0], encoding="utf-8")
 
     by = {h.name: h for h in harnesses.detect()}
     assert by["kimi"].installed is True
@@ -41,6 +45,17 @@ def test_wired_harness_is_installed_and_not_pending(tmp_path):
     pending = {h.name for h in harnesses.pending()}
     assert "kimi" not in pending
     assert "opencode" not in pending
+
+
+def test_bundle_partial_install_is_not_wired(tmp_path):
+    # opencode's bundle dir exists, but its opencode.json plugin entry is missing —
+    # OpenCode won't actually load the plugin, so this must NOT count as wired.
+    oc = providers.get("opencode")
+    (tmp_path / ".config" / "opencode" / oc.bundle_install_subpath).mkdir(parents=True)
+
+    by = {h.name: h for h in harnesses.detect()}
+    assert by["opencode"].installed is False
+    assert "opencode" in {h.name for h in harnesses.pending()}   # still offered
 
 
 def test_install_cmd_carries_provider_extra_flags():
