@@ -218,11 +218,21 @@ runs shell hooks and a CLI — five are supported today:
 
 <table>
 <tr>
-<td align="center"><strong>Claude Code</strong><br/><sub>plugin · skills + hooks</sub></td>
-<td align="center"><strong>Codex</strong><br/><sub>plugin + trusted hooks</sub></td>
-<td align="center"><strong>Kimi Code</strong><br/><sub>config.toml hooks</sub></td>
-<td align="center"><strong>pi</strong><br/><sub>bundle plugin</sub></td>
-<td align="center"><strong>opencode</strong><br/><sub>bundle plugin</sub></td>
+<td align="center" width="20%">
+<a href="https://claude.com/product/claude-code"><img src="https://github.com/anthropics.png?size=120" alt="Claude Code" width="44" height="44"></a><br/>
+<strong>Claude Code</strong><br/><sub>plugin · skills + hooks</sub></td>
+<td align="center" width="20%">
+<a href="https://github.com/openai/codex"><img src="https://github.com/openai.png?size=120" alt="Codex" width="44" height="44"></a><br/>
+<strong>Codex</strong><br/><sub>plugin + trusted hooks</sub></td>
+<td align="center" width="20%">
+<a href="https://github.com/MoonshotAI/kimi-cli"><img src="https://github.com/MoonshotAI.png?size=120" alt="Kimi Code" width="44" height="44"></a><br/>
+<strong>Kimi Code</strong><br/><sub>config.toml hooks</sub></td>
+<td align="center" width="20%">
+<a href="https://pi.dev/"><img src="https://github.com/earendil-works.png?size=120" alt="pi" width="44" height="44"></a><br/>
+<strong>pi</strong><br/><sub>bundle plugin</sub></td>
+<td align="center" width="20%">
+<a href="https://opencode.ai/"><img src="https://github.com/sst.png?size=120" alt="opencode" width="44" height="44"></a><br/>
+<strong>opencode</strong><br/><sub>bundle plugin</sub></td>
 </tr>
 </table>
 

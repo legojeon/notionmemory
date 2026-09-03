@@ -221,11 +221,21 @@ notionmemory는 **에이전트가 주도**합니다. CLI는 에이전트가 호�
 
 <table>
 <tr>
-<td align="center"><strong>Claude Code</strong><br/><sub>플러그인 · 스킬 + 훅</sub></td>
-<td align="center"><strong>Codex</strong><br/><sub>플러그인 + 신뢰 훅</sub></td>
-<td align="center"><strong>Kimi Code</strong><br/><sub>config.toml 훅</sub></td>
-<td align="center"><strong>pi</strong><br/><sub>번들 플러그인</sub></td>
-<td align="center"><strong>opencode</strong><br/><sub>번들 플러그인</sub></td>
+<td align="center" width="20%">
+<a href="https://claude.com/product/claude-code"><img src="https://github.com/anthropics.png?size=120" alt="Claude Code" width="44" height="44"></a><br/>
+<strong>Claude Code</strong><br/><sub>플러그인 · 스킬 + 훅</sub></td>
+<td align="center" width="20%">
+<a href="https://github.com/openai/codex"><img src="https://github.com/openai.png?size=120" alt="Codex" width="44" height="44"></a><br/>
+<strong>Codex</strong><br/><sub>플러그인 + 신뢰 훅</sub></td>
+<td align="center" width="20%">
+<a href="https://github.com/MoonshotAI/kimi-cli"><img src="https://github.com/MoonshotAI.png?size=120" alt="Kimi Code" width="44" height="44"></a><br/>
+<strong>Kimi Code</strong><br/><sub>config.toml 훅</sub></td>
+<td align="center" width="20%">
+<a href="https://pi.dev/"><img src="https://github.com/earendil-works.png?size=120" alt="pi" width="44" height="44"></a><br/>
+<strong>pi</strong><br/><sub>번들 플러그인</sub></td>
+<td align="center" width="20%">
+<a href="https://opencode.ai/"><img src="https://github.com/sst.png?size=120" alt="opencode" width="44" height="44"></a><br/>
+<strong>opencode</strong><br/><sub>번들 플러그인</sub></td>
 </tr>
 </table>
 
